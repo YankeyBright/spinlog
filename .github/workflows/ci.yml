@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Quality (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ['18.x', '20.x', '22.x', '24.x']
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install Dependencies Without Lifecycle Hooks
+        run: npm ci --ignore-scripts
+
+      - name: Verify Phase 0 and Phase 1
+        run: |
+          npm run check:phase0
+          npm run check:phase1
+
+  supply-chain:
+    name: Supply Chain (Node 24)
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: '24.x'
+          cache: 'npm'
+
+      - name: Install Dependencies Without Lifecycle Hooks
+        run: npm ci --ignore-scripts
+
+      - name: Verify Ordered Phase Gates
+        run: npm run check:phases
+
+      - name: Audit Dependency Graph
+        run: npm audit --audit-level=low
