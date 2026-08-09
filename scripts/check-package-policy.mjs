@@ -39,15 +39,15 @@ if (packageJson.sideEffects !== false) {
   failures.push('sideEffects must be false')
 }
 
-if (packageJson.engines?.node !== '>=18') {
-  failures.push('engines.node must be >=18')
+if (packageJson.engines?.node !== '^22.0.0 || ^24.0.0') {
+  failures.push('engines.node must name the supported Node 22 and 24 LTS majors')
 }
 
 if (packageJson.name !== 'spinlog' || packageJson.license !== 'MIT') {
   failures.push('package identity must remain spinlog under the MIT license')
 }
 
-if (packageJson.repository?.url !== 'https://github.com/spinlog/spinlog.git') {
+if (packageJson.repository?.url !== 'https://github.com/YankeyBright/spinlog.git') {
   failures.push('repository.url must match the trusted publishing repository')
 }
 

@@ -35,8 +35,8 @@ export function validateTypeScriptConfig(tsconfig) {
   const failures = []
 
   for (const [option, expected] of [
-    ['target', 'ES2022'],
-    ['module', 'Node18'],
+    ['target', 'ES2023'],
+    ['module', 'Node20'],
     ['moduleResolution', 'Node16'],
     ['rootDir', 'src'],
     ['outDir', 'dist'],
@@ -45,10 +45,19 @@ export function validateTypeScriptConfig(tsconfig) {
     ['sourceMap', false],
     ['noEmitOnError', true],
     ['strict', true],
+    ['skipLibCheck', false],
   ]) {
     if (compilerOptions?.[option] !== expected) {
       failures.push(`tsconfig ${option} must be ${String(expected)}`)
     }
+  }
+
+  if (JSON.stringify(compilerOptions?.lib) !== JSON.stringify(['ES2023'])) {
+    failures.push('tsconfig lib must be exactly ES2023')
+  }
+
+  if (JSON.stringify(compilerOptions?.types) !== JSON.stringify(['node'])) {
+    failures.push('tsconfig types must explicitly include only node')
   }
 
   return failures

@@ -1,54 +1,38 @@
-# Programming Tools To Use
+# Toolchain Specification
 
-**Language & Runtime:**
-- TypeScript -> ESM-only JS
-- Target: Node.js >= 18
-- TypeScript: exact pin `7.0.2`
-- Config: `strict: true`, `module: "Node18"`, `moduleResolution: "Node16"`, `target: "ES2022"`
-- Declarations: direct `tsc --emitDeclarationOnly` after the JavaScript build
+## Language And Runtime
 
-**Bundler:**
-- `tsup` configured:
-  - `format: ['esm']`
-  - `minify: true`
-  - `sourcemap: false`
-  - `dts: false`
-  - treeshake + `sideEffects: false` in package.json
+- Runtime support: Node.js 22 and 24 LTS.
+- TypeScript: exact pin `7.0.2`.
+- Node declarations: direct exact pin `@types/node@22.20.1`.
+- Compiler: `target: "ES2023"`, `lib: ["ES2023"]`, `module: "Node20"`, `moduleResolution: "Node16"`, and `types: ["node"]`.
+- Strict checking, declaration output, no source maps, no declaration maps, and no skipped library checks.
 
-tsup owns JavaScript bundling only. Direct TypeScript declaration emit avoids coupling the package build to tsup's declaration-bundling plugin while preserving `dist/index.d.ts`.
+`module: "Node20"` is the latest fixed Node module mode in the selected compiler. It avoids floating NodeNext semantics while matching modern ESM behavior on the supported runtimes.
 
-**Testing & Quality:**
-- `vitest` with:
-  - fake timers for 80ms interval
-  - stream mocking (mock process.stderr.write)
-  - ESM-native execution
-  - 100% coverage threshold enforced
-- `biome` for zero-configuration, lightning-fast formatting and linting (replaces ESLint/Prettier to align with zero runtime/minimal tooling ethos)
+## Build
 
-**Security & Compliance:**
-- GitHub Actions with OIDC -> Sigstore provenance
-- Trusted publishing (no long-lived NPM_TOKEN)
-- Branch protection: require multi-party review
-- Pin all GitHub Actions to SHA hash, not @v4 tag
-- Scope the tsup esbuild override to patched `0.28.1` until tsup declares a compatible patched range; validate both the override and lockfile in the Phase 1 gate
+- tsup `8.5.1` emits minified, tree-shaken ESM JavaScript only with `target: "node22"` and `dts: false`.
+- `tsc --emitDeclarationOnly` emits `dist/index.d.ts` after the JavaScript build.
+- Direct TypeScript emission avoids tsup's declaration-bundling plugin path.
+- `dist` contains only `index.js` and `index.d.ts`.
 
-**Inventory Tooling:**
-- CycloneDX CLI: `@cyclonedx/cyclonedx-npm`
-- Generate and validate a reproducible, runtime-only CycloneDX JSON v1.5 SBOM in the supply-chain and release gates
-- Document zero-dependency pedigree
+## Test And Quality
 
-**Package.json must include:**
-```json
-{
-  "type": "module",
-  "sideEffects": false,
-  "files": ["dist", "README.md", "LICENSE", "SECURITY.md", "sbom.json"],
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    }
-  }
-}
-```
-And NO `dependencies`, NO `optionalDependencies`, NO `scripts` with pre/post install.
+- Vitest `4.1.10` with Vite `8.2.1` and the V8 provider.
+- Explicit `coverage.include` collects every source file; the removed `coverage.all` option is not used.
+- 100% statements, branches, functions, and lines globally and per source file.
+- Phase 0 policy tests mutate the machine contract and prove that drift is rejected.
+- Phase 2 behavior tests use fake timers and controlled stderr writes without network access.
+- Size Limit `13.0.3` independently checks the byte budget.
+- Biome `2.5.7` owns formatting and linting.
+
+## Security Tooling
+
+- All direct development dependencies are exact-pinned and locked.
+- GitHub Actions use immutable commit SHAs, minimal permissions, and no persisted checkout credentials.
+- npm publishing uses OIDC without a long-lived publish token.
+- The npm CLI's native SBOM command plus a checked-in deterministic validator generates a reproducible runtime-only CycloneDX 1.5 document.
+- The tsup-scoped esbuild `0.28.1` override remains until upstream declares a compatible patched range; Phase 1 validates the manifest and lockfile.
+
+The runtime package still has no dependency, optional-dependency, or peer-dependency entries. Development tooling is not represented as consumer runtime software.

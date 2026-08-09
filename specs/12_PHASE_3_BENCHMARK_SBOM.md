@@ -24,7 +24,7 @@ Benchmark dependencies belong to the development toolchain only and must not ent
 
 ## SBOM Generation
 
-The supply-chain job uses Node 24 because the CycloneDX generator requires Node >=20.18.0.
+The supply-chain job uses the release baseline, Node 24. The generator delegates inventory extraction to npm's native lockfile-only SBOM command, then removes volatile generation metadata, normalizes the root identity from `package.json` independently of the checkout-directory name, canonicalizes the document, and validates the frozen package identity and empty runtime graph.
 
 ```bash
 npm run sbom

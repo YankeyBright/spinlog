@@ -13,7 +13,7 @@ export const CANONICAL_PHASES = Object.freeze([
 
 export const AUTHORITATIVE_PHASE_FILES = Object.freeze([
   'README.md',
-  'docs/phase-map.md',
+  'specs/00_PHASE_MAP.md',
   'specs/03_COMPETITIVE_ANALYSIS.md',
   'specs/09_PHASE_0_PRODUCT_SPEC_LOCK.md',
   'specs/10_PHASE_1_PACKAGE_SCAFFOLDING.md',
@@ -22,11 +22,6 @@ export const AUTHORITATIVE_PHASE_FILES = Object.freeze([
   'specs/13_PHASE_4_DOCS_MIGRATION.md',
   'specs/14_PHASE_5_RELEASE.md',
   'specs/16_POST_MVP_FEATURES.md',
-  'harness/plan.md',
-  'harness/invariants.md',
-  'harness/loops.md',
-  'harness/done.md',
-  'harness/kickoff.md',
 ])
 
 const REQUIRED_TEXT = Object.freeze({
@@ -34,7 +29,7 @@ const REQUIRED_TEXT = Object.freeze({
     'Phase 0 freezes the product contract. Phase 1 establishes the secure package shell.',
     'the v1 runtime API begins in Phase 2',
   ],
-  'docs/phase-map.md': CANONICAL_PHASES.map(({ number, title }) => `| ${number} | ${title} |`),
+  'specs/00_PHASE_MAP.md': CANONICAL_PHASES.map(({ number, title }) => `| ${number} | ${title} |`),
   'specs/03_COMPETITIVE_ANALYSIS.md': [
     '| Color functions (red, green, blue, etc.) | chalk, picocolors |',
     '| npm OIDC provenance configuration |',
@@ -48,10 +43,6 @@ const REQUIRED_TEXT = Object.freeze({
   'specs/13_PHASE_4_DOCS_MIGRATION.md': ['# Phase 4: Documentation and Migration'],
   'specs/14_PHASE_5_RELEASE.md': ['# Phase 5: Trusted Release'],
   'specs/16_POST_MVP_FEATURES.md': ['after the Phase 2 core is stable and tested'],
-  'harness/plan.md': CANONICAL_PHASES.map(({ number, title }) => `## Phase ${number}: ${title}`),
-  'harness/invariants.md': ['canonical phase map', 'npm run check:phase-map'],
-  'harness/loops.md': ['`docs/phase-map.md`', '`npm run check:phase-map`'],
-  'harness/done.md': ['npm run check:phase-map'],
 })
 
 const LEGACY_TAXONOMY = Object.freeze([

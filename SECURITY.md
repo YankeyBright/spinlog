@@ -2,21 +2,25 @@
 
 ## Supported Versions
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 0.1.x   | :white_check_mark: |
+No production version of `spinlog` has been published. Security fixes currently target the default branch and the Phase 0/1 package shell only.
 
-## Reporting a Vulnerability
+The planned v1 runtime supports the Node.js 22 and 24 LTS majors. Users must run security-supported patch releases from those lines.
 
-Please report vulnerabilities through a private GitHub Security Advisory for this repository. Do not open public issues for security vulnerabilities. The maintainers target acknowledgement within five business days and will provide a remediation status after triage.
+## Reporting A Vulnerability
 
-## Core Security Invariants
+Use a private GitHub Security Advisory in [`YankeyBright/spinlog`](https://github.com/YankeyBright/spinlog/security/advisories/new). Do not open a public issue for an undisclosed vulnerability.
 
-This project adheres to a strict zero-trust model:
+Maintainers target acknowledgement within five business days. Severity, remediation, release timing, and disclosure are determined after triage; acknowledgement is not a promise of a fixed resolution date.
 
-- **Zero Runtime Dependencies**: The published package relies only on Node.js built-ins and declares no runtime, optional, or peer dependencies.
-- **No Lifecycle Scripts**: The published `package.json` contains no `preinstall`, `install`, `postinstall`, `prepare`, `prepublish`, `prepublishOnly`, `prepack`, or `postpack` script.
-- **Controlled Installs**: CI uses `npm ci --ignore-scripts` to prevent transitive dependency install hooks from executing during verification or release.
-- **Provenance**: Releases are published from a GitHub-hosted Node 24 runner using npm OIDC trusted publishing and `npm publish --provenance`. The workflow does not use `NPM_TOKEN` or `NODE_AUTH_TOKEN`.
-- **SBOM**: A checked CycloneDX v1.5 library SBOM with zero runtime components is included in the npm tarball and GitHub Release.
-- **Audit Gate**: The Node 24 supply-chain job fails on any dependency audit finding at low severity or above.
+## Security Controls
+
+- **Runtime graph:** The published manifest declares no runtime, optional, or peer dependencies.
+- **Lifecycle policy:** Package install, prepare, publish, and pack lifecycle hooks are prohibited.
+- **Install isolation:** CI uses `npm ci --ignore-scripts` for development-tool installation.
+- **Package payload:** A dry-run allowlist limits the files admitted to npm.
+- **Build graph:** Direct development tools are exact-pinned, lockfile-resolved, audited, and excluded from the runtime SBOM.
+- **Publication:** The protected GitHub release workflow uses OIDC trusted publishing without a long-lived npm publish token.
+- **Provenance:** Public releases include npm provenance tied to `YankeyBright/spinlog` and a validated runtime-only CycloneDX 1.5 SBOM.
+- **Host ownership:** The planned library installs no process signal listener and never terminates its host process.
+
+These controls reduce defined risks but do not eliminate compromise, maintainer, CI, registry, or application-level risk.

@@ -1,42 +1,55 @@
-# Risks and Strategic Mitigations
+# Risks And Mitigations
 
-**1. Browser Sandbox Crash**
-Risk: `process` undefined -> ReferenceError
-Mitigation: 
-```ts
-const isNode = typeof process !== 'undefined' && process.stderr?.write
-if (!isNode) return { start:()=>{}, succeed:()=>{} } // no-op
-```
-Wrap all process.env access in try/catch.
+## Stream Write Failure
 
-**2. Stream Write Failure**
-Risk: stderr closed
-Mitigation: try/catch around write, fallback to no-op. Never throw.
+**Risk:** stderr becomes unavailable during cosmetic output.
 
-**3. OIDC Build Compromise**
-Risk: Attacker compromises CI workflow itself (not token)
-Mitigation:
-- Pin all actions to SHA hash, not tags
-- Require 2 reviewers for .github/workflows/*
-- Use ephemeral runners only
-- No secrets in env, use OIDC
+**Mitigation:** Catch synchronous writes, clear the active timer, attempt cursor restoration, suppress further cosmetic failure, and preserve wrapped promise settlement. Do not install a global stream error listener.
 
-**4. Size Creep**
-Risk: Adding colors/frames exceeds 1228 bytes
-Mitigation: CI size gate is impassable. Hard fail. Document that new features must replace old or be tree-shakable.
+## Host Shutdown Interference
 
-**5. Cursor Leak on Kill -9**
-Risk: SIGKILL cannot be trapped
-Mitigation: Document limitation. For SIGINT/SIGTERM we guarantee restore via sync writeSync. Recommend users use wrapper: `process.on('exit', ()=>showCursor())` as backup.
+**Risk:** A composable library changes signal defaults or preempts application cleanup.
 
-**6. Unicode Support False Positive**
-Risk: Terminal claims unicode but renders tofu
-Mitigation: Use conservative heuristic: win32 -> ascii unless WT_SESSION set. Allow override via `options.spinner = 'dots'`.
+**Mitigation:** Install no process-lifecycle listener and invoke no termination API. Explicit spinner methods own cleanup; the application owns shutdown policy.
 
-**7. Nested Color Bleed**
-Risk: Common bug in naive impl
-Mitigation: Test matrix explicitly covers `red('a '+blue('b')+' c')` -> must end with red, not default.
+## Abrupt Cursor Leakage
 
-**8. Interval Leak**
-Risk: forget stop() -> process hangs
-Mitigation: Ensure `succeed/fail/etc` always clearInterval, and in non-TTY path never create interval.
+**Risk:** An uncatchable termination can occur while the interactive cursor is hidden.
+
+**Mitigation:** Restore in every explicit lifecycle path, keep process ownership with the application, document the limitation, and avoid claiming cleanup for uncatchable termination.
+
+## Unicode False Positive
+
+**Risk:** A terminal renders braille or status symbols incorrectly.
+
+**Mitigation:** Provide a line spinner and ASCII statuses. On Windows, require `WT_SESSION` before selecting Unicode automatically.
+
+## Nested Color Bleed
+
+**Risk:** Closing an inner style resets its enclosing style.
+
+**Mitigation:** Reopen the parent style after an inner close and behavior-test nested foreground, background, modifier, and reset combinations.
+
+## Timer Leak
+
+**Risk:** An active interval keeps the process alive or continues rendering after settlement.
+
+**Mitigation:** Centralize cleanup and prove every stop and terminal transition clears the timer. Never create a timer in non-interactive execution.
+
+## Contract Drift
+
+**Risk:** Documentation, declarations, and checkers evolve into different APIs.
+
+**Mitigation:** Keep one closed JSON behavior model, deterministically project the declaration contract, reject extra and missing surface, and mutation-test the policy validator.
+
+## Size Creep
+
+**Risk:** Frozen API behavior exceeds 1,228 gzip bytes once implemented.
+
+**Mitigation:** Enforce the exact level-9 gzip limit in CI. Any proposed API expansion must first revise Phase 0 rather than bypassing the size gate.
+
+## Release Workflow Compromise
+
+**Risk:** Build infrastructure is modified even though publishing uses OIDC.
+
+**Mitigation:** Pin actions to immutable commits, minimize permissions, disable persisted checkout credentials, protect the release environment, prohibit long-lived publish tokens, and verify provenance after publication.

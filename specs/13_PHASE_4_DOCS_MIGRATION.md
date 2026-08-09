@@ -1,50 +1,23 @@
 # Phase 4: Documentation and Migration
 
-**README Must Highlight (top badges):**
-- Zero Dependencies badge
-- No Lifecycle Scripts badge
-- npm provenance / Sigstore attestation badge
-- Size badge <1.2kB
-- ESM only
+Phase 4 begins only after Phase 2 runtime behavior and Phase 3 measurements exist.
 
-**Sections:**
+## Public Documentation
 
-1. **Security First:**
-   ```
-   npm audit signatures  # verifies Sigstore
-   ```
-   Show how to verify: `npm view spinlog dist.attestations`
+- Describe the exact default factory, named styles, types, options, transitions, idempotency, promise semantics, environment policy, streams, and process ownership.
+- State the measured artifact size as an exact byte count bounded by 1,228 gzip bytes.
+- Document zero consumer runtime dependencies and absent lifecycle scripts without claiming zero risk or certification.
+- Publish provenance, signature, and SBOM verification only after those registry artifacts exist.
+- Use `import spinlog, { green } from 'spinlog'`; do not document a named factory export.
 
-2. **Why spinlog vs ora/chalk:** table from competitive analysis
+## Migration
 
-3. **Quick Start:**
-   ```ts
-   import { spinlog } from 'spinlog'
-   const s = spinlog('Loading').start()
-   s.succeed('Done')
-   ```
+- Clearly state that spinlog is not API-compatible with Chalk or Ora.
+- Map only behavior supported by the frozen contract.
+- Reject or flag custom streams, custom animations, advanced colors, concurrency, and other deferred behavior.
+- Keep codemod dependencies and execution outside the runtime package.
+- Test transforms against representative fixtures before publishing migration claims.
 
-4. **API Reference:** all methods, colors, options
+## Definition Of Done
 
-5. **Enterprise Compliance:** SBOM location, provenance, NO_COLOR support
-
-6. **Migration Guide + Codemod:**
-
-   Codemod idea (jscodeshift):
-   - `ora('text').start()` -> `spinlog('text').start()`
-   - `chalk.red(text)` -> `spinlog.red(text)`
-   - `ora({text, color}).start()` -> `spinlog(text,{color}).start()`
-
-   *Note:* The codemod script should be provided as a separate package or standalone script (e.g., `npx @spinlog/migrate`) to avoid adding dependencies like `jscodeshift` to the main zero-dep package.
-
-   Snippet:
-   ```ts
-   // before
-   import ora from 'ora'; import chalk from 'chalk';
-   ora(chalk.red('hi')).start()
-   // after
-   import { spinlog } from 'spinlog';
-   spinlog(spinlog.red('hi')).start()
-   ```
-
-**DoD:** README passes enterprise auditor check - can verify zero deps via `npm ls`, no scripts via `cat package.json`, provenance via `npm audit signatures`.
+Every documented example passes against the built package, every capability claim has a behavior test, every size/security claim has a reproducible command, and migration tooling adds nothing to the npm runtime graph.

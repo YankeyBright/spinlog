@@ -16,9 +16,11 @@ function loadPhaseDocuments() {
 
 const validTypeScriptConfig = {
   compilerOptions: {
-    target: 'ES2022',
-    module: 'Node18',
+    target: 'ES2023',
+    lib: ['ES2023'],
+    module: 'Node20',
     moduleResolution: 'Node16',
+    types: ['node'],
     rootDir: 'src',
     outDir: 'dist',
     declaration: true,
@@ -26,6 +28,7 @@ const validTypeScriptConfig = {
     sourceMap: false,
     noEmitOnError: true,
     strict: true,
+    skipLibCheck: false,
   },
 }
 
@@ -54,10 +57,9 @@ describe('phase-map policy', () => {
   it('rejects the former Phase 1 runtime taxonomy', () => {
     const documents = loadPhaseDocuments()
 
-    documents['harness/plan.md'] = documents['harness/plan.md'].replace(
-      '## Phase 1: Package Scaffolding',
-      '## Phase 1: Core Implementation Hardening',
-    )
+    documents['specs/10_PHASE_1_PACKAGE_SCAFFOLDING.md'] = documents[
+      'specs/10_PHASE_1_PACKAGE_SCAFFOLDING.md'
+    ].replace('# Phase 1: Package Scaffolding', '# Phase 1: Core Implementation Hardening')
 
     expect(validatePhaseMap(documents)).toEqual(
       expect.arrayContaining([
@@ -69,7 +71,7 @@ describe('phase-map policy', () => {
 })
 
 describe('Phase 1 TypeScript policy', () => {
-  it('accepts Node18 modules with Node16 resolution', () => {
+  it('accepts fixed Node20 modules with Node16 resolution', () => {
     expect(validateTypeScriptConfig(validTypeScriptConfig)).toEqual([])
   })
 
@@ -81,7 +83,7 @@ describe('Phase 1 TypeScript policy', () => {
       },
     }
 
-    expect(validateTypeScriptConfig(nodeNextConfig)).toContain('tsconfig module must be Node18')
+    expect(validateTypeScriptConfig(nodeNextConfig)).toContain('tsconfig module must be Node20')
   })
 })
 

@@ -25,13 +25,11 @@ pnpm-debug.log*
 .vscode/mcp.json
 .vscode/*.local.json
 
-# Local harness state
-harness/episodic_memory.db
-harness/episodic_memory.db-*
-harness/implementation-notes.md
+# Local planning and agent state
+docs/
+harness/
 
 # Operating-system metadata
 .DS_Store
 Thumbs.db
 Desktop.ini
-

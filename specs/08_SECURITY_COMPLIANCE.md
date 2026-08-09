@@ -1,54 +1,37 @@
-# Security & Compliance Requirements
+# Security Assurance Requirements
 
-## NIST SSDF Mapping
+## Practice Mapping
 
-| Control | Implementation |
-|---|---|
-| PO.1, PO.2 (Prepare Org) | Branch protection, two required reviewers, and `SECURITY.md` establish release ownership and disclosure expectations. |
-| PS.3 (Protect Software) | Generate and validate a CycloneDX v1.5 SBOM in the Node 24 supply-chain job, then publish it with the tarball and GitHub Release. |
-| PW.4 (Well-Secured Reuse) | Runtime, optional, and peer dependency maps are empty. The generated runtime SBOM proves `components: []`. |
-| PW.5, PW.8 (Produce Secure) | Vitest with fake timers and mocked streams covers runtime behavior; CI runs typecheck, lint, test, package, and supply-chain checks. |
-| RV.1 (Respond to Vulnerabilities) | `SECURITY.md` defines a private reporting channel and acknowledgement target. |
+| Practice | Repository evidence |
+| --- | --- |
+| Defined ownership and response | Protected repository settings plus `SECURITY.md`. |
+| Controlled reuse | Empty consumer dependency maps and a runtime-only SBOM. |
+| Reproducible verification | Exact direct pins, lockfile installation, typecheck, tests, artifact checks, and dependency audit. |
+| Protected publication | Public-repository OIDC, immutable action commits, protected release environment, tag validation, and no long-lived publish token. |
+| Vulnerability response | Private GitHub advisory channel and documented acknowledgement target. |
 
-## Provenance And Trusted Publishing
+This mapping is engineering evidence, not certification against NIST SSDF, SLSA, an executive order, or another compliance regime.
 
-- Publish only from the GitHub-hosted release workflow.
-- Grant `id-token: write` and use `npm publish --provenance`.
-- Use Node 24 and npm >=11.5.1. npm trusted publishing requires Node >=22.14.0 and npm >=11.5.1.
-- Do not use `NPM_TOKEN` or `NODE_AUTH_TOKEN` to publish.
-- Protect release tags and the GitHub `release` environment before publishing.
-- Verify the tag matches `package.json` before publication.
+## Trusted Publishing
 
-Before the first release, configure the npm Trusted Publisher with the exact GitHub owner, repository, workflow filename `release.yml`, and `release` environment, then allow the `npm publish` action. npm validates those values at publish time, not when the configuration is saved.
+- Publish only from `.github/workflows/release.yml` in `YankeyBright/spinlog`.
+- Require `id-token: write`, Node 24, npm at or above 11.5.1, and the protected `release` environment.
+- Configure npm with the exact owner, repository, workflow filename, environment, and allowed publish action.
+- Use `npm publish --provenance --access public` and no `NPM_TOKEN` or `NODE_AUTH_TOKEN`.
+- Keep the repository and package public because private-repository provenance is unsupported.
+- Verify tag/version equality, dependency audit, package gates, and provenance before declaring a release complete.
 
-OIDC provenance is an npm attestation mechanism. It strengthens build-origin evidence but must not be represented as a standalone SLSA Level 3 certification.
+OIDC provenance supplies cryptographic build-origin evidence. It does not prove source correctness or independently confer a SLSA level.
 
-## CycloneDX SBOM v1.5
+## Runtime SBOM
 
-Generate and validate the runtime SBOM with Node >=20.18.0:
+`npm run sbom` invokes npm's native lockfile-only SBOM command, omits development, optional, and peer classes, and canonicalizes volatile metadata into a reproducible CycloneDX 1.5 library document. `npm run sbom:check` requires the package name/version, repository, purl, library type, root-only dependency graph, reproducibility marker, and an empty runtime component list.
 
-```bash
-npm run sbom
-npm run sbom:check
-```
+The SBOM represents the consumer runtime package, not the development workstation or GitHub-hosted build environment. Attach it to both the npm package and GitHub Release.
 
-The SBOM command omits development, optional, and peer dependency classes. The resulting document must have the following properties:
+## Evidence Discipline
 
-- `bomFormat: CycloneDX`
-- `specVersion: 1.5`
-- `metadata.component.name: spinlog`
-- `metadata.component.type: library`
-- `components: []`
-
-Attach `sbom.json` to the npm tarball and the GitHub Release. The Node 24 supply-chain job verifies the file before publication.
-
-## International Considerations
-
-- `README.md` documents the zero-runtime-dependency policy, absence of package lifecycle scripts, OIDC provenance, and audit commands.
-- Run `npm audit signatures` and inspect the npm provenance record after publication.
-- Keep the repository's security contact and disclosure target current.
-
-## e18e Alignment
-
-- Position the package as a modern, dependency-free alternative for its defined terminal-output scope.
-- Do not publish capability or compatibility claims before the corresponding runtime behavior and tests exist.
+- Do not publish API, compatibility, size, signature, or provenance claims before the corresponding artifact exists.
+- Record exact proof commands and outcomes in implementation notes.
+- Recheck public repository identity and npm trusted-publisher settings before first publication.
+- Run `npm audit signatures` and inspect npm attestations after publication.

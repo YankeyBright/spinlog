@@ -11,7 +11,13 @@ const output = execFileSync(process.execPath, [npmCli, 'pack', '--dry-run', '--j
   stdio: ['ignore', 'pipe', 'inherit'],
 })
 const [pack] = JSON.parse(output)
-const allowedRootFiles = new Set(['package.json', 'README.md', 'LICENSE', 'SECURITY.md', 'sbom.json'])
+const allowedRootFiles = new Set([
+  'package.json',
+  'README.md',
+  'LICENSE',
+  'SECURITY.md',
+  'sbom.json',
+])
 const requiredFiles = [
   'package.json',
   'README.md',
@@ -22,8 +28,9 @@ const requiredFiles = [
   'dist/index.d.ts',
 ]
 const packagedFiles = pack.files.map(({ path }) => path)
-const unexpectedFiles = packagedFiles
-  .filter((path) => !path.startsWith('dist/') && !allowedRootFiles.has(path))
+const unexpectedFiles = packagedFiles.filter(
+  (path) => !path.startsWith('dist/') && !allowedRootFiles.has(path),
+)
 const missingFiles = requiredFiles.filter((path) => !packagedFiles.includes(path))
 
 if (unexpectedFiles.length > 0 || missingFiles.length > 0) {

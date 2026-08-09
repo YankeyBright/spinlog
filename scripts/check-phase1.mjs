@@ -113,7 +113,8 @@ function sourceFiles(directory) {
 
 require(packageJson.type === 'module', 'package.json type must be module')
 require(packageJson.sideEffects === false, 'package.json sideEffects must be false')
-require(packageJson.engines?.node === '>=18', 'package.json engines.node must be >=18')
+require(packageJson.engines?.node ===
+  '^22.0.0 || ^24.0.0', 'package.json engines.node must name Node 22 and 24 LTS')
 require(entryPoint.types === './dist/index.d.ts' &&
   entryPoint.import ===
     './dist/index.js', 'package.json exports must expose the ESM entrypoint and declarations')
@@ -130,6 +131,8 @@ require(JSON.stringify(packageJson.files) ===
 failures.push(...validateTypeScriptConfig(tsconfig))
 failures.push(...validateEsbuildSecurityPolicy(packageJson, packageLock))
 require(packageJson.devDependencies?.typescript === '7.0.2', 'TypeScript must be pinned to 7.0.2')
+require(packageJson.devDependencies?.['@types/node'] ===
+  '22.20.1', '@types/node must be a direct exact-pinned development dependency')
 require(packageJson.scripts?.build ===
   'npm run build:js && npm run build:types', 'build must compose JavaScript and declaration builds')
 require(packageJson.scripts?.['build:js'] === 'tsup', 'build:js must run tsup')
@@ -138,7 +141,7 @@ require(packageJson.scripts?.['build:types'] ===
 require(packageJson.scripts?.['check:phase-map'] ===
   'node scripts/check-phase-map.mjs', 'check:phase-map must run the phase-map validator')
 require(packageJson.scripts?.['check:phase0'] ===
-  'npm run check:phase-map && node scripts/check-phase0.mjs', 'check:phase0 must run the phase-map validator first')
+  'npm run check:phase-map && npm run test:phase0 && node scripts/check-phase0.mjs', 'check:phase0 must run phase-map and contract-policy tests first')
 require(packageJson.scripts?.['check:phase1']?.startsWith(
   'npm run check:phase-map && ',
 ), 'check:phase1 must run the phase-map validator first')
@@ -151,6 +154,7 @@ for (const value of [
   'dts: false',
   'treeshake: true',
   "platform: 'node'",
+  "target: 'node22'",
 ]) {
   require(tsupConfig.includes(value), `tsup.config.ts must contain ${value}`)
 }
@@ -158,7 +162,6 @@ for (const value of [
 for (const value of [
   "environment: 'node'",
   "provider: 'v8'",
-  'all: true',
   "include: ['src/**/*.ts']",
   '...coverageConfigDefaults.exclude',
   'thresholds: {',
@@ -172,6 +175,8 @@ for (const value of [
 ]) {
   require(vitestConfig.includes(value), `vitest.config.ts must contain ${value}`)
 }
+
+require(!/\ball\s*:/.test(vitestConfig), 'vitest.config.ts must not use removed coverage.all')
 
 for (const path of sourceFiles('src')) {
   require(!/(?:\/\*|\/\/)\s*(?:c8|istanbul|v8)\s+ignore\b/i.test(

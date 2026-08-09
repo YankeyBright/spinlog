@@ -1,7 +1,7 @@
 {
   "name": "spinlog",
   "version": "0.1.0",
-  "description": "A sub-1.2kB, zero-dependency, ESM-only unified primitive that replaces chalk + ora.",
+  "description": "A zero-runtime-dependency, ESM-only terminal color and spinner primitive capped at 1,228 bytes gzipped.",
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -18,13 +18,17 @@
     "sbom.json"
   ],
   "engines": {
-    "node": ">=18"
+    "node": "^22.0.0 || ^24.0.0"
   },
   "license": "MIT",
   "author": "spinlog contributors",
   "repository": {
     "type": "git",
-    "url": "https://github.com/spinlog/spinlog.git"
+    "url": "https://github.com/YankeyBright/spinlog.git"
+  },
+  "homepage": "https://github.com/YankeyBright/spinlog#readme",
+  "bugs": {
+    "url": "https://github.com/YankeyBright/spinlog/issues"
   },
   "keywords": [
     "cli",
@@ -46,14 +50,15 @@
     "typecheck": "tsc --noEmit",
     "lint": "biome lint .",
     "format": "biome format . --write",
-    "sbom": "cyclonedx-npm --package-lock-only --validate --output-file sbom.json --spec-version 1.5 --output-reproducible --omit dev --omit optional --omit peer --mc-type library",
+    "sbom": "node scripts/generate-sbom.mjs",
     "sbom:check": "node scripts/check-sbom.mjs",
     "policy:check": "node scripts/check-package-policy.mjs",
     "size": "node scripts/check-size.mjs",
     "size:limit": "size-limit",
     "pack:check": "node scripts/check-pack.mjs",
     "check:phase-map": "node scripts/check-phase-map.mjs",
-    "check:phase0": "npm run check:phase-map && node scripts/check-phase0.mjs",
+    "test:phase0": "vitest run test/phase0-contract-policy.test.ts",
+    "check:phase0": "npm run check:phase-map && npm run test:phase0 && node scripts/check-phase0.mjs",
     "check:phase1": "npm run check:phase-map && npm run policy:check && npm run typecheck && npm run lint && npm run test:coverage && npm run build && node scripts/check-phase1.mjs && npm run size && npm run size:limit && npm run pack:check",
     "check:phase1:release": "npm run sbom && npm run sbom:check && node scripts/check-phase1-release.mjs",
     "check:phases": "node scripts/check-phases.mjs",
@@ -62,14 +67,14 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.7",
-    "@cyclonedx/cyclonedx-npm": "6.0.0",
-    "@size-limit/preset-small-lib": "11.2.0",
-    "@vitest/coverage-v8": "3.2.7",
-    "size-limit": "11.2.0",
+    "@size-limit/preset-small-lib": "13.0.3",
+    "@types/node": "22.20.1",
+    "@vitest/coverage-v8": "4.1.10",
+    "size-limit": "13.0.3",
     "tsup": "8.5.1",
     "typescript": "7.0.2",
-    "vite": "6.4.3",
-    "vitest": "3.2.7"
+    "vite": "8.2.1",
+    "vitest": "4.1.10"
   },
   "overrides": {
     "tsup": {

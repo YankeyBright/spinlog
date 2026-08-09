@@ -1,0 +1,708 @@
+import { isDeepStrictEqual } from 'node:util'
+
+const STYLE_EXPORTS = Object.freeze([
+  'reset',
+  'bold',
+  'dim',
+  'italic',
+  'underline',
+  'strikethrough',
+  'black',
+  'red',
+  'green',
+  'yellow',
+  'blue',
+  'magenta',
+  'cyan',
+  'white',
+  'blackBright',
+  'redBright',
+  'greenBright',
+  'yellowBright',
+  'blueBright',
+  'magentaBright',
+  'cyanBright',
+  'whiteBright',
+  'bgBlack',
+  'bgRed',
+  'bgGreen',
+  'bgYellow',
+  'bgBlue',
+  'bgMagenta',
+  'bgCyan',
+  'bgWhite',
+  'bgBlackBright',
+  'bgRedBright',
+  'bgGreenBright',
+  'bgYellowBright',
+  'bgBlueBright',
+  'bgMagentaBright',
+  'bgCyanBright',
+  'bgWhiteBright',
+])
+
+const TYPE_EXPORTS = Object.freeze([
+  'PromiseOptions',
+  'Spinlog',
+  'Spinner',
+  'SpinnerColor',
+  'SpinnerName',
+  'SpinnerOptions',
+])
+
+const SPINNER_COLORS = Object.freeze([
+  'black',
+  'red',
+  'green',
+  'yellow',
+  'blue',
+  'magenta',
+  'cyan',
+  'white',
+  'blackBright',
+  'redBright',
+  'greenBright',
+  'yellowBright',
+  'blueBright',
+  'magentaBright',
+  'cyanBright',
+  'whiteBright',
+])
+
+const STATES = Object.freeze([
+  'idle',
+  'spinning',
+  'stopped',
+  'succeeded',
+  'failed',
+  'warned',
+  'informed',
+])
+
+const TERMINAL_ACTIONS = Object.freeze({
+  succeed: 'succeeded',
+  fail: 'failed',
+  warn: 'warned',
+  info: 'informed',
+})
+
+const EXPECTED_RENDERING = Object.freeze({
+  stream: 'stderr',
+  stdoutWrites: false,
+  segmentOrder: ['prefix', 'symbol', 'text', 'suffix'],
+  segmentSeparator: ' ',
+  dotsFrames: [
+    '\u280b',
+    '\u2819',
+    '\u2839',
+    '\u2838',
+    '\u283c',
+    '\u2834',
+    '\u2826',
+    '\u2827',
+    '\u2807',
+    '\u280f',
+  ],
+  lineFrames: ['-', '\\', '|', '/'],
+  unicodeStatusSymbols: {
+    succeed: '\u2714',
+    fail: '\u2716',
+    warn: '\u26a0',
+    info: '\u2139',
+  },
+  asciiStatusSymbols: { succeed: '+', fail: 'x', warn: '!', info: 'i' },
+  statusColors: { succeed: 'green', fail: 'red', warn: 'yellow', info: 'blue' },
+  colorApplication: 'symbol-only',
+  emptySegments: 'omit',
+  interactive: {
+    startSequence: ['hide-cursor', 'render-frame'],
+    frameSequence: ['clear-line', 'render-frame'],
+    stopSequence: ['clear-line', 'show-cursor'],
+    terminalSequence: ['clear-line', 'render-status', 'newline', 'show-cursor'],
+    firstFrame: 'synchronous',
+    hideCursor: '\u001b[?25l',
+    showCursor: '\u001b[?25h',
+    clearLine: '\u001b[2K\r',
+  },
+  nonInteractive: {
+    createTimer: false,
+    cursorControl: false,
+    startSequence: ['render-frame', 'newline'],
+    stopSequence: [],
+    terminalSequence: ['render-status', 'newline'],
+  },
+})
+
+const EXPECTED_ENVIRONMENT = Object.freeze({
+  colorPrecedence: [
+    'FORCE_COLOR',
+    'NO_COLOR',
+    'NODE_DISABLE_COLORS',
+    'CI',
+    'TERM=dumb',
+    'NODE_ENV=test',
+    'stderr.isTTY',
+  ],
+  noColor: 'non-empty-disables',
+  nodeDisableColors: 'non-empty-disables',
+  forceColorFalseValues: ['0', 'false'],
+  forceColorOtherDefinedValues: 'enable',
+  forceColorEnablesAnimation: false,
+  unicodeWindowsHeuristic: 'WT_SESSION-required',
+})
+
+const EXPECTED_PROMISE = Object.freeze({
+  inputs: ['PromiseLike<T>', '() => PromiseLike<T>'],
+  callbackArguments: 0,
+  startBeforeInputObservation: true,
+  return: 'Promise<T>',
+  startBeforeCallback: true,
+  invokeCallbackOnce: true,
+  assimilateThenables: true,
+  synchronousThrowBecomesRejection: true,
+  fulfillmentAction: 'succeed',
+  rejectionAction: 'fail',
+  preserveFulfillmentValue: true,
+  preserveRejectionReason: true,
+  cosmeticFailureMasksSettlement: false,
+})
+
+const STYLE_CODES = Object.freeze({
+  reset: [0, 0],
+  bold: [1, 22],
+  dim: [2, 22],
+  italic: [3, 23],
+  underline: [4, 24],
+  strikethrough: [9, 29],
+  black: [30, 39],
+  red: [31, 39],
+  green: [32, 39],
+  yellow: [33, 39],
+  blue: [34, 39],
+  magenta: [35, 39],
+  cyan: [36, 39],
+  white: [37, 39],
+  blackBright: [90, 39],
+  redBright: [91, 39],
+  greenBright: [92, 39],
+  yellowBright: [93, 39],
+  blueBright: [94, 39],
+  magentaBright: [95, 39],
+  cyanBright: [96, 39],
+  whiteBright: [97, 39],
+  bgBlack: [40, 49],
+  bgRed: [41, 49],
+  bgGreen: [42, 49],
+  bgYellow: [43, 49],
+  bgBlue: [44, 49],
+  bgMagenta: [45, 49],
+  bgCyan: [46, 49],
+  bgWhite: [47, 49],
+  bgBlackBright: [100, 49],
+  bgRedBright: [101, 49],
+  bgGreenBright: [102, 49],
+  bgYellowBright: [103, 49],
+  bgBlueBright: [104, 49],
+  bgMagentaBright: [105, 49],
+  bgCyanBright: [106, 49],
+  bgWhiteBright: [107, 49],
+})
+
+const EXPECTED_DEFERRED = Object.freeze([
+  {
+    id: 'task-groups',
+    api: 'spinlog.group()',
+    reason: 'Concurrent task orchestration requires a separate state and rendering contract.',
+  },
+  {
+    id: 'progress-bars',
+    api: 'spinlog.progress()',
+    reason: 'Determinate progress needs independent update, throttling, and non-TTY semantics.',
+  },
+  {
+    id: 'prompts',
+    api: 'spinlog.confirm() and spinlog.text()',
+    reason:
+      'Raw input, cancellation, and cross-platform terminal behavior form a separate security boundary.',
+  },
+  {
+    id: 'intro-outro',
+    api: 'spinlog.intro() and spinlog.outro()',
+    reason: 'Flow decoration is not required by the core color and spinner primitive.',
+  },
+  {
+    id: 'structured-logs',
+    api: 'structured: true',
+    reason: 'Machine output requires a separately versioned stdout schema.',
+  },
+  {
+    id: 'custom-spinners',
+    api: 'custom frames and intervals',
+    reason: 'Arbitrary animation data expands validation, timing, and size requirements.',
+  },
+  {
+    id: 'custom-streams',
+    api: 'custom writable streams',
+    reason:
+      'The v1 stderr-only contract intentionally avoids stream ownership and error-listener complexity.',
+  },
+  {
+    id: 'concurrent-spinners',
+    api: 'multiple active spinners',
+    reason: 'Shared-line coordination belongs with the deferred task-group renderer.',
+  },
+  {
+    id: 'advanced-colors',
+    api: 'style chaining, 256-color, and truecolor',
+    reason:
+      'The exact ANSI-16 named-export surface preserves tree-shaking and the fixed size budget.',
+  },
+])
+
+const DOCUMENT_PATHS = Object.freeze([
+  'README.md',
+  'SECURITY.md',
+  'specs/00_PHASE_MAP.md',
+  'specs/01_PROJECT_MANIFEST.md',
+  'specs/05_TERMINAL_SPEC.md',
+  'specs/06_CORE_API_SPEC.md',
+  'specs/07_ARCHITECTURE.md',
+  'specs/08_SECURITY_COMPLIANCE.md',
+  'specs/09_PHASE_0_PRODUCT_SPEC_LOCK.md',
+  'specs/15_RISKS.md',
+  'specs/16_POST_MVP_FEATURES.md',
+])
+
+function sorted(value) {
+  return [...value].sort()
+}
+
+function sameValues(actual, expected) {
+  return JSON.stringify(sorted(actual)) === JSON.stringify(sorted(expected))
+}
+
+function require(condition, message, failures) {
+  if (!condition) {
+    failures.push(message)
+  }
+}
+
+function requireExact(actual, expected, path, failures) {
+  require(isDeepStrictEqual(actual, expected), `${path} must match the frozen contract`, failures)
+}
+
+function exactKeys(value, expected, path, failures) {
+  require(value !== null &&
+    typeof value === 'object' &&
+    !Array.isArray(value), `${path} must be an object`, failures)
+
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return
+  }
+
+  require(sameValues(
+    Object.keys(value),
+    expected,
+  ), `${path} keys must be exactly: ${expected.join(', ')}`, failures)
+}
+
+export function renderPublicApiDeclaration(contract) {
+  const colorUnion = SPINNER_COLORS.map((color) => `  | '${color}'`).join('\n')
+  const styleDeclarations = contract.publicApi.styleExports
+    .map((name) => `export declare const ${name}: Style`)
+    .join('\n')
+
+  return `type Style = (text: string) => string
+
+export type SpinnerName = 'dots' | 'line'
+
+export type SpinnerColor =
+${colorUnion}
+
+export interface SpinnerOptions {
+  color?: SpinnerColor
+  prefix?: string
+  suffix?: string
+  spinner?: SpinnerName
+}
+
+export interface PromiseOptions extends SpinnerOptions {
+  text?: string
+}
+
+export interface Spinner {
+  text: string
+  color: SpinnerColor
+  prefix: string
+  suffix: string
+  start(): this
+  stop(): this
+  succeed(text?: string): this
+  fail(text?: string): this
+  warn(text?: string): this
+  info(text?: string): this
+}
+
+export interface Spinlog {
+  (text?: string, options?: SpinnerOptions): Spinner
+  promise<T>(input: PromiseLike<T>, options?: PromiseOptions): Promise<T>
+  promise<T>(task: () => PromiseLike<T>, options?: PromiseOptions): Promise<T>
+}
+
+${styleDeclarations.replace('export declare const black: Style', '\nexport declare const black: Style').replace('export declare const bgBlack: Style', '\nexport declare const bgBlack: Style')}
+
+declare const spinlog: Spinlog
+
+export default spinlog
+`
+}
+
+function validateDeclaration(declaration, contract, failures) {
+  require(declaration ===
+    renderPublicApiDeclaration(
+      contract,
+    ), 'public API declaration must match the generated closed contract', failures)
+}
+
+function validateTransitions(contract, failures) {
+  const stateMachine = contract.stateMachine
+  require(stateMachine?.initial === 'idle', 'initial state must be idle', failures)
+  requireExact(stateMachine?.states, STATES, 'stateMachine.states', failures)
+  exactKeys(
+    stateMachine,
+    [
+      'initial',
+      'states',
+      'start',
+      'stop',
+      ...Object.keys(TERMINAL_ACTIONS),
+      'mutationsChangeState',
+      'mutationsApply',
+      'terminalTextOverridesStoredText',
+    ],
+    'stateMachine',
+    failures,
+  )
+
+  for (const action of ['start', 'stop', ...Object.keys(TERMINAL_ACTIONS)]) {
+    require(sameValues(
+      Object.keys(stateMachine?.[action] ?? {}),
+      STATES,
+    ), `${action} must define every legal source state`, failures)
+  }
+
+  for (const state of STATES) {
+    const start = stateMachine?.start?.[state]
+    const stop = stateMachine?.stop?.[state]
+    exactKeys(start, ['to', 'effect', 'idempotent'], `stateMachine.start.${state}`, failures)
+    exactKeys(stop, ['to', 'effect', 'idempotent'], `stateMachine.stop.${state}`, failures)
+    requireExact(
+      start,
+      state === 'spinning'
+        ? { to: 'spinning', effect: 'none', idempotent: true }
+        : { to: 'spinning', effect: 'begin-cycle', idempotent: false },
+      `stateMachine.start.${state}`,
+      failures,
+    )
+
+    const expectedStop =
+      state === 'spinning'
+        ? { to: 'stopped', effect: 'clear-and-restore', idempotent: false }
+        : state === 'idle'
+          ? { to: 'stopped', effect: 'none', idempotent: false }
+          : state === 'stopped'
+            ? { to: 'stopped', effect: 'none', idempotent: true }
+            : { to: state, effect: 'none', idempotent: true }
+    requireExact(stop, expectedStop, `stateMachine.stop.${state}`, failures)
+
+    for (const [action, target] of Object.entries(TERMINAL_ACTIONS)) {
+      const transition = stateMachine?.[action]?.[state]
+      exactKeys(
+        transition,
+        ['to', 'effect', 'idempotent'],
+        `stateMachine.${action}.${state}`,
+        failures,
+      )
+      const expected = STATES.slice(3).includes(state)
+        ? { to: state, effect: 'none', idempotent: true }
+        : {
+            to: target,
+            effect: state === 'spinning' ? 'stop-and-persist-status' : 'persist-status',
+            idempotent: false,
+          }
+      requireExact(transition, expected, `stateMachine.${action}.${state}`, failures)
+    }
+  }
+
+  require(stateMachine?.mutationsChangeState ===
+    false, 'mutations must not change lifecycle state', failures)
+  require(stateMachine?.mutationsApply ===
+    'next-render', 'mutations must apply on the next render', failures)
+  require(stateMachine?.terminalTextOverridesStoredText ===
+    true, 'terminal text must replace stored text before rendering', failures)
+}
+
+function validateDocuments(documents, contract, failures) {
+  for (const path of DOCUMENT_PATHS) {
+    require(typeof documents?.[path] === 'string', `missing Phase 0 document: ${path}`, failures)
+  }
+
+  const corpus = Object.values(documents ?? {}).join('\n')
+  for (const [pattern, description] of [
+    [/Node\s*(?:>=\s*)?18|Node18/g, 'legacy Node 18 policy'],
+    [/github\.com\/spinlog\/spinlog/gi, 'placeholder repository identity'],
+    [/process\.(?:on|once)\(['"]SIG(?:INT|TERM)/g, 'library-owned signal listener'],
+    [/process\.exit\(/g, 'library-owned forced exit'],
+    [/fs\.writeSync\(2/g, 'signal-context synchronous write'],
+  ]) {
+    require(!pattern.test(corpus), `normative documents contain ${description}`, failures)
+  }
+
+  for (const path of ['specs/09_PHASE_0_PRODUCT_SPEC_LOCK.md', 'specs/06_CORE_API_SPEC.md']) {
+    require(documents?.[path]?.includes('specs/v1-public-api.d.ts') &&
+      documents?.[path]?.includes(
+        'specs/v1-behavior.json',
+      ), `${path} must identify both machine-readable contracts as normative`, failures)
+  }
+
+  for (const [path, snippets] of Object.entries({
+    'README.md': ['Node 22', 'Node 24', 'https://github.com/YankeyBright/spinlog'],
+    'specs/00_PHASE_MAP.md': ['| 0 | Product and Spec Lock |', '| 5 | Trusted Release |'],
+    'specs/01_PROJECT_MANIFEST.md': [
+      'specs/v1-public-api.d.ts',
+      'specs/v1-behavior.json',
+      '`^22.0.0 || ^24.0.0`',
+    ],
+    'specs/05_TERMINAL_SPEC.md': ['never writes to `stdout`', 'installs no process signal'],
+    'specs/09_PHASE_0_PRODUCT_SPEC_LOCK.md': [
+      'Node 22 and Node 24',
+      '1,228 bytes',
+      'only to `stderr`',
+    ],
+  })) {
+    for (const snippet of snippets) {
+      require(documents?.[path]?.includes(
+        snippet,
+      ), `${path} must contain the frozen contract text: ${snippet}`, failures)
+    }
+  }
+
+  const terminalSpec = documents?.['specs/05_TERMINAL_SPEC.md'] ?? ''
+  require(terminalSpec.indexOf('FORCE_COLOR=0') <
+    terminalSpec.indexOf(
+      'NO_COLOR',
+    ), 'terminal capability policy must give FORCE_COLOR explicit precedence', failures)
+
+  for (const { api, reason } of contract.deferred) {
+    require(documents?.['specs/16_POST_MVP_FEATURES.md']?.includes(
+      `**${api}**: ${reason}`,
+    ), `specs/16_POST_MVP_FEATURES.md must include the exact rationale for ${api}`, failures)
+  }
+}
+
+export function validatePhase0Contract({ contract, declaration, packageJson, documents = {} }) {
+  const failures = []
+
+  exactKeys(
+    contract,
+    [
+      'schemaVersion',
+      'phase',
+      'identity',
+      'runtime',
+      'size',
+      'publicApi',
+      'defaults',
+      'rendering',
+      'environment',
+      'stateMachine',
+      'promise',
+      'styles',
+      'processOwnership',
+      'writeFailures',
+      'deferred',
+      'permanentNonGoals',
+    ],
+    'contract',
+    failures,
+  )
+  require(contract.schemaVersion === 1 &&
+    contract.phase === 0, 'contract version and phase must be 1 and 0', failures)
+  requireExact(
+    contract.identity,
+    {
+      packageName: 'spinlog',
+      author: 'spinlog contributors',
+      license: 'MIT',
+      repository: 'https://github.com/YankeyBright/spinlog',
+      repositoryGit: 'https://github.com/YankeyBright/spinlog.git',
+      visibility: 'public',
+    },
+    'identity',
+    failures,
+  )
+  requireExact(
+    contract.runtime,
+    {
+      engines: '^22.0.0 || ^24.0.0',
+      supportedLtsMajors: [22, 24],
+      moduleFormat: 'esm',
+      browserSupport: false,
+    },
+    'runtime',
+    failures,
+  )
+  requireExact(
+    contract.size,
+    {
+      artifact: 'dist/index.js',
+      compression: 'gzip',
+      level: 9,
+      maximumBytes: 1228,
+    },
+    'size',
+    failures,
+  )
+  requireExact(
+    contract.publicApi,
+    {
+      declaration: 'specs/v1-public-api.d.ts',
+      defaultExport: 'spinlog',
+      typeExports: TYPE_EXPORTS,
+      styleExports: STYLE_EXPORTS,
+    },
+    'publicApi',
+    failures,
+  )
+  requireExact(
+    contract.defaults,
+    { text: '', color: 'cyan', prefix: '', suffix: '', spinner: 'dots', intervalMs: 80 },
+    'defaults',
+    failures,
+  )
+  requireExact(contract.rendering, EXPECTED_RENDERING, 'rendering', failures)
+  requireExact(contract.environment, EXPECTED_ENVIRONMENT, 'environment', failures)
+  requireExact(contract.promise, EXPECTED_PROMISE, 'promise', failures)
+  requireExact(
+    contract.styles,
+    {
+      input: 'string',
+      output: 'string',
+      pure: true,
+      writesStreams: false,
+      nestedStylesRestoreParent: true,
+      capabilityStream: 'stderr',
+      escapePrefix: '\u001b[',
+      escapeSuffix: 'm',
+      sgr: STYLE_CODES,
+    },
+    'styles',
+    failures,
+  )
+  requireExact(
+    contract.processOwnership,
+    {
+      signalListeners: false,
+      exitCalls: false,
+      killCalls: false,
+      globalStreamErrorListeners: false,
+      applicationOwnsShutdown: true,
+      explicitMethodsRestoreCursor: true,
+    },
+    'processOwnership',
+    failures,
+  )
+  requireExact(
+    contract.writeFailures,
+    {
+      catchSynchronousWrites: true,
+      clearActiveTimer: true,
+      attemptCursorRestore: true,
+      cosmeticMethodsThrow: false,
+      promiseSettlementPreserved: true,
+      asynchronousStreamErrorsOwnedByHost: true,
+    },
+    'writeFailures',
+    failures,
+  )
+  requireExact(contract.deferred, EXPECTED_DEFERRED, 'deferred', failures)
+  requireExact(
+    contract.permanentNonGoals,
+    ['commonjs', 'browser-first-runtime'],
+    'permanentNonGoals',
+    failures,
+  )
+  require(contract.identity?.repository ===
+    'https://github.com/YankeyBright/spinlog', 'repository identity must match the public repository', failures)
+  require(contract.identity?.visibility ===
+    'public', 'repository visibility must be public', failures)
+  require(contract.runtime?.engines ===
+    '^22.0.0 || ^24.0.0', 'runtime engines must name only supported LTS majors', failures)
+  require(JSON.stringify(contract.runtime?.supportedLtsMajors) ===
+    JSON.stringify([22, 24]), 'supported runtime majors must be Node 22 and 24', failures)
+  require(contract.runtime?.moduleFormat === 'esm' &&
+    contract.runtime?.browserSupport === false, 'runtime must be ESM-only and Node-only', failures)
+  require(contract.size?.artifact === 'dist/index.js' &&
+    contract.size?.compression === 'gzip' &&
+    contract.size?.level === 9 &&
+    contract.size?.maximumBytes ===
+      1228, 'size contract must be dist/index.js at 1,228 bytes using gzip level 9', failures)
+  require(sameValues(
+    contract.publicApi?.typeExports ?? [],
+    TYPE_EXPORTS,
+  ), 'contract type export list must match the declaration policy', failures)
+  require(JSON.stringify(contract.publicApi?.styleExports) ===
+    JSON.stringify(
+      STYLE_EXPORTS,
+    ), 'contract style exports must match the declaration policy', failures)
+  require(isDeepStrictEqual(contract.defaults, {
+    text: '',
+    color: 'cyan',
+    prefix: '',
+    suffix: '',
+    spinner: 'dots',
+    intervalMs: 80,
+  }), 'spinner defaults must match the frozen values', failures)
+  require(contract.rendering?.stream === 'stderr' &&
+    contract.rendering?.stdoutWrites === false, 'renderer must write only stderr', failures)
+  require(contract.styles?.pure === true &&
+    contract.styles?.writesStreams ===
+      false, 'style helpers must be pure and stream-free', failures)
+  require(contract.processOwnership?.signalListeners === false &&
+    contract.processOwnership?.exitCalls === false &&
+    contract.processOwnership?.killCalls === false &&
+    contract.processOwnership?.applicationOwnsShutdown ===
+      true, 'the library must not own host shutdown', failures)
+  require(contract.writeFailures?.cosmeticMethodsThrow === false &&
+    contract.writeFailures?.promiseSettlementPreserved ===
+      true, 'cosmetic failures must not throw or mask promise settlement', failures)
+  require(Array.isArray(contract.deferred) &&
+    contract.deferred.length === 9 &&
+    contract.deferred.every(
+      ({ id, api, reason }) => id && api && reason,
+    ), 'every deferred feature must have an id, API, and rationale', failures)
+
+  require(packageJson?.name ===
+    contract.identity?.packageName, 'package name must match the contract', failures)
+  require(packageJson?.author ===
+    contract.identity?.author, 'package author must match the contract', failures)
+  require(packageJson?.license ===
+    contract.identity?.license, 'package license must match the contract', failures)
+  require(packageJson?.repository?.url ===
+    contract.identity?.repositoryGit, 'package repository must match the contract', failures)
+  require(packageJson?.engines?.node ===
+    contract.runtime?.engines, 'package engines must match the contract', failures)
+  require(packageJson?.type === 'module', 'package type must remain module', failures)
+  for (const dependencyType of ['dependencies', 'optionalDependencies', 'peerDependencies']) {
+    require(Object.keys(packageJson?.[dependencyType] ?? {}).length ===
+      0, `${dependencyType} must remain empty`, failures)
+  }
+
+  validateDeclaration(declaration, contract, failures)
+  validateTransitions(contract, failures)
+  validateDocuments(documents, contract, failures)
+
+  return failures
+}
+
+export { DOCUMENT_PATHS, SPINNER_COLORS, STATES, STYLE_EXPORTS, TYPE_EXPORTS }

@@ -1,59 +1,51 @@
-# Terminal Protocol & Implementation Foundations
+# Terminal Protocol
 
-You must implement directly without external libs.
+`specs/v1-behavior.json` is normative for terminal behavior. Phase 2 must implement it without external runtime packages.
 
-## 1. SGR - Select Graphic Rendition
-Format: `\x1b[<code>m`
+## ANSI Styles
 
-Constants to hardcode:
-- Foreground 30-37: black, red, green, yellow, blue, magenta, cyan, white
-- Bright 90-97: bright variants
-- Background 40-47: bgBlack, bgRed, bgGreen, bgYellow, bgBlue, bgMagenta, bgCyan, bgWhite
-- Bright background 100-107: bright bg variants
-- Modifiers: 1=bold (reset 22), 2=dim (reset 22), 3=italic (reset 23), 4=underline (reset 24), 9=strikethrough (reset 29), 0=reset all
-- Restore: `\x1b[39m` = default fg, `\x1b[49m` = default bg, `\x1b[0m` = full reset
+Use Select Graphic Rendition sequences in the form `\x1b[<code>m`.
 
-**Nested Closure Handling:**
-Problem: `red('a ' + blue('b') + ' c')` must not bleed.
-Solution: On format, replace inner closing sequences with parent opening sequence.
-Implementation: When wrapping string, detect `\x1b[39m` or `\x1b[0m` inside and replace with opening code.
+- Foreground: 30-37 and bright foreground 90-97.
+- Background: 40-47 and bright background 100-107.
+- Modifiers: reset 0, bold 1/22, dim 2/22, italic 3/23, underline 4/24, and strikethrough 9/29.
+- Default foreground and background restoration: 39 and 49.
 
-Avoid regex per call if possible - use fast string replace.
+Nested styles must restore the enclosing opening sequence instead of leaking the terminal default. For example, the outer red style in `red('a ' + blue('b') + ' c')` remains active for ` c`.
 
-## 2. Cursor Control
-- Hide: `\x1b[?25l`
-- Show: `\x1b[?25h`
-- Clear line: `\x1b[2K\r` or `\r\x1b[K`
+Style helpers are pure `(text: string) => string` functions. They never select or write a stream.
 
-Animation loop:
-- Interval: 80ms (neurological cadence expected from ora)
-- Each tick: clear line, write frame + text to stderr
-- Frames: Unicode braille (⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏) if unicode supported, else ASCII (`-\|/`)
+## Cursor And Line Control
 
-## 3. Environment Detection (create env.ts)
-Check order matters:
-1. `process.env.NO_COLOR` - if set and not empty string -> disable all ANSI
-2. `process.env.FORCE_COLOR` - if set -> force color even if non-TTY
-3. `process.stderr.isTTY` - if false -> non-TTY mode
-4. `process.env.CI` or `process.env.TERM === 'dumb'` or `process.env.NODE_ENV === 'test'` -> CI mode
+- Hide cursor: `\x1b[?25l`
+- Show cursor: `\x1b[?25h`
+- Clear active line: `\x1b[2K\r`
 
-In non-TTY/CI: disable animation interval, emit static text only. Prevents flooding logs with ANSI frames.
+Interactive animation renders immediately, then advances every 80ms. The dots frame code points are `\u280b`, `\u2819`, `\u2839`, `\u2838`, `\u283c`, `\u2834`, `\u2826`, `\u2827`, `\u2807`, and `\u280f`. The line frames are `-`, `\\`, `|`, and `/`.
 
-Defensive: Wrap all `process` access in try/catch + `typeof process !== 'undefined'` check for browser sandbox safety. Degrade to no-op if process undefined.
+The status symbols are `\u2714`, `\u2716`, `\u26a0`, and `\u2139`, with ASCII fallbacks `+`, `x`, `!`, and `i`. Success, failure, warning, and information symbols use green, red, yellow, and blue respectively. Color applies only to the symbol. Empty segments are omitted; remaining prefix, symbol, text, and suffix segments are joined in that order with one ASCII space.
 
-Unicode detection heuristic: Check if `process.platform !== 'win32'` or if `process.env.WT_SESSION` is set (Windows Terminal supports Unicode).
+Interactive `start()` hides the cursor and renders the first frame synchronously. Each subsequent frame clears the active line before rendering without a newline. `stop()` clears the line and restores the cursor. A terminal method clears the line, writes one newline-terminated status, and restores the cursor. Non-interactive `start()` writes one newline-terminated static frame; `stop()` writes nothing; a terminal method writes one newline-terminated status. Non-interactive execution never creates a timer or emits cursor-control sequences.
 
-## 4. Stream Routing & Signal Trap
-- All cosmetic -> `process.stderr` (fd 2)
-- Keep `stdout` clean for JSON piping
+## Capability Policy
 
-Signal Handling (singleton module `signal.ts`):
-- Must trap SIGINT and SIGTERM once (prevent multiple listeners)
-- On SIGINT (2) -> exit 130 (128+2)
-- On SIGTERM (15) -> exit 143 (128+15)
-- Handler must: 
-  1. Use `fs.writeSync(2, '\x1b[?25h\n')` - SYNCHRONOUS, to guarantee before exit in signal context
-  2. Then `process.exit(code)`
-- If process object missing -> no-op
+Color and animation are separate decisions.
 
-This prevents cursor leakage (hidden cursor left behind).
+1. `FORCE_COLOR=0` or `FORCE_COLOR=false` disables color.
+2. Any other defined `FORCE_COLOR` value enables ANSI-16 color and overrides color-disable environment variables.
+3. Without `FORCE_COLOR`, a non-empty `NO_COLOR` or `NODE_DISABLE_COLORS` disables color.
+4. Without an override, CI, `TERM=dumb`, `NODE_ENV=test`, or non-TTY stderr disables color.
+5. Animation is disabled for CI, dumb terminals, test execution, and non-TTY stderr regardless of color forcing.
+
+On Windows, the dots spinner uses its line fallback unless `WT_SESSION` indicates Windows Terminal. No browser fallback is provided because v1 is Node-only.
+
+## Streams And Process Ownership
+
+- Spinner frames, static fallback lines, and statuses write only to `stderr`.
+- The package never writes to `stdout`.
+- Interactive animation hides the cursor and every explicit stop or terminal transition restores it in cleanup.
+- The library installs no process signal or exit listener and never terminates the host process.
+- Applications own abrupt shutdown and may call `stop()` from their own shutdown policy.
+- Concurrent active spinners and custom streams are unsupported in v1.
+
+Synchronous write failures are caught around each cosmetic write. The active timer is cleared, cursor restoration is attempted, and promise results remain unchanged. Asynchronous host-stream error policy remains application-owned.

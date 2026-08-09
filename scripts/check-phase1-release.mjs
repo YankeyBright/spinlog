@@ -1,5 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 
+import { NPM_SBOM_ARGUMENTS } from './generate-sbom.mjs'
+
 const failures = []
 
 function require(condition, message) {
@@ -42,14 +44,14 @@ function readObject(path) {
   return value
 }
 
-const [major, minor] = process.versions.node.split('.').map(Number)
-require(major > 20 ||
-  (major === 20 && minor >= 18), 'Phase 1 release checks require Node >=20.18.0 for SBOM tooling')
+const [major] = process.versions.node.split('.').map(Number)
+require(major >= 22, 'Phase 1 release checks require Node >=22')
 
 const packageJson = readObject('package.json')
 const bom = readObject('sbom.json')
 const ciWorkflow = readText('.github/workflows/ci.yml')
 const releaseWorkflow = readText('.github/workflows/release.yml')
+const repositoryPrivateContext = `REPOSITORY_PRIVATE: ${'$'}{{ github.event.repository.private }}`
 const sbomCommand = packageJson.scripts?.sbom
 const components = Array.isArray(bom.components) ? bom.components : []
 const metadataProperties = bom.metadata?.properties
@@ -57,19 +59,22 @@ const isReproducible =
   Array.isArray(metadataProperties) &&
   metadataProperties.some(({ name, value }) => name === 'cdx:reproducible' && value === 'true')
 
+require(sbomCommand ===
+  'node scripts/generate-sbom.mjs', 'sbom script must use the checked-in npm SBOM adapter')
+require(!(
+  '@cyclonedx/cyclonedx-npm' in (packageJson.devDependencies ?? {})
+), 'the native npm SBOM adapter must not retain the external CycloneDX wrapper')
+
 for (const value of [
-  'cyclonedx-npm',
+  'sbom',
   '--package-lock-only',
-  '--validate',
-  '--spec-version 1.5',
-  '--output-reproducible',
-  '--omit dev',
-  '--omit optional',
-  '--omit peer',
-  '--mc-type library',
+  '--omit=dev',
+  '--omit=optional',
+  '--omit=peer',
+  '--sbom-format=cyclonedx',
+  '--sbom-type=library',
 ]) {
-  require(typeof sbomCommand === 'string' &&
-    sbomCommand.includes(value), `sbom script must contain ${value}`)
+  require(NPM_SBOM_ARGUMENTS.includes(value), `npm SBOM adapter must use ${value}`)
 }
 
 require(bom.bomFormat === 'CycloneDX', 'sbom.json bomFormat must be CycloneDX')
@@ -82,7 +87,9 @@ require(isReproducible, 'SBOM must declare reproducible output')
 require(components.length === 0, `SBOM components must be empty, found ${components.length}`)
 
 for (const value of [
-  "node-version: ['18.x', '20.x', '22.x', '24.x']",
+  'EXPECTED_REPOSITORY: YankeyBright/spinlog',
+  repositoryPrivateContext,
+  "node-version: ['22.x', '24.x']",
   'npm ci --ignore-scripts',
   'npm run check:phases',
   'npm audit --audit-level=low',
@@ -91,13 +98,16 @@ for (const value of [
 }
 
 for (const value of [
+  'EXPECTED_REPOSITORY: YankeyBright/spinlog',
+  repositoryPrivateContext,
   'id-token: write',
   'environment: release',
   "node-version: '24.x'",
   'npm ci --ignore-scripts',
   'npm run check:phases',
   'npm audit --audit-level=low',
-  'npm publish --provenance',
+  'package-manager-cache: false',
+  'npm publish --provenance --access public',
   'gh release create "$GITHUB_REF_NAME" sbom.json',
 ]) {
   require(releaseWorkflow.includes(value), `release workflow must contain ${value}`)

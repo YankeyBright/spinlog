@@ -9,8 +9,8 @@ Terminal colors and spinners are common CLI needs, but applications often add mu
 `spinlog` supplies the color-and-spinner layer of a CLI stack with:
 
 - no runtime, optional, or peer dependency map;
-- ESM-only Node >=18 support;
-- cosmetic output routed to `stderr` by default;
+- ESM-only support for the Node.js 22 and 24 LTS majors;
+- pure style helpers and spinner-owned output routed exclusively to `stderr`;
 - a small gzip-constrained bundle; and
 - package, SBOM, and provenance evidence that can be checked by automated review.
 

@@ -1,46 +1,35 @@
 # Phase 5: Trusted Release
 
-## Release Preconditions
+## Preconditions
 
-Before the first publication:
+1. Protect `main`, version tags, workflow files, and the GitHub `release` environment.
+2. Configure npm Trusted Publishing for owner `YankeyBright`, repository `spinlog`, workflow `release.yml`, environment `release`, and permission to publish.
+3. Confirm the repository and package are public and revoke any long-lived npm publish token.
+4. Confirm the GitHub-hosted release job uses Node 24 and npm at or above the trusted-publishing minimum.
+5. Pass the required Node 22 and Node 24 quality jobs plus the Node 24 supply-chain job.
 
-1. Protect `main` and version tags. Require review for the GitHub `release` environment.
-2. Configure npm Trusted Publishing for the exact `spinlog/spinlog` repository and `release.yml` workflow, allowing `npm publish`.
-3. Remove or revoke npm publish tokens. The release workflow uses OIDC and must not set `NPM_TOKEN` or `NODE_AUTH_TOKEN`.
-4. Confirm the workflow runs on a GitHub-hosted runner with Node 24 and npm >=11.5.1.
+## Tag-Driven Protocol
 
-## Tag-Driven Release Protocol
-
-1. Set the intended semantic version in `package.json` and update the lockfile.
-2. Pass the Node 18, 20, 22, and 24 quality matrix and the Node 24 supply-chain job.
+1. Set the intended semantic version in both manifest and lockfile.
+2. Complete release notes and pass all foundation gates.
 3. Create a protected tag named exactly `v<package-version>`.
-4. The release workflow performs the following in order:
+4. The immutable workflow performs, in order:
 
 ```text
 npm ci --ignore-scripts
--> verify the tag/version match
--> npm run verify:release
+-> verify repository identity and tag/version equality
+-> npm run check:phases
 -> npm audit --audit-level=low
--> npm publish --provenance
+-> npm publish --provenance --access public
 -> create the GitHub Release and attach sbom.json
 ```
 
-The workflow validates the release tag before publish, fails dependency audit findings at low severity or higher, and only then publishes with npm provenance.
+Checkout credentials are not persisted and dependency caching is disabled for release builds.
 
 ## Post-Publish Verification
 
-```bash
-npm audit signatures
-npm view spinlog@$(npm pkg get version --json | tr -d '"') --json
-npm view spinlog@$(npm pkg get version --json | tr -d '"') dist.attestations --json
-```
-
-Confirm that the npm package contains `sbom.json`, the GitHub Release contains the same SBOM asset, and npm reports provenance for the published version.
-
-## Security Response
-
-`SECURITY.md` defines the project's private reporting channel and five-business-day acknowledgement target. Incident-specific remediation, disclosure, and root-cause communications are determined after triage; this document does not promise a fixed public disclosure timeline.
+Run `npm audit signatures` and inspect the published version's attestations and file list. Confirm npm provenance names `YankeyBright/spinlog`, and confirm the npm tarball and GitHub Release contain the validated SBOM.
 
 ## Definition Of Done
 
-A release is complete only when the package version and tag match, npm provenance is present, `sbom.json` is attached to the GitHub Release, and all repository invariant gates have passed.
+A release is complete only when package, tag, repository, provenance, SBOM, signature, and foundation-gate evidence agree.

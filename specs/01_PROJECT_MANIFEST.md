@@ -1,36 +1,29 @@
 # Project Manifest: spinlog
 
-**One-liner:** A sub-1.2kB, zero-runtime-dependency, ESM-only terminal primitive for colors and spinner state transitions on Node.js.
+**One-liner:** A zero-runtime-dependency, ESM-only terminal color and spinner primitive capped at 1,228 gzip bytes.
 
 ## Target Users
 
-Node.js CLI developers and security-conscious organizations that need polished terminal feedback without adding a runtime dependency tree.
+Node.js CLI developers and security-conscious teams that need terminal feedback without adding a consumer runtime dependency tree.
 
 ## Hard Constraints
 
-1. **Zero Runtime Surface:** `dependencies`, `optionalDependencies`, and `peerDependencies` are empty.
-2. **No Package Lifecycle Scripts:** The published package declares no install, publish, prepare, or pack lifecycle scripts.
-3. **ESM Only:** `type: module` with an import-only public export map. No CommonJS output.
-4. **Size Budget:** `dist/index.js` is at most 1,228 bytes after gzip compression.
-5. **Node >=18:** The runtime is supported and verified from Node 18 upward.
-6. **Build Shape:** `tsup` produces minified ESM declarations without source maps; `sideEffects` is `false`.
-7. **Stream Discipline:** Cosmetic colors, spinner frames, and terminal state output use `stderr` only.
-8. **Supply Chain:** Release publishing uses GitHub OIDC provenance and includes a runtime-only CycloneDX SBOM.
+1. **Zero Runtime Dependencies:** `dependencies`, `optionalDependencies`, and `peerDependencies` remain empty.
+2. **No Lifecycle Scripts:** The package declares no install, publish, prepare, or pack lifecycle hook.
+3. **ESM Only:** `type: module` and an import-only export map; no CommonJS artifact.
+4. **Exact Size Budget:** `dist/index.js` is at most 1,228 bytes after gzip level 9.
+5. **Supported Runtime:** Node.js 22 and 24 LTS (`^22.0.0 || ^24.0.0`).
+6. **Build Shape:** tsup emits minified ESM JavaScript and TypeScript emits declarations directly; no source maps.
+7. **Stream Discipline:** Style helpers are pure; spinner-owned output uses only stderr and the package never writes stdout.
+8. **Host Ownership:** The library installs no process-lifecycle listener and never terminates its host process.
+9. **Supply Chain:** Releases use GitHub OIDC trusted publishing and include a validated runtime-only CycloneDX SBOM.
 
-## v1 API Boundary
+## v1 Boundary
 
-- Color functions and named color exports.
-- A spinner with `start`, `stop`, `succeed`, `fail`, `warn`, and `info` transitions.
-- Live mutation of `text`, `color`, `prefix`, and `suffix`.
-- `spinlog.promise(...)`.
+The exact surface and behavior are frozen in `specs/v1-public-api.d.ts` and `specs/v1-behavior.json`. They cover ANSI-16 styles, one spinner lifecycle, four mutable fields, and promise wrapping. Phase 2 may implement no additional export.
 
-## Deferred Beyond v1
+Task groups, progress bars, prompts, intro/outro helpers, structured logging, custom streams and animations, concurrent spinners, and advanced colors are deferred with rationale in `specs/16_POST_MVP_FEATURES.md`.
 
-Task groups, progress bars, prompts, intro/outro helpers, and structured JSON logging are explicitly deferred. See `docs/post-mvp.md` for the rationale.
+## Security Position
 
-## Value Proposition
-
-- Replaces the colors-and-spinner portion of a fragmented CLI stack without runtime dependencies.
-- Keeps machine-readable `stdout` clean by default.
-- Provides verifiable package contents, SBOM, and npm provenance evidence for audit workflows.
-- Aligns with the dependency-reduction goals of ecosystem cleanup efforts without making unsupported compliance-certification claims.
+Zero runtime dependencies remove a specific consumer-side transitive dependency class. They do not remove source, build-tool, maintainer-account, CI, or registry risk. Package allowlisting, exact development pins, dependency audit, provenance, and SBOM checks address those separate surfaces without claiming certification.

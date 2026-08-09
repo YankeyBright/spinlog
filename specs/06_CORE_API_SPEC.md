@@ -1,68 +1,47 @@
 # Core API Specification
 
-This specification defines the frozen v1 runtime surface. It is subordinate to `docs/mvp-contract.md` and `docs/stream-policy.md`.
+The public declaration in `specs/v1-public-api.d.ts` and behavior model in `specs/v1-behavior.json` are the normative v1 API contract. Phase 2 implementation and declarations must conform exactly; undocumented exports are contract violations.
 
-## Spinner Factory
+## Export Surface
 
-```ts
-const spinner = spinlog('Installing', {
-  color: 'cyan',
-  prefix: '[1/3]',
-  suffix: 'please wait',
-})
-```
+The default export is the callable `spinlog` factory. Named type exports are `SpinnerName`, `SpinnerColor`, `SpinnerOptions`, `PromiseOptions`, `Spinner`, and `Spinlog`.
 
-The factory returns a spinner instance. Cosmetic output always writes to `stderr`.
+Named runtime exports are exactly:
 
-## Spinner Lifecycle
+- Modifiers: `reset`, `bold`, `dim`, `italic`, `underline`, `strikethrough`.
+- Foreground: `black`, `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `white`, and their `Bright` variants.
+- Background: the corresponding `bg*` and `bg*Bright` functions.
 
-```ts
-spinner.start()
-spinner.stop()
-spinner.succeed('Done')
-spinner.fail('Failed')
-spinner.warn('Warning')
-spinner.info('Information')
-```
+Aliases, style chaining, advanced color modes, named factory aliases, and CommonJS exports are excluded.
 
-Terminal transitions must stop animation, clear or finalize the active line as appropriate, restore cursor state if it was hidden, and write a persistent result to `stderr`.
+## Factory And Defaults
 
-## Live Mutation
+`spinlog(text?, options?)` returns `Spinner`. Options are limited to `color`, `prefix`, `suffix`, and `spinner`. Defaults are empty text/prefix/suffix, cyan, dots, and an 80ms interval. Spinner names are exactly `dots` and `line`; spinner colors are the 16 foreground names.
 
-```ts
-spinner.text = 'Downloading'
-spinner.color = 'blue'
-spinner.prefix = '[2/3]'
-spinner.suffix = 'almost there'
-```
+The mutable instance properties are exactly `text`, `color`, `prefix`, and `suffix`. Lifecycle methods return the same instance for chaining and accept no undocumented parameters.
 
-Mutations affect the next rendered frame without adding unintended line breaks. The supported mutable fields are exactly `text`, `color`, `prefix`, and `suffix`.
+## Lifecycle
+
+The internal states are `idle`, `spinning`, `stopped`, `succeeded`, `failed`, `warned`, and `informed`.
+
+| Operation | Idle or stopped | Spinning | Terminal state |
+| --- | --- | --- | --- |
+| `start()` | Begin a new cycle | Idempotent no-op | Begin a new cycle |
+| `stop()` | Enter/remain stopped without output | Clear, restore, and stop | Idempotent no-op |
+| Terminal method | Persist the requested status once | Stop, restore, and persist once | Preserve the first terminal result |
+
+Mutation never changes state and becomes visible on the next render. An optional terminal text argument replaces stored text before persistence. A new `start()` resets terminal idempotency for the next cycle. The per-method, per-source-state matrices in `specs/v1-behavior.json` are exhaustive; a destination or effect not listed there is illegal.
 
 ## Promise Wrapper
 
-```ts
-const value = await spinlog.promise(fetchData(), { text: 'Fetching' })
-```
+`spinlog.promise(...)` has exactly two generic overloads: a `PromiseLike<T>` input or a zero-argument function returning `PromiseLike<T>`. Both accept optional `PromiseOptions` and return `Promise<T>`.
 
-`spinlog.promise(...)` accepts a promise or async function, starts a spinner, calls `succeed` on resolution, calls `fail` on rejection, and rethrows the original rejection.
+The spinner starts before a direct input is observed or a callback is invoked. The callback runs once, thenables are assimilated, synchronous callback throws become rejections, and resolution calls `succeed` while rejection calls `fail`. The fulfillment value or original rejection reason is preserved. Cosmetic failures never replace action settlement.
 
-## Colors
+## Terminal Degradation
 
-```ts
-import { bold, blue, dim, green, red, yellow } from 'spinlog'
-
-const message = bold(green('done'))
-```
-
-Color helpers are named ESM exports and must remain independently tree-shakeable. They honor the environment policy for color support.
-
-## Non-TTY And CI Behavior
-
-- Non-TTY and CI execution never starts an animation interval.
-- Static messages and terminal transitions still use `stderr`.
-- `NO_COLOR` disables color output according to the environment policy.
-- `FORCE_COLOR` behavior is defined and tested without overriding the stream policy.
+Interactive rendering uses stderr and timers. Non-interactive execution creates no timer and emits deterministic static start and terminal lines. Style helpers remain pure string transformations and use stderr capability only to decide whether ANSI is appropriate.
 
 ## Explicitly Excluded From v1
 
-The following API members must not be implemented or documented as available in v1: `spinlog.group`, `spinlog.progress`, `spinlog.confirm`, `spinlog.text`, `spinlog.intro`, `spinlog.outro`, and `structured: true`.
+The complete deferred list and rationale are in `specs/16_POST_MVP_FEATURES.md`. Phase 2 may not export task groups, progress, prompts, intro/outro helpers, structured logs, custom streams, custom animations, concurrent spinners, or advanced color APIs.

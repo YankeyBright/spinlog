@@ -5,9 +5,8 @@ export default defineConfig({
     environment: 'node',
     coverage: {
       provider: 'v8',
-      all: true,
       include: ['src/**/*.ts'],
-      exclude: ['docs/**', 'config/**', ...coverageConfigDefaults.exclude],
+      exclude: ['config/**', ...coverageConfigDefaults.exclude],
       thresholds: {
         lines: 100,
         functions: 100,
@@ -18,9 +17,9 @@ export default defineConfig({
       },
     },
     include: ['test/**/*.test.ts'],
-    exclude: ['dist', 'docs', 'config'],
+    exclude: ['dist', 'config'],
     fakeTimers: {
       toFake: ['setInterval', 'clearInterval', 'setTimeout', 'clearTimeout'],
-    }
+    },
   },
 })

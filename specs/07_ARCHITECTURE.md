@@ -1,56 +1,40 @@
 # Architecture
 
-## v1 Module Layout
+## Phase 2 Module Layout
 
 ```text
-spinlog/
-  src/
-    index.ts       public ESM entrypoint, factory, and colors
-    ansi.ts        ANSI SGR and cursor control primitives
-    env.ts         NO_COLOR, FORCE_COLOR, TTY, and CI detection
-    signal.ts      process-wide cursor restoration for termination signals
-    spinner.ts     spinner state machine and stderr renderer
-  test/
-    ansi.test.ts
-    env.test.ts
-    spinner.test.ts
-    signal.test.ts
-    integration.test.ts
-  scripts/
-    check-package-policy.mjs
-    check-pack.mjs
-    check-sbom.mjs
-    check-size.mjs
+src/
+  index.ts    public ESM factory, promise wrapper, and named styles
+  ansi.ts     ANSI style, cursor, and line-control primitives
+  env.ts      color, animation, TTY, CI, and Unicode decisions
+  spinner.ts  lifecycle state machine and stderr renderer
 ```
 
-No v1 source module is reserved for task groups, progress bars, prompts, intro/outro helpers, or structured logging. Those features remain post-MVP.
+Phase 0 and Phase 1 do not create these runtime modules beyond the inert entry point. The declarations in `specs/v1-public-api.d.ts` are a specification artifact and are not published until Phase 2 implements them.
 
-## Module Responsibilities
+## Responsibilities
 
 ### `ansi.ts`
 
-Owns compact ANSI sequences for SGR colors, cursor visibility, and line clearing. Nested color closures must restore the outer style without an external parser.
+Owns compact ANSI sequences and pure style functions. Nested closures restore the enclosing style without an external parser. It performs no stream or process-lifecycle operations.
 
 ### `env.ts`
 
-Contains all terminal capability decisions so they are testable. It interprets `NO_COLOR`, `FORCE_COLOR`, `stderr.isTTY`, and CI state without changing the output-stream policy.
-
-### `signal.ts`
-
-Installs a singleton `SIGINT` and `SIGTERM` handler only while terminal state needs restoration. Cleanup writes synchronously to `stderr` and preserves the conventional exit codes.
+Separates color capability from animation capability and implements the exact environment precedence in `specs/v1-behavior.json`. The package is Node-only, so it does not carry browser emulation.
 
 ### `spinner.ts`
 
-Owns the finite lifecycle, rendering interval, mutation fields, and transition behavior. It must not import network packages, write cosmetic output to `stdout`, or create an interval in non-TTY or CI mode.
+Owns lifecycle state, timer creation and cleanup, mutable properties, rendering, cursor visibility during active animation, static degradation, and synchronous write containment. It writes only to stderr and does not install process or stream-global listeners.
 
 ### `index.ts`
 
-Exports the public ESM factory, promise wrapper, and tree-shakeable colors. It contains no CommonJS compatibility wrapper.
+Exports the callable default factory, promise overload implementation, type surface, and exact named style functions. It adds no CommonJS wrapper or post-MVP API.
 
-## Architectural Rules
+## Ownership Rules
 
-- Prefer Node built-ins and local modules only.
-- Keep terminal rendering deterministic and state transitions idempotent.
-- Keep process and stream interaction behind narrow, mockable boundaries.
-- Add coverage in proportion to terminal-state and signal-handling risk; do not use a blanket percentage target as a substitute for scenario coverage.
-- Keep post-MVP APIs out of the runtime exports until their own contract, stream rules, and tests are approved.
+- The library owns only resources created by a spinner instance.
+- Explicit lifecycle methods clear instance timers and restore cursor state.
+- The host application owns signals, process termination, and asynchronous stream errors.
+- Multiple simultaneously active spinners are unsupported until a coordinated renderer is specified.
+- Runtime code uses Node built-ins and local modules only.
+- The Phase 2 gate must compare emitted declarations and runtime exports with the frozen Phase 0 contract.

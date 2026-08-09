@@ -2,49 +2,46 @@
 
 ## Goal
 
-Create a production-ready TypeScript package shell around the frozen Phase 0 contract. Phase 1 proves build, test, package, size, and release controls without implementing the v1 runtime API.
+Create a production package shell around the frozen Phase 0 contract. Phase 1 proves build, test, package, size, and release controls without implementing v1 runtime behavior.
 
 ## Package Manifest
 
-- ESM-only package with `type: "module"`, `sideEffects: false`, and an import-only export map.
-- Node runtime floor of `>=18`.
+- ESM-only with `type: "module"`, `sideEffects: false`, and an import-only export map.
+- Runtime engines `^22.0.0 || ^24.0.0` and public repository `YankeyBright/spinlog`.
 - Publish allowlist limited to `dist`, `README.md`, `LICENSE`, `SECURITY.md`, and `sbom.json`.
-- No runtime, optional, or peer dependencies.
-- No npm lifecycle scripts.
-- Development dependencies are exact-pinned and limited to build, test, formatting, size, SBOM, and release verification.
+- No runtime, optional, or peer dependencies and no npm lifecycle scripts.
+- Direct development dependencies are exact-pinned and lockfile-resolved.
 
-## TypeScript and Build Contract
+## TypeScript And Build
 
-- TypeScript is pinned to `7.0.2`.
-- `target` is `ES2022`, `module` is `Node18`, and `moduleResolution` is `Node16`.
-- `src` is the source root and `dist` is the output directory.
-- Strict checking and declaration emission are enabled; source maps and declaration maps are disabled.
-- tsup builds minified, tree-shaken ESM JavaScript only.
-- `tsc --emitDeclarationOnly` produces declarations after the JavaScript build.
-- No CommonJS artifact or source map may be generated.
+- TypeScript `7.0.2` with direct `@types/node@22.20.1`.
+- `target: "ES2023"`, `lib: ["ES2023"]`, `module: "Node20"`, and `moduleResolution: "Node16"`.
+- Strict checking and declaration emission; no skipped library checks or map output.
+- tsup emits minified, tree-shaken ESM JavaScript with `target: "node22"` and no declarations.
+- `tsc --emitDeclarationOnly` subsequently emits `dist/index.d.ts`.
+- Dist contains exactly ESM JavaScript and declarations.
 
-## Quality and Release Preparation
+## Quality And Release Preparation
 
-- Vitest runs in Node with V8 coverage at 100% globally and per source file.
+- Vitest enforces 100% V8 coverage globally and per source file.
+- The Phase 0 policy suite proves the contract validator rejects known drift cases.
 - Biome formatting and linting are enabled.
-- The gzip size gate fails above 1,228 bytes.
-- The package dry-run must contain only allowlisted files.
-- CI verifies Node 18, 20, 22, and 24.
-- Release preparation uses GitHub OIDC, pinned action SHAs, a runtime-only CycloneDX 1.5 SBOM, and no long-lived npm token.
-- The Phase 1 gate rejects esbuild versions affected by GHSA-g7r4-m6w7-qqqr and requires an explicit review when tsup's declared esbuild range changes.
+- The exact gzip gate rejects artifacts above 1,228 bytes.
+- Package dry-run validation enforces the approved seven-file tarball.
+- Required CI runs on Node 22 and Node 24.
+- Release preparation uses immutable action commits, disabled persisted credentials, GitHub OIDC, a runtime-only CycloneDX 1.5 SBOM, and no long-lived npm token.
+- The Phase 1 gate retains and validates the patched esbuild override until its explicit retirement condition is met.
 
-## Source and Test Shell
+## Source Boundary
 
-- `src/index.ts` remains an inert entry point until Phase 2.
-- `test/` contains only package-shell and verification-control tests.
-- Runtime implementation files are not required by the Phase 1 gate.
+`src/index.ts` remains inert through Phase 1. The contract declaration under `specs` is not the emitted package declaration and does not claim implementation. Runtime modules and behavior tests begin in Phase 2.
 
-## Definition of Done
+## Definition Of Done
 
 ```bash
-npm run check:phase-map
+npm run check:phase0
 npm run check:phase1
 npm run check:phase1:release
 ```
 
-All commands must exit successfully. The package must remain importable as ESM, emit valid declarations, stay within the size budget, and preserve the seven-file tarball allowlist.
+All commands must pass before Phase 1 is marked complete.
