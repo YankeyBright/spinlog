@@ -36,6 +36,7 @@ function readObject(path) {
 
 const contract = readObject('specs/v1-behavior.json')
 const declaration = readText('specs/v1-public-api.d.ts')
+const stylesDeclaration = readText('specs/v1-styles-api.d.ts')
 const packageJson = readObject('package.json')
 const documents = Object.fromEntries(DOCUMENT_PATHS.map((path) => [path, readText(path)]))
 
@@ -53,7 +54,9 @@ if (process.env.GITHUB_ACTIONS === 'true') {
   }
 }
 
-failures.push(...validatePhase0Contract({ contract, declaration, packageJson, documents }))
+failures.push(
+  ...validatePhase0Contract({ contract, declaration, stylesDeclaration, packageJson, documents }),
+)
 
 if (failures.length > 0) {
   for (const failure of failures) {

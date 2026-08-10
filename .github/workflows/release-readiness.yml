@@ -1,0 +1,43 @@
+name: Release Readiness
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-readiness
+  cancel-in-progress: false
+
+env:
+  EXPECTED_REPOSITORY: YankeyBright/spinlog
+  REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '24.x'
+          package-manager-cache: false
+
+      - name: Install Dependencies Without Lifecycle Hooks
+        run: npm ci --ignore-scripts
+
+      - name: Verify Implemented Phases
+        run: npm run check:phases
+
+      - name: Audit Dependency Graph
+        run: npm audit --audit-level=low
+
+      - name: Inspect Package Payload
+        run: npm pack --dry-run --json --ignore-scripts

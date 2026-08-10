@@ -1,16 +1,16 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 3,
   "phase": 0,
   "identity": {
     "packageName": "spinlog",
     "author": "spinlog contributors",
     "license": "MIT",
     "repository": "https://github.com/YankeyBright/spinlog",
-    "repositoryGit": "https://github.com/YankeyBright/spinlog.git",
+    "repositoryGit": "git+https://github.com/YankeyBright/spinlog.git",
     "visibility": "public"
   },
   "runtime": {
-    "engines": "^22.0.0 || ^24.0.0",
+    "engines": "^22.13.0 || ^24.0.0",
     "supportedLtsMajors": [22, 24],
     "moduleFormat": "esm",
     "browserSupport": false
@@ -19,10 +19,12 @@
     "artifact": "dist/index.js",
     "compression": "gzip",
     "level": 9,
-    "maximumBytes": 1228
+    "maximumBytes": 2560
   },
   "publicApi": {
     "declaration": "specs/v1-public-api.d.ts",
+    "stylesDeclaration": "specs/v1-styles-api.d.ts",
+    "stylesSubpath": "spinlog/styles",
     "defaultExport": "spinlog",
     "typeExports": [
       "PromiseOptions",
@@ -117,8 +119,10 @@
       "warn": "yellow",
       "info": "blue"
     },
-    "colorApplication": "symbol-only",
+    "frameColorApplication": "frame-only",
+    "statusColorApplication": "symbol-only",
     "emptySegments": "omit",
+    "timerReferenced": false,
     "interactive": {
       "startSequence": ["hide-cursor", "render-frame"],
       "frameSequence": ["clear-line", "render-frame"],
@@ -137,6 +141,23 @@
       "terminalSequence": ["render-status", "newline"]
     }
   },
+  "textSafety": {
+    "fields": ["text", "prefix", "suffix", "terminalText"],
+    "boundary": "render-only",
+    "preserveAssignedValues": true,
+    "stripVTControlCharacters": true,
+    "replaceCodePointRanges": [
+      "U+0000-U+001F",
+      "U+007F-U+009F",
+      "U+061C",
+      "U+200E-U+200F",
+      "U+2028-U+202E",
+      "U+2066-U+2069"
+    ],
+    "replacement": " ",
+    "trimSegmentBoundaries": true,
+    "embeddedAnsi": "strip"
+  },
   "environment": {
     "colorPrecedence": [
       "FORCE_COLOR",
@@ -152,7 +173,23 @@
     "forceColorFalseValues": ["0", "false"],
     "forceColorOtherDefinedValues": "enable",
     "forceColorEnablesAnimation": false,
+    "ci": "non-empty-disables",
+    "termDumb": "exact-disables",
+    "nodeEnvTest": "exact-disables",
     "unicodeWindowsHeuristic": "WT_SESSION-required"
+  },
+  "inputValidation": {
+    "factoryText": "string",
+    "options": "non-null-non-array-object",
+    "textFields": ["text", "prefix", "suffix", "terminalText"],
+    "spinnerNames": ["dots", "line"],
+    "colors": "publicApi.SpinnerColor",
+    "mutableFields": ["text", "color", "prefix", "suffix"],
+    "unknownOptionKeys": "ignore",
+    "invalidFactoryInput": "throw-TypeError-before-output",
+    "invalidMutation": "throw-TypeError-and-preserve-value",
+    "invalidPromiseOptions": "reject-TypeError-before-start-or-input",
+    "invalidStyleInput": "throw-TypeError-before-capability-detection"
   },
   "stateMachine": {
     "initial": "idle",
@@ -233,9 +270,12 @@
   "styles": {
     "input": "string",
     "output": "string",
-    "pure": true,
+    "sideEffectFree": true,
+    "readsCapability": true,
     "writesStreams": false,
     "nestedStylesRestoreParent": true,
+    "resetBehavior": "hard-reset-boundary",
+    "resetRestoresParent": false,
     "capabilityStream": "stderr",
     "escapePrefix": "\u001b[",
     "escapeSuffix": "m",
@@ -292,6 +332,11 @@
     "catchSynchronousWrites": true,
     "clearActiveTimer": true,
     "attemptCursorRestore": true,
+    "activeFailureState": "stopped",
+    "terminalStatePreserved": true,
+    "futureStartRetries": true,
+    "cleanupFailuresSuppressed": true,
+    "backpressureIsFailure": false,
     "cosmeticMethodsThrow": false,
     "promiseSettlementPreserved": true,
     "asynchronousStreamErrorsOwnedByHost": true

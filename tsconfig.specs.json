@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "declaration": false,
+    "isolatedDeclarations": false,
+    "noEmit": true,
+    "rootDir": "specs"
+  },
+  "include": ["specs/v1-public-api.d.ts", "specs/v1-styles-api.d.ts"],
+  "exclude": []
+}

@@ -14,7 +14,8 @@ This mapping is engineering evidence, not certification against NIST SSDF, SLSA,
 
 ## Trusted Publishing
 
-- Publish only from `.github/workflows/release.yml` in `YankeyBright/spinlog`.
+- Before Phase 5, `.github/workflows/release-readiness.yml` is verification-only and has no tag trigger, write permission, OIDC permission, publish command, or release command.
+- Phase 5 creates `.github/workflows/release.yml`; publish only from that workflow in `YankeyBright/spinlog`.
 - Require `id-token: write`, Node 24, npm at or above 11.5.1, and the protected `release` environment.
 - Configure npm with the exact owner, repository, workflow filename, environment, and allowed publish action.
 - Use `npm publish --provenance --access public` and no `NPM_TOKEN` or `NODE_AUTH_TOKEN`.

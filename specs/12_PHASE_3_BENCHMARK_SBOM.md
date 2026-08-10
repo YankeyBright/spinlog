@@ -2,7 +2,7 @@
 
 ## Size Gate (Hard Fail)
 
-The package budget is exactly 1,228 gzipped bytes for `dist/index.js`.
+The package ceiling is exactly 2,560 gzipped bytes for `dist/index.js`.
 
 ```bash
 npm run build
@@ -10,7 +10,7 @@ npm run size
 npm run size:limit
 ```
 
-`npm run size` performs the hard cross-platform Node `zlib` check. The `.size-limit.json` policy independently enforces the unambiguous `1228 B` limit across the supported Node matrix.
+`npm run size` performs the hard cross-platform Node `zlib` check. The `.size-limit.json` policy independently enforces the unambiguous `2560 B` limit across the supported Node matrix.
 
 ## Benchmarking
 

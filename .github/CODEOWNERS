@@ -1,0 +1,7 @@
+* @YankeyBright
+
+/src/ @YankeyBright
+/specs/ @YankeyBright
+/.github/workflows/ @YankeyBright
+/package.json @YankeyBright
+/package-lock.json @YankeyBright

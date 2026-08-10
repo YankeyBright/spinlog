@@ -5,10 +5,10 @@ Phase 4 begins only after Phase 2 runtime behavior and Phase 3 measurements exis
 ## Public Documentation
 
 - Describe the exact default factory, named styles, types, options, transitions, idempotency, promise semantics, environment policy, streams, and process ownership.
-- State the measured artifact size as an exact byte count bounded by 1,228 gzip bytes.
+- State the measured artifact size as an exact byte count bounded by 2,560 gzip bytes.
 - Document zero consumer runtime dependencies and absent lifecycle scripts without claiming zero risk or certification.
 - Publish provenance, signature, and SBOM verification only after those registry artifacts exist.
-- Use `import spinlog, { green } from 'spinlog'`; do not document a named factory export.
+- Use `import spinlog, { green } from 'spinlog'` for the full API and `import { green } from 'spinlog/styles'` for style-only bundles; do not document a named factory export.
 
 ## Migration
 

@@ -7,9 +7,7 @@ Implement and prove the frozen v1 contract. Runtime behavior and deterministic t
 ## Runtime Modules
 
 1. `src/ansi.ts`
-   - Implement the exact SGR names and sequences.
-   - Export pure, independently tree-shakeable style helpers.
-   - Restore enclosing styles correctly for nested formatting.
+   - Apply capability-approved color to spinner frames and statuses.
 2. `src/env.ts`
    - Implement the frozen color and animation precedence independently.
    - Detect TTY, CI, dumb terminal, test mode, and the Windows Unicode heuristic.
@@ -20,6 +18,10 @@ Implement and prove the frozen v1 contract. Runtime behavior and deterministic t
 4. `src/index.ts`
    - Export the callable default factory, exact types, exact styles, and the two promise overloads.
    - Export nothing listed as deferred or permanently excluded.
+5. `src/styles.ts`
+   - Export the exact 38 side-effect-free style helpers.
+   - Reject invalid JavaScript input consistently and preserve nested SGR behavior.
+   - Provide the independently tree-shakeable `spinlog/styles` entrypoint.
 
 ## Required Behavior Tests
 
@@ -29,6 +31,8 @@ Implement and prove the frozen v1 contract. Runtime behavior and deterministic t
 - Process-ownership tests prove no signal or exit listeners are installed and no host termination API is invoked.
 - Promise tests prove both overloads, thenable assimilation, callback ordering, synchronous throws, exact value/reason preservation, and cosmetic-failure isolation.
 - Contract tests compare emitted declarations and runtime exports against Phase 0.
+- Declaration comparison uses direct TypeScript emit, TypeScript CLI compilation, pinned Biome canonicalization, and negative/positive consumer type fixtures. It does not depend on TypeScript 7's unstable compiler API.
+- Packed-consumer tests install the actual tarball and validate package-name imports, module-resolution profiles, stderr output, and timer ownership.
 
 Tests make no network calls. Every source file maintains 100% statements, branches, functions, and lines globally and per file.
 
@@ -42,8 +46,9 @@ All entries in `specs/16_POST_MVP_FEATURES.md`, CommonJS, and browser-first supp
 npm run test:coverage
 npm run check:phase0
 npm run check:phase1
+npm run check:phase2
 npm run check:phases
 npm audit --audit-level=low
 ```
 
-The runtime is complete only when behavior, declaration, stream, ownership, ESM, size, package, SBOM, and release-policy checks all pass.
+The ordered aggregate success record is `{"phase0":"pass","phase1":"pass","phase1Release":"pass","phase2":"pass"}`. The runtime is complete only when behavior, declaration, stream, ownership, ESM, size, package, SBOM, and release-policy checks all pass. An over-budget implementation remains incomplete even when every behavioral test passes.

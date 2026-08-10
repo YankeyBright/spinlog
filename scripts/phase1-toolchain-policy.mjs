@@ -1,5 +1,4 @@
-const ESBUILD_OVERRIDE_VERSION = '0.28.1'
-const TSUP_ESBUILD_RANGE = '^0.27.0'
+const ESBUILD_VERSION = '0.28.2'
 const AFFECTED_ESBUILD_MINIMUM = [0, 27, 3]
 const PATCHED_ESBUILD_MINIMUM = [0, 28, 1]
 
@@ -11,18 +10,13 @@ function parseVersion(version) {
 function compareVersions(left, right) {
   for (let index = 0; index < 3; index += 1) {
     const difference = left[index] - right[index]
-
-    if (difference !== 0) {
-      return difference
-    }
+    if (difference !== 0) return difference
   }
-
   return 0
 }
 
 function isAffectedEsbuildVersion(version) {
   const parsed = parseVersion(version)
-
   return (
     parsed !== undefined &&
     compareVersions(parsed, AFFECTED_ESBUILD_MINIMUM) >= 0 &&
@@ -45,6 +39,16 @@ export function validateTypeScriptConfig(tsconfig) {
     ['sourceMap', false],
     ['noEmitOnError', true],
     ['strict', true],
+    ['verbatimModuleSyntax', true],
+    ['isolatedModules', true],
+    ['isolatedDeclarations', true],
+    ['noUncheckedSideEffectImports', true],
+    ['moduleDetection', 'force'],
+    ['noUncheckedIndexedAccess', true],
+    ['noImplicitReturns', true],
+    ['noUnusedLocals', true],
+    ['noUnusedParameters', true],
+    ['noFallthroughCasesInSwitch', true],
     ['skipLibCheck', false],
   ]) {
     if (compilerOptions?.[option] !== expected) {
@@ -52,10 +56,12 @@ export function validateTypeScriptConfig(tsconfig) {
     }
   }
 
+  if ('esModuleInterop' in (compilerOptions ?? {})) {
+    failures.push('tsconfig must not enable CommonJS interoperability')
+  }
   if (JSON.stringify(compilerOptions?.lib) !== JSON.stringify(['ES2023'])) {
     failures.push('tsconfig lib must be exactly ES2023')
   }
-
   if (JSON.stringify(compilerOptions?.types) !== JSON.stringify(['node'])) {
     failures.push('tsconfig types must explicitly include only node')
   }
@@ -66,27 +72,22 @@ export function validateTypeScriptConfig(tsconfig) {
 export function validateEsbuildSecurityPolicy(packageJson, packageLock) {
   const failures = []
   const packages = packageLock?.packages ?? {}
-  const tsupPackage = packages['node_modules/tsup']
   const rootEsbuild = packages['node_modules/esbuild']
 
-  if (packageJson?.overrides?.tsup?.esbuild !== ESBUILD_OVERRIDE_VERSION) {
-    failures.push(`tsup esbuild override must be ${ESBUILD_OVERRIDE_VERSION}`)
+  if (packageJson?.devDependencies?.esbuild !== ESBUILD_VERSION) {
+    failures.push(`esbuild must be a direct exact pin at ${ESBUILD_VERSION}`)
   }
-
+  if ('tsup' in (packageJson?.devDependencies ?? {})) {
+    failures.push('tsup must not remain after direct esbuild migration')
+  }
+  if ('overrides' in (packageJson ?? {})) {
+    failures.push('package.json overrides must be absent after direct esbuild migration')
+  }
   if (packageLock?.lockfileVersion !== 3) {
     failures.push('package-lock.json must use lockfileVersion 3')
   }
-
-  if (tsupPackage?.version !== packageJson?.devDependencies?.tsup) {
-    failures.push('package-lock.json tsup version must match package.json')
-  }
-
-  if (tsupPackage?.dependencies?.esbuild !== TSUP_ESBUILD_RANGE) {
-    failures.push('tsup esbuild range changed; review whether the security override can be retired')
-  }
-
-  if (rootEsbuild?.version !== ESBUILD_OVERRIDE_VERSION) {
-    failures.push(`package-lock.json root esbuild must resolve to ${ESBUILD_OVERRIDE_VERSION}`)
+  if (rootEsbuild?.version !== ESBUILD_VERSION) {
+    failures.push(`package-lock.json root esbuild must resolve to ${ESBUILD_VERSION}`)
   }
 
   for (const [path, metadata] of Object.entries(packages)) {

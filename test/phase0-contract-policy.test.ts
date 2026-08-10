@@ -8,6 +8,7 @@ function loadFixture() {
   return {
     contract: JSON.parse(readFileSync('specs/v1-behavior.json', 'utf8')),
     declaration: readFileSync('specs/v1-public-api.d.ts', 'utf8'),
+    stylesDeclaration: readFileSync('specs/v1-styles-api.d.ts', 'utf8'),
     packageJson: JSON.parse(readFileSync('package.json', 'utf8')),
     documents: Object.fromEntries(DOCUMENT_PATHS.map((path) => [path, readFileSync(path, 'utf8')])),
   }
@@ -27,6 +28,18 @@ describe('Phase 0 contract policy', () => {
 
     expect(validatePhase0Contract(fixture)).toContain(
       'public API declaration must match the generated closed contract',
+    )
+  })
+
+  it('rejects styles subpath declaration drift', () => {
+    const fixture = loadFixture()
+    fixture.stylesDeclaration = fixture.stylesDeclaration.replace(
+      'export declare const bgWhiteBright: Style\n',
+      '',
+    )
+
+    expect(validatePhase0Contract(fixture)).toContain(
+      'styles API declaration must match the generated closed contract',
     )
   })
 
@@ -90,7 +103,7 @@ describe('Phase 0 contract policy', () => {
     const fixture = loadFixture()
     fixture.contract.styles.sgr.red = [91, 39]
     fixture.contract.writeFailures.cosmeticMethodsThrow = true
-    fixture.contract.size.maximumBytes = 1229
+    fixture.contract.size.maximumBytes = 2049
 
     expect(validatePhase0Contract(fixture)).toEqual(
       expect.arrayContaining([
@@ -99,6 +112,69 @@ describe('Phase 0 contract policy', () => {
         'size must match the frozen contract',
       ]),
     )
+  })
+
+  it('rejects unsafe text rendering and referenced timer drift', () => {
+    const fixture = loadFixture()
+    fixture.contract.textSafety.stripVTControlCharacters = false
+    fixture.contract.textSafety.boundary = 'assignment'
+    fixture.contract.rendering.timerReferenced = true
+
+    expect(validatePhase0Contract(fixture)).toEqual(
+      expect.arrayContaining([
+        'textSafety must match the frozen contract',
+        'rendering must match the frozen contract',
+        'rendering must be unreferenced and sanitize without mutating public fields',
+      ]),
+    )
+  })
+
+  it('rejects bidi sanitization and runtime validation drift', () => {
+    const fixture = loadFixture()
+    fixture.contract.textSafety.replaceCodePointRanges.pop()
+    fixture.contract.inputValidation.invalidMutation = 'accept-invalid-value'
+
+    expect(validatePhase0Contract(fixture)).toEqual(
+      expect.arrayContaining([
+        'textSafety must match the frozen contract',
+        'inputValidation must match the frozen contract',
+      ]),
+    )
+  })
+
+  it('rejects ambiguous active and terminal write-failure behavior', () => {
+    const fixture = loadFixture()
+    fixture.contract.writeFailures.activeFailureState = 'spinning'
+    fixture.contract.writeFailures.terminalStatePreserved = false
+    fixture.contract.writeFailures.futureStartRetries = false
+
+    expect(validatePhase0Contract(fixture)).toEqual(
+      expect.arrayContaining([
+        'writeFailures must match the frozen contract',
+        'write failure must stop only the active cycle and preserve terminal state',
+      ]),
+    )
+  })
+
+  it('rejects frame, status, and reset semantic drift', () => {
+    const fixture = loadFixture()
+    fixture.contract.rendering.frameColorApplication = 'whole-line'
+    fixture.contract.rendering.statusColorApplication = 'whole-line'
+    fixture.contract.styles.resetRestoresParent = true
+
+    expect(validatePhase0Contract(fixture)).toEqual(
+      expect.arrayContaining([
+        'rendering must match the frozen contract',
+        'styles must match the frozen contract',
+      ]),
+    )
+  })
+
+  it('rejects ambiguous CI and terminal capability semantics', () => {
+    const fixture = loadFixture()
+    fixture.contract.environment.ci = 'truthy-disables'
+
+    expect(validatePhase0Contract(fixture)).toContain('environment must match the frozen contract')
   })
 
   it('rejects library-owned signals and forced exits', () => {

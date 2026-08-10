@@ -11,18 +11,23 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   EXPECTED_REPOSITORY: YankeyBright/spinlog
   REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
 
 jobs:
-  verify:
+  quality:
     name: Quality (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        node-version: ['22.x', '24.x']
+        node-version: ['22.13.0', '22.x', '24.0.0', '24.x']
     steps:
       - name: Checkout Repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -38,15 +43,20 @@ jobs:
       - name: Install Dependencies Without Lifecycle Hooks
         run: npm ci --ignore-scripts
 
-      - name: Verify Phase 0 and Phase 1
-        run: |
-          npm run check:phase0
-          npm run check:phase1
+      - name: Verify Ordered Phase Gates
+        run: npm run check:phases
 
-  supply-chain:
-    name: Supply Chain (Node 24)
-    needs: verify
-    runs-on: ubuntu-latest
+      - name: Audit Dependency Graph
+        run: npm audit --audit-level=low
+
+  cross-platform:
+    name: Consumer Smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
     steps:
       - name: Checkout Repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -62,8 +72,34 @@ jobs:
       - name: Install Dependencies Without Lifecycle Hooks
         run: npm ci --ignore-scripts
 
-      - name: Verify Ordered Phase Gates
-        run: npm run check:phases
+      - name: Build And Verify Packed Consumer
+        run: |
+          npm run build
+          npm run test:consumer
+          npm run pack:check
+
+  supply-chain:
+    name: Supply Chain (Node 24)
+    needs: [quality, cross-platform]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '24.x'
+          cache: 'npm'
+
+      - name: Install Dependencies Without Lifecycle Hooks
+        run: npm ci --ignore-scripts
+
+      - name: Verify Release-Readiness Controls
+        run: npm run check:phase1:release
 
       - name: Audit Dependency Graph
         run: npm audit --audit-level=low

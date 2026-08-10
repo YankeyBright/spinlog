@@ -1,6 +1,6 @@
 # Core API Specification
 
-The public declaration in `specs/v1-public-api.d.ts` and behavior model in `specs/v1-behavior.json` are the normative v1 API contract. Phase 2 implementation and declarations must conform exactly; undocumented exports are contract violations.
+The public declarations in `specs/v1-public-api.d.ts` and `specs/v1-styles-api.d.ts`, plus the behavior model in `specs/v1-behavior.json`, are the normative v1 API contract. Phase 2 implementation and declarations must conform exactly; undocumented exports are contract violations.
 
 ## Export Surface
 
@@ -14,11 +14,15 @@ Named runtime exports are exactly:
 
 Aliases, style chaining, advanced color modes, named factory aliases, and CommonJS exports are excluded.
 
+The `spinlog/styles` subpath exports exactly the 38 style functions and the `Style` type. It omits the spinner runtime so style-only consumers receive the smallest tree-shakeable entrypoint.
+
 ## Factory And Defaults
 
 `spinlog(text?, options?)` returns `Spinner`. Options are limited to `color`, `prefix`, `suffix`, and `spinner`. Defaults are empty text/prefix/suffix, cyan, dots, and an 80ms interval. Spinner names are exactly `dots` and `line`; spinner colors are the 16 foreground names.
 
 The mutable instance properties are exactly `text`, `color`, `prefix`, and `suffix`. Lifecycle methods return the same instance for chaining and accept no undocumented parameters.
+
+At runtime, invalid factory text, option objects, option values, terminal text overrides, and mutable assignments throw `TypeError` before output. A failed mutation preserves its previous value. Invalid promise options reject before spinner start, direct thenable observation, or task invocation. Unknown option keys are ignored for forward compatibility.
 
 ## Lifecycle
 
@@ -30,7 +34,7 @@ The internal states are `idle`, `spinning`, `stopped`, `succeeded`, `failed`, `w
 | `stop()` | Enter/remain stopped without output | Clear, restore, and stop | Idempotent no-op |
 | Terminal method | Persist the requested status once | Stop, restore, and persist once | Preserve the first terminal result |
 
-Mutation never changes state and becomes visible on the next render. An optional terminal text argument replaces stored text before persistence. A new `start()` resets terminal idempotency for the next cycle. The per-method, per-source-state matrices in `specs/v1-behavior.json` are exhaustive; a destination or effect not listed there is illegal.
+Mutation never changes state and becomes visible on the next render. An optional terminal text argument replaces stored text before persistence. Rendering sanitizes user-controlled segments without changing their assigned property values. A new `start()` resets terminal idempotency for the next cycle. The per-method, per-source-state matrices in `specs/v1-behavior.json` are exhaustive; a destination or effect not listed there is illegal.
 
 ## Promise Wrapper
 
@@ -40,7 +44,7 @@ The spinner starts before a direct input is observed or a callback is invoked. T
 
 ## Terminal Degradation
 
-Interactive rendering uses stderr and timers. Non-interactive execution creates no timer and emits deterministic static start and terminal lines. Style helpers remain pure string transformations and use stderr capability only to decide whether ANSI is appropriate.
+Interactive rendering uses stderr and unreferenced timers. Non-interactive execution creates no timer and emits deterministic static start and terminal lines. An active synchronous write failure ends only that rendering cycle in `stopped`; terminal state and promise settlement remain logical outcomes rather than I/O outcomes. Style helpers remain side-effect-free and stream-free while using stderr capability only to decide whether ANSI is appropriate.
 
 ## Explicitly Excluded From v1
 

@@ -2,7 +2,7 @@
 
 ## Preconditions
 
-1. Protect `main`, version tags, workflow files, and the GitHub `release` environment.
+1. Replace the verification-only `release-readiness.yml` with the tag-driven `.github/workflows/release.yml`, then protect `main`, version tags, workflow files, and the GitHub `release` environment.
 2. Configure npm Trusted Publishing for owner `YankeyBright`, repository `spinlog`, workflow `release.yml`, environment `release`, and permission to publish.
 3. Confirm the repository and package are public and revoke any long-lived npm publish token.
 4. Confirm the GitHub-hosted release job uses Node 24 and npm at or above the trusted-publishing minimum.

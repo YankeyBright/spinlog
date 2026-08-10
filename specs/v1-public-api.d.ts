@@ -1,7 +1,9 @@
 type Style = (text: string) => string
 
+/** Built-in spinner animation names. */
 export type SpinnerName = 'dots' | 'line'
 
+/** ANSI-16 foreground colors available to spinner frames. */
 export type SpinnerColor =
   | 'black'
   | 'red'
@@ -20,6 +22,7 @@ export type SpinnerColor =
   | 'cyanBright'
   | 'whiteBright'
 
+/** Options used to create a spinner. */
 export interface SpinnerOptions {
   color?: SpinnerColor
   prefix?: string
@@ -27,23 +30,32 @@ export interface SpinnerOptions {
   spinner?: SpinnerName
 }
 
+/** Options used by {@link Spinlog.promise}. */
 export interface PromiseOptions extends SpinnerOptions {
   text?: string
 }
 
+/** A mutable spinner with idempotent lifecycle methods. */
 export interface Spinner {
   text: string
   color: SpinnerColor
   prefix: string
   suffix: string
+  /** Starts a new rendering cycle or returns the active instance unchanged. */
   start(): this
+  /** Stops an active cycle and restores owned terminal state. */
   stop(): this
+  /** Persists the first successful terminal result for the current cycle. */
   succeed(text?: string): this
+  /** Persists the first failed terminal result for the current cycle. */
   fail(text?: string): this
+  /** Persists the first warning terminal result for the current cycle. */
   warn(text?: string): this
+  /** Persists the first informational terminal result for the current cycle. */
   info(text?: string): this
 }
 
+/** Callable spinner factory with promise-settlement integration. */
 export interface Spinlog {
   (text?: string, options?: SpinnerOptions): Spinner
   promise<T>(input: PromiseLike<T>, options?: PromiseOptions): Promise<T>

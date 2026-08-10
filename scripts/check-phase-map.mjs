@@ -28,6 +28,7 @@ const REQUIRED_TEXT = Object.freeze({
   'README.md': [
     'Phase 0 freezes the product contract. Phase 1 establishes the secure package shell.',
     'the v1 runtime API begins in Phase 2',
+    'the current implementation belongs to Phase 2',
   ],
   'specs/00_PHASE_MAP.md': CANONICAL_PHASES.map(({ number, title }) => `| ${number} | ${title} |`),
   'specs/03_COMPETITIVE_ANALYSIS.md': [

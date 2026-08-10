@@ -10,7 +10,7 @@ Terminal colors and spinners are common CLI needs, but applications often add mu
 
 - no runtime, optional, or peer dependency map;
 - ESM-only support for the Node.js 22 and 24 LTS majors;
-- pure style helpers and spinner-owned output routed exclusively to `stderr`;
+- side-effect-free, stream-free style helpers and spinner-owned output routed exclusively to `stderr`;
 - a small gzip-constrained bundle; and
 - package, SBOM, and provenance evidence that can be checked by automated review.
 

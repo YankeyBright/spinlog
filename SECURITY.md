@@ -2,9 +2,9 @@
 
 ## Supported Versions
 
-No production version of `spinlog` has been published. Security fixes currently target the default branch and the Phase 0/1 package shell only.
+No production version of `spinlog` has been published. Security fixes currently target the default branch and the completed Phase 0 through Phase 2 implementation.
 
-The planned v1 runtime supports the Node.js 22 and 24 LTS majors. Users must run security-supported patch releases from those lines.
+The v1 runtime requires Node.js `^22.13.0 || ^24.0.0`. Users must run security-supported patch releases from those lines.
 
 ## Reporting A Vulnerability
 
@@ -19,8 +19,8 @@ Maintainers target acknowledgement within five business days. Severity, remediat
 - **Install isolation:** CI uses `npm ci --ignore-scripts` for development-tool installation.
 - **Package payload:** A dry-run allowlist limits the files admitted to npm.
 - **Build graph:** Direct development tools are exact-pinned, lockfile-resolved, audited, and excluded from the runtime SBOM.
-- **Publication:** The protected GitHub release workflow uses OIDC trusted publishing without a long-lived npm publish token.
-- **Provenance:** Public releases include npm provenance tied to `YankeyBright/spinlog` and a validated runtime-only CycloneDX 1.5 SBOM.
-- **Host ownership:** The planned library installs no process signal listener and never terminates its host process.
+- **Publication:** The current release-readiness workflow is read-only and cannot publish. Phase 5 will introduce protected OIDC trusted publishing without a long-lived npm token.
+- **Provenance:** Future public releases must include npm provenance tied to `YankeyBright/spinlog` and a validated runtime-only CycloneDX 1.5 SBOM.
+- **Host ownership:** The library installs no process signal listener and never terminates its host process.
 
 These controls reduce defined risks but do not eliminate compromise, maintainer, CI, registry, or application-level risk.

@@ -4,19 +4,24 @@
 
 ```text
 src/
-  index.ts    public ESM factory, promise wrapper, and named styles
-  ansi.ts     ANSI style, cursor, and line-control primitives
+  index.ts    public ESM factory, promise wrapper, types, and style re-exports
+  ansi.ts     internal spinner-frame color adapter
   env.ts      color, animation, TTY, CI, and Unicode decisions
   spinner.ts  lifecycle state machine and stderr renderer
+  styles.ts   public side-effect-free ANSI-16 style entrypoint
 ```
 
-Phase 0 and Phase 1 do not create these runtime modules beyond the inert entry point. The declarations in `specs/v1-public-api.d.ts` are a specification artifact and are not published until Phase 2 implements them.
+Phase 0 and Phase 1 did not create these runtime modules beyond the inert entry point. The declarations in `specs/v1-public-api.d.ts` and `specs/v1-styles-api.d.ts` were specification artifacts until Phase 2 implemented them.
 
 ## Responsibilities
 
 ### `ansi.ts`
 
-Owns compact ANSI sequences and pure style functions. Nested closures restore the enclosing style without an external parser. It performs no stream or process-lifecycle operations.
+Applies validated spinner-frame colors after `env.ts` has decided capability. It performs no stream or process-lifecycle operations.
+
+### `styles.ts`
+
+Owns the public style-only entrypoint. Helpers validate string input, consult `env.ts`, and delegate SGR composition to Node's stable `styleText`. Nested non-reset styles restore their enclosing style; reset remains a hard SGR boundary. Helpers are side-effect-free and never write streams.
 
 ### `env.ts`
 
@@ -24,11 +29,11 @@ Separates color capability from animation capability and implements the exact en
 
 ### `spinner.ts`
 
-Owns lifecycle state, timer creation and cleanup, mutable properties, rendering, cursor visibility during active animation, static degradation, and synchronous write containment. It writes only to stderr and does not install process or stream-global listeners.
+Owns lifecycle state, unreferenced timer creation and cleanup, mutable properties, render-boundary text sanitization, cursor visibility during active animation, static degradation, and synchronous write containment. It writes only to stderr and does not install process or stream-global listeners.
 
 ### `index.ts`
 
-Exports the callable default factory, promise overload implementation, type surface, and exact named style functions. It adds no CommonJS wrapper or post-MVP API.
+Exports the callable default factory, promise overload implementation, type surface, and exact named style functions. It adds no CommonJS wrapper or post-MVP API; style-only users may import `spinlog/styles` without bundling the spinner.
 
 ## Ownership Rules
 
@@ -38,3 +43,4 @@ Exports the callable default factory, promise overload implementation, type surf
 - Multiple simultaneously active spinners are unsupported until a coordinated renderer is specified.
 - Runtime code uses Node built-ins and local modules only.
 - The Phase 2 gate must compare emitted declarations and runtime exports with the frozen Phase 0 contract.
+- The build emits linked source maps for diagnostics, while the npm payload remains an exact allowlist.
