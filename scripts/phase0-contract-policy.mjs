@@ -154,17 +154,20 @@ const EXPECTED_TEXT_SAFETY = Object.freeze({
 })
 
 const EXPECTED_ENVIRONMENT = Object.freeze({
+  colorPrecedenceDirection: 'highest-to-lowest',
   colorPrecedence: [
-    'FORCE_COLOR',
     'NO_COLOR',
     'NODE_DISABLE_COLORS',
+    'FORCE_COLOR',
     'CI',
     'TERM=dumb',
     'NODE_ENV=test',
     'stderr.isTTY',
   ],
   noColor: 'non-empty-disables',
+  noColorOverridesForceColor: true,
   nodeDisableColors: 'non-empty-disables',
+  nodeDisableColorsOverridesForceColor: true,
   forceColorFalseValues: ['0', 'false'],
   forceColorOtherDefinedValues: 'enable',
   forceColorEnablesAnimation: false,
@@ -568,10 +571,10 @@ function validateDocuments(documents, contract, failures) {
   }
 
   const terminalSpec = documents?.['specs/05_TERMINAL_SPEC.md'] ?? ''
-  require(terminalSpec.indexOf('FORCE_COLOR=0') <
+  require(terminalSpec.indexOf('NO_COLOR') <
     terminalSpec.indexOf(
-      'NO_COLOR',
-    ), 'terminal capability policy must give FORCE_COLOR explicit precedence', failures)
+      'FORCE_COLOR=0',
+    ), 'terminal capability policy must give NO_COLOR explicit precedence', failures)
 
   for (const { api, reason } of contract.deferred) {
     require(documents?.['specs/16_POST_MVP_FEATURES.md']?.includes(
@@ -614,8 +617,8 @@ export function validatePhase0Contract({
     'contract',
     failures,
   )
-  require(contract.schemaVersion === 3 &&
-    contract.phase === 0, 'contract version and phase must be 3 and 0', failures)
+  require(contract.schemaVersion === 4 &&
+    contract.phase === 0, 'contract version and phase must be 4 and 0', failures)
   requireExact(
     contract.identity,
     {

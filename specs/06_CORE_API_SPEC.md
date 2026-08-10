@@ -44,7 +44,7 @@ The spinner starts before a direct input is observed or a callback is invoked. T
 
 ## Terminal Degradation
 
-Interactive rendering uses stderr and unreferenced timers. Non-interactive execution creates no timer and emits deterministic static start and terminal lines. An active synchronous write failure ends only that rendering cycle in `stopped`; terminal state and promise settlement remain logical outcomes rather than I/O outcomes. Style helpers remain side-effect-free and stream-free while using stderr capability only to decide whether ANSI is appropriate.
+Interactive rendering uses stderr and unreferenced timers. Non-interactive execution creates no timer and emits deterministic static start and terminal lines. An active synchronous write failure ends only that rendering cycle in `stopped`; terminal state and promise settlement remain logical outcomes rather than I/O outcomes. Style helpers remain side-effect-free and stream-free while using stderr capability only to decide whether ANSI is appropriate. Non-empty `NO_COLOR` and `NODE_DISABLE_COLORS` values outrank `FORCE_COLOR`; color forcing never enables animation.
 
 ## Explicitly Excluded From v1
 

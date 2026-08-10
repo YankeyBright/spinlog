@@ -20,6 +20,7 @@ Freeze the exact v1 product surface and behavior that every later phase must pre
 - The package is ESM-only, supports the Node 22 and Node 24 LTS majors, and has zero runtime, optional, and peer dependencies.
 - Style helpers are side-effect-free and stream-free. Spinner frames and statuses write only to `stderr`; v1 never writes to `stdout`.
 - User text is sanitized only at the rendering boundary, active write failure moves the current cycle to `stopped`, and terminal state never depends on cosmetic I/O success.
+- Color precedence is frozen highest-to-lowest as `NO_COLOR`, `NODE_DISABLE_COLORS`, `FORCE_COLOR`, CI, dumb terminal, test mode, and stderr TTY capability.
 - The library installs no process signal or exit listener and never terminates the host process.
 - `dist/index.js` may not exceed 2,560 bytes after gzip level 9.
 - Every feature outside this boundary is either listed with exact rationale in `specs/16_POST_MVP_FEATURES.md` or declared a permanent non-goal in the behavior contract.

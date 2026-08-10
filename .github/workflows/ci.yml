@@ -50,13 +50,14 @@ jobs:
         run: npm audit --audit-level=low
 
   cross-platform:
-    name: Consumer Smoke (${{ matrix.os }})
+    name: Consumer Smoke (${{ matrix.os }} / Node ${{ matrix.node-version }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
         os: [windows-latest, macos-latest]
+        node-version: ['22.13.0', '24.x']
     steps:
       - name: Checkout Repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -66,7 +67,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
-          node-version: '24.x'
+          node-version: ${{ matrix.node-version }}
           cache: 'npm'
 
       - name: Install Dependencies Without Lifecycle Hooks

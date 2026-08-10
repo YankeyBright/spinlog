@@ -75,21 +75,12 @@ import { createSpinner } from './spinner.js'
 
 // ── Type Definitions ────────────────────────────────────────────────────────
 
-/**
- * Signature for a style function: takes a string, returns a styled string.
- * The styling is applied only when color capability is detected (see env.ts).
- */
 type Style = (text: string) => string
 
 /** Built-in spinner animation names. */
 export type SpinnerName = 'dots' | 'line'
 
-/**
- * ANSI-16 foreground colors available to spinner frames.
- *
- * These correspond to the 16 standard terminal colors. Every color here is
- * also available as a standalone style function (e.g. `import { cyan } from 'spinlog'`).
- */
+/** ANSI-16 foreground colors available to spinner frames. */
 export type SpinnerColor =
   | 'black'
   | 'red'
@@ -108,15 +99,7 @@ export type SpinnerColor =
   | 'cyanBright'
   | 'whiteBright'
 
-/**
- * Options used to create a spinner.
- *
- * All fields are optional — sensible defaults are applied in spinner.ts:
- *   color   → 'cyan'
- *   prefix  → '' (empty string, no prefix)
- *   suffix  → '' (empty string, no suffix)
- *   spinner → 'dots' (Braille dot animation)
- */
+/** Options used to create a spinner. */
 export interface SpinnerOptions {
   color?: SpinnerColor
   prefix?: string
@@ -124,30 +107,12 @@ export interface SpinnerOptions {
   spinner?: SpinnerName
 }
 
-/**
- * Options used by {@link Spinlog.promise}.
- * Extends `SpinnerOptions` with a `text` field for the spinner message.
- */
+/** Options used by {@link Spinlog.promise}. */
 export interface PromiseOptions extends SpinnerOptions {
   text?: string
 }
 
-/**
- * A mutable spinner with idempotent lifecycle methods.
- *
- * Lifecycle flow:
- *   1. Create with `spinlog('Loading…')` — spinner is in IDLE state.
- *   2. Call `.start()` — transitions to SPINNING, begins animation.
- *   3. End with a terminal method: `.succeed()`, `.fail()`, `.warn()`, or `.info()`.
- *      Each prints a final status line and stops the animation.
- *
- * Idempotency:
- *   - Calling `.start()` on an already-spinning instance is a no-op (returns `this`).
- *   - Calling a terminal method more than once is a no-op after the first call.
- *   - `.stop()` cleans up without printing a status line.
- *
- * All properties (text, color, prefix, suffix) can be changed mid-spin.
- */
+/** A mutable spinner with idempotent lifecycle methods. */
 export interface Spinner {
   text: string
   color: SpinnerColor
@@ -167,17 +132,7 @@ export interface Spinner {
   info(text?: string): this
 }
 
-/**
- * Callable spinner factory with promise-settlement integration.
- *
- * Usage as a factory:
- *   const spinner = spinlog('Loading…', { color: 'yellow' })
- *   spinner.start()
- *
- * Usage with promises:
- *   await spinlog.promise(fetch('/data'), { text: 'Fetching…' })
- *   // Automatically calls .succeed() or .fail() based on promise outcome.
- */
+/** Callable spinner factory with promise-settlement integration. */
 export interface Spinlog {
   (text?: string, options?: SpinnerOptions): Spinner
   promise<T>(input: PromiseLike<T>, options?: PromiseOptions): Promise<T>
@@ -283,13 +238,6 @@ const promise: Spinlog['promise'] = async <T>(
 
 // ── Default Export ───────────────────────────────────────────────────────────
 
-/**
- * Assemble the final `spinlog` object: a callable factory with a `.promise`
- * method attached.
- *
- * `@__PURE__` tells bundlers (esbuild, Rollup) that this `Object.assign`
- * has no side effects, so it can be tree-shaken if unused.
- */
 const spinlog: Spinlog = /* @__PURE__ */ Object.assign(factory, { promise })
 
 export default spinlog

@@ -36,6 +36,9 @@ jobs:
       - name: Verify Implemented Phases
         run: npm run check:phases
 
+      - name: Verify Release-Readiness Controls
+        run: npm run verify:release
+
       - name: Audit Dependency Graph
         run: npm audit --audit-level=low
 

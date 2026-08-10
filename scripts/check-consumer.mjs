@@ -54,15 +54,17 @@ try {
 
   writeFileSync(
     join(consumer, 'smoke.mjs'),
-    `import spinlog from 'spinlog'\nimport { red } from 'spinlog/styles'\nif (typeof spinlog !== 'function' || typeof red !== 'function') throw new Error('invalid exports')\nif (red('value') !== 'value') throw new Error('FORCE_COLOR=0 must disable styles')\nspinlog('consumer', { spinner: 'line' }).start().succeed('done')\n`,
+    `import spinlog from 'spinlog'\nimport { red } from 'spinlog/styles'\nprocess.env.FORCE_COLOR = '1'\nprocess.env.NO_COLOR = '1'\nif (typeof spinlog !== 'function' || typeof red !== 'function') throw new Error('invalid exports')\nif (red('value') !== 'value') throw new Error('NO_COLOR must override FORCE_COLOR')\nspinlog('consumer', { spinner: 'line' }).start().succeed('done')\n`,
   )
   const environment = {
     ...process.env,
     CI: '1',
-    FORCE_COLOR: '0',
     NODE_ENV: 'production',
     WT_SESSION: 'consumer-proof',
   }
+  delete environment.FORCE_COLOR
+  delete environment.NO_COLOR
+  delete environment.NODE_DISABLE_COLORS
   const smoke = spawnSync(process.execPath, ['smoke.mjs'], {
     cwd: consumer,
     encoding: 'utf8',
@@ -82,7 +84,7 @@ try {
   const unref = spawnSync(process.execPath, ['unref.mjs'], {
     cwd: consumer,
     encoding: 'utf8',
-    env: { ...environment, CI: '' },
+    env: { ...environment, CI: '', NO_COLOR: '1' },
     timeout: 5_000,
   })
   if (unref.status !== 0 || unref.error) {

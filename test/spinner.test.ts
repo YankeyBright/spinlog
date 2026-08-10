@@ -161,6 +161,17 @@ describe('spinner lifecycle and rendering', () => {
     bright.stop()
   })
 
+  it('keeps frames and statuses plain when NO_COLOR conflicts with FORCE_COLOR', () => {
+    process.env.FORCE_COLOR = '1'
+    process.env.NO_COLOR = '1'
+    const spinner = spinlog('work', { color: 'magenta', spinner: 'line' })
+
+    spinner.start()
+    expect(output()[1]).toBe('- work')
+    spinner.succeed()
+    expect(output().at(-2)).toBe('✔ work\n')
+  })
+
   it('degrades deterministically without timers or cursor control', () => {
     setTTY(false)
     const spinner = spinlog('static')

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "phase": 0,
   "identity": {
     "packageName": "spinlog",
@@ -159,17 +159,20 @@
     "embeddedAnsi": "strip"
   },
   "environment": {
+    "colorPrecedenceDirection": "highest-to-lowest",
     "colorPrecedence": [
-      "FORCE_COLOR",
       "NO_COLOR",
       "NODE_DISABLE_COLORS",
+      "FORCE_COLOR",
       "CI",
       "TERM=dumb",
       "NODE_ENV=test",
       "stderr.isTTY"
     ],
     "noColor": "non-empty-disables",
+    "noColorOverridesForceColor": true,
     "nodeDisableColors": "non-empty-disables",
+    "nodeDisableColorsOverridesForceColor": true,
     "forceColorFalseValues": ["0", "false"],
     "forceColorOtherDefinedValues": "enable",
     "forceColorEnablesAnimation": false,

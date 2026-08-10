@@ -177,6 +177,15 @@ describe('Phase 0 contract policy', () => {
     expect(validatePhase0Contract(fixture)).toContain('environment must match the frozen contract')
   })
 
+  it('rejects ambiguous or FORCE_COLOR-first precedence semantics', () => {
+    const fixture = loadFixture()
+    fixture.contract.environment.colorPrecedenceDirection = 'lowest-to-highest'
+    fixture.contract.environment.noColorOverridesForceColor = false
+    fixture.contract.environment.nodeDisableColorsOverridesForceColor = false
+
+    expect(validatePhase0Contract(fixture)).toContain('environment must match the frozen contract')
+  })
+
   it('rejects library-owned signals and forced exits', () => {
     const fixture = loadFixture()
     fixture.contract.processOwnership.signalListeners = true

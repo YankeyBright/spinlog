@@ -33,11 +33,15 @@ Interactive `start()` hides the cursor and renders the first frame synchronously
 
 Color and animation are separate decisions.
 
-1. `FORCE_COLOR=0` or `FORCE_COLOR=false` disables color.
-2. Any other defined `FORCE_COLOR` value enables ANSI-16 color and overrides color-disable environment variables.
-3. Without `FORCE_COLOR`, a non-empty `NO_COLOR` or `NODE_DISABLE_COLORS` disables color.
-4. Without an override, a non-empty `CI`, exact `TERM=dumb`, exact `NODE_ENV=test`, or non-TTY stderr disables color.
+Precedence is listed from highest to lowest:
+
+1. A non-empty `NO_COLOR` disables color, including when `FORCE_COLOR` is defined.
+2. A non-empty `NODE_DISABLE_COLORS` disables color, including when `FORCE_COLOR` is defined.
+3. `FORCE_COLOR=0` or `FORCE_COLOR=false` disables color; any other defined value enables ANSI-16 color.
+4. Without an explicit color request, a non-empty `CI`, exact `TERM=dumb`, exact `NODE_ENV=test`, or non-TTY stderr disables color.
 5. Animation is disabled for CI, dumb terminals, test execution, and non-TTY stderr regardless of color forcing.
+
+This is spinlog's frozen product policy. It deliberately gives explicit color-disable variables priority because v1 exposes no per-call capability override.
 
 On Windows, the dots spinner uses its line fallback unless `WT_SESSION` indicates Windows Terminal. No browser fallback is provided because v1 is Node-only.
 

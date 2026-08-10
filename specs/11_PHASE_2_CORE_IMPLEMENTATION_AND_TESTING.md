@@ -26,7 +26,7 @@ Implement and prove the frozen v1 contract. Runtime behavior and deterministic t
 ## Required Behavior Tests
 
 - ANSI tests prove every style sequence, disabled output, and nested restoration.
-- Environment tests prove `NO_COLOR`, `FORCE_COLOR`, CI, dumb-terminal, test, TTY, and Unicode decisions.
+- Environment tests prove `NO_COLOR` and `NODE_DISABLE_COLORS` override `FORCE_COLOR`, plus CI, dumb-terminal, test, TTY, animation, and Unicode decisions.
 - Spinner tests use fake timers and controlled stderr writes to prove immediate render, 80ms cadence, all legal transitions, idempotency, mutation, static degradation, cleanup, and write-failure containment.
 - Process-ownership tests prove no signal or exit listeners are installed and no host termination API is invoked.
 - Promise tests prove both overloads, thenable assimilation, callback ordering, synchronous throws, exact value/reason preservation, and cosmetic-failure isolation.

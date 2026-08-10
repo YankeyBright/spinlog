@@ -8,12 +8,22 @@ describe('terminal capabilities', () => {
   })
 
   it.each([
+    [{ NO_COLOR: '1', FORCE_COLOR: '1' }, false],
+    [{ NO_COLOR: '1', FORCE_COLOR: '' }, false],
+    [{ NODE_DISABLE_COLORS: '1', FORCE_COLOR: '1' }, false],
+    [{ NO_COLOR: '1', NODE_DISABLE_COLORS: '1', FORCE_COLOR: '1' }, false],
+    [{ NO_COLOR: '', NODE_DISABLE_COLORS: '', FORCE_COLOR: '1' }, true],
+  ])('applies the highest-to-lowest explicit color precedence for %j', (env, expected) => {
+    expect(getCapabilities(env, true, 'linux')[0]).toBe(expected)
+  })
+
+  it.each([
     [{ FORCE_COLOR: '0' }, false],
     [{ FORCE_COLOR: 'false' }, false],
     [{ FORCE_COLOR: '' }, true],
     [{ FORCE_COLOR: '1' }, true],
-  ])('applies FORCE_COLOR precedence for %j', (env, expected) => {
-    expect(getCapabilities({ ...env, NO_COLOR: '1', CI: '1' }, false, 'linux')[0]).toBe(expected)
+  ])('interprets FORCE_COLOR=%j below explicit disable variables', (env, expected) => {
+    expect(getCapabilities(env, true, 'linux')[0]).toBe(expected)
   })
 
   it.each([

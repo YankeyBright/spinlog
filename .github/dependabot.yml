@@ -8,6 +8,15 @@ updates:
     versioning-strategy: increase
     commit-message:
       prefix: deps
+    labels:
+      - "dependencies"
+    groups:
+      dev-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
 
   - package-ecosystem: github-actions
     directory: /
@@ -16,3 +25,5 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: ci
+    labels:
+      - "ci"

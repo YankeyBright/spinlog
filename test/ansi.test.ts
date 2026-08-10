@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import * as spinlog from '../src/index.js'
+import * as styles from '../src/styles.js'
 
 const CODES = {
   reset: [0, 0],
@@ -84,7 +85,11 @@ const STYLES = {
 }
 
 describe('ANSI styles', () => {
-  beforeEach(() => vi.stubEnv('FORCE_COLOR', '1'))
+  beforeEach(() => {
+    vi.stubEnv('FORCE_COLOR', '1')
+    vi.stubEnv('NO_COLOR', '')
+    vi.stubEnv('NODE_DISABLE_COLORS', '')
+  })
   afterEach(() => vi.unstubAllEnvs())
 
   it('emits every frozen SGR opening and closing sequence', () => {
@@ -100,6 +105,13 @@ describe('ANSI styles', () => {
     for (const name of Object.keys(CODES)) {
       expect(STYLES[name as keyof typeof CODES]('plain')).toBe('plain')
     }
+  })
+
+  it('honors NO_COLOR over FORCE_COLOR through both public entry points', () => {
+    vi.stubEnv('NO_COLOR', '1')
+
+    expect(spinlog.red('plain')).toBe('plain')
+    expect(styles.red('plain')).toBe('plain')
   })
 
   it.each(['0', '1'])('rejects invalid JavaScript input with FORCE_COLOR=%s', (forceColor) => {
