@@ -107,7 +107,7 @@ export interface SpinnerOptions {
   spinner?: SpinnerName
 }
 
-/** Options used by {@link Spinlog.promise}. */
+/** Options used by the `Spinlog.promise` overloads. */
 export interface PromiseOptions extends SpinnerOptions {
   text?: string
 }

@@ -27,11 +27,11 @@ Implement and prove the frozen v1 contract. Runtime behavior and deterministic t
 
 - ANSI tests prove every style sequence, disabled output, and nested restoration.
 - Environment tests prove `NO_COLOR` and `NODE_DISABLE_COLORS` override `FORCE_COLOR`, plus CI, dumb-terminal, test, TTY, animation, and Unicode decisions.
-- Spinner tests use fake timers and controlled stderr writes to prove immediate render, 80ms cadence, all legal transitions, idempotency, mutation, static degradation, cleanup, and write-failure containment.
+- Spinner tests use fake timers and controlled stderr writes to prove immediate render, 80ms cadence, all legal transitions, validation-before-idempotency, mutation, static degradation, cleanup, and write-failure containment.
 - Process-ownership tests prove no signal or exit listeners are installed and no host termination API is invoked.
 - Promise tests prove both overloads, thenable assimilation, callback ordering, synchronous throws, exact value/reason preservation, and cosmetic-failure isolation.
 - Contract tests compare emitted declarations and runtime exports against Phase 0.
-- Declaration comparison uses direct TypeScript emit, TypeScript CLI compilation, pinned Biome canonicalization, and negative/positive consumer type fixtures. It does not depend on TypeScript 7's unstable compiler API.
+- API Extractor validates the frozen root and styles declarations and their emitted counterparts against tracked semantic reports. Documentation-only edits do not change report parity; export, overload, property, or return-type drift does.
 - Packed-consumer tests install the actual tarball and validate package-name imports, module-resolution profiles, stderr output, and timer ownership.
 
 Tests make no network calls. Every source file maintains 100% statements, branches, functions, and lines globally and per file.
@@ -51,4 +51,4 @@ npm run check:phases
 npm audit --audit-level=low
 ```
 
-The ordered aggregate success record is `{"phase0":"pass","phase1":"pass","phase1Release":"pass","phase2":"pass"}`. The runtime is complete only when behavior, declaration, stream, ownership, ESM, size, package, SBOM, and release-policy checks all pass. An over-budget implementation remains incomplete even when every behavioral test passes.
+The Phase 2 gate is independent of Phase 3 evidence. After Phase 3 is complete, the ordered aggregate success record is `{"phase0":"pass","phase1":"pass","phase1Release":"pass","phase2":"pass","phase3":"pass"}`. The runtime is complete only when behavior, declaration, stream, ownership, ESM, size, package, SBOM, and release-policy checks all pass. An over-budget implementation remains incomplete even when every behavioral test passes.

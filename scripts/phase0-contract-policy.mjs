@@ -187,6 +187,7 @@ const EXPECTED_INPUT_VALIDATION = Object.freeze({
   unknownOptionKeys: 'ignore',
   invalidFactoryInput: 'throw-TypeError-before-output',
   invalidMutation: 'throw-TypeError-and-preserve-value',
+  invalidTerminalOverride: 'throw-TypeError-before-idempotency-state-mutation-timer-or-output',
   invalidPromiseOptions: 'reject-TypeError-before-start-or-input',
   invalidStyleInput: 'throw-TypeError-before-capability-detection',
 })
@@ -375,7 +376,7 @@ export interface SpinnerOptions {
   spinner?: SpinnerName
 }
 
-/** Options used by {@link Spinlog.promise}. */
+/** Options used by the \`Spinlog.promise\` overloads. */
 export interface PromiseOptions extends SpinnerOptions {
   text?: string
 }
@@ -617,7 +618,7 @@ export function validatePhase0Contract({
     'contract',
     failures,
   )
-  require(contract.schemaVersion === 4 &&
+  require(contract.schemaVersion === 5 &&
     contract.phase === 0, 'contract version and phase must be 4 and 0', failures)
   requireExact(
     contract.identity,

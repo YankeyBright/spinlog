@@ -28,7 +28,11 @@ try {
     for (const failure of failures) console.error(`pack: ${failure}`)
     process.exitCode = 1
   } else {
-    const pack = Array.isArray(parsed) ? parsed[0] : parsed.files ? parsed : Object.values(parsed)[0]
+    const pack = Array.isArray(parsed)
+      ? parsed[0]
+      : parsed.files
+        ? parsed
+        : Object.values(parsed)[0]
     console.log(`pack=valid files=${pack.files.length}`)
   }
 } finally {

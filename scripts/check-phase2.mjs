@@ -1,10 +1,10 @@
-import { execFileSync } from 'node:child_process'
-import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
+import { inspectRuntimeDirectory, validateRuntimePolicy } from './runtime-policy.mjs'
+
 const failures = []
-const EXPECTED_SOURCE_FILES = ['ansi.ts', 'env.ts', 'index.ts', 'spinner.ts', 'styles.ts']
 
 function require(condition, message) {
   if (!condition) failures.push(message)
@@ -32,51 +32,36 @@ function readObject(path) {
   }
 }
 
-function declarationShape(path, text) {
-  try {
-    const formatted = execFileSync(
-      process.execPath,
-      [resolve('node_modules/@biomejs/biome/bin/biome'), 'format', '--stdin-file-path=contract.d.ts'],
-      { encoding: 'utf8', input: text },
-    )
-    return formatted.replace(/\n\s*\n/g, '\n').trim()
-  } catch (error) {
-    failures.push(`${path} must parse as declarations: ${error.message}`)
-    return ''
-  }
-}
-
 const contract = readObject('specs/v1-behavior.json')
-const expectedDeclaration = readText('specs/v1-public-api.d.ts')
-const emittedDeclaration = readText('dist/index.d.ts')
-const expectedStylesDeclaration = readText('specs/v1-styles-api.d.ts')
-const emittedStylesDeclaration = readText('dist/styles.d.ts')
+const packageJson = readObject('package.json')
 const coverage = readObject('coverage/coverage-final.json')
-const sourceFiles = existsSync('src')
-  ? readdirSync('src')
-      .filter((entry) => entry.endsWith('.ts'))
-      .sort()
-  : []
+let runtimeFiles = []
+try {
+  const inspected = inspectRuntimeDirectory('src')
+  runtimeFiles = inspected.files
+  failures.push(...inspected.failures, ...validateRuntimePolicy(runtimeFiles))
+} catch (error) {
+  failures.push(`could not inspect runtime source: ${error.message}`)
+}
+for (const path of [
+  'specs/v1-public-api.d.ts',
+  'specs/v1-styles-api.d.ts',
+  'dist/index.d.ts',
+  'dist/styles.d.ts',
+  'etc/spinlog.api.md',
+  'etc/spinlog-styles.api.md',
+]) {
+  require(existsSync(path), `API Extractor contract evidence must exist: ${path}`)
+}
+require(packageJson.devDependencies?.['@microsoft/api-extractor'] ===
+  '7.58.12', 'API Extractor must be an exact development-only pin')
+require(packageJson.devDependencies?.yaml ===
+  '2.9.0', 'yaml must be an exact development-only pin for structural workflow validation')
 
-require(JSON.stringify(sourceFiles) ===
-  JSON.stringify(
-    EXPECTED_SOURCE_FILES,
-  ), `src must contain exactly: ${EXPECTED_SOURCE_FILES.join(', ')}`)
-require(declarationShape('specs/v1-public-api.d.ts', expectedDeclaration) ===
-  declarationShape(
-    'dist/index.d.ts',
-    emittedDeclaration,
-  ), 'emitted declarations must match the frozen public API contract')
-require(declarationShape('specs/v1-styles-api.d.ts', expectedStylesDeclaration) ===
-  declarationShape(
-    'dist/styles.d.ts',
-    emittedStylesDeclaration,
-  ), 'emitted styles declarations must match the frozen styles subpath contract')
-
-const expectedCoveragePaths = EXPECTED_SOURCE_FILES.map((file) => `/src/${file}`)
+const expectedCoveragePaths = runtimeFiles.map(({ path }) => `/src/${path}`)
 const coverageEntries = Object.entries(coverage)
 require(coverageEntries.length ===
-  EXPECTED_SOURCE_FILES.length, `coverage must contain exactly ${EXPECTED_SOURCE_FILES.length} source files`)
+  runtimeFiles.length, `coverage must contain exactly ${runtimeFiles.length} source files`)
 
 for (const suffix of expectedCoveragePaths) {
   const matches = coverageEntries.filter(([path]) => path.replaceAll('\\', '/').endsWith(suffix))
@@ -106,17 +91,6 @@ for (const suffix of expectedCoveragePaths) {
   require([...executableLines.values()].every(
     (count) => count > 0,
   ), `${suffix} must have complete line coverage`)
-}
-
-const runtimeSource = EXPECTED_SOURCE_FILES.map((file) => readText(`src/${file}`)).join('\n')
-for (const [pattern, description] of [
-  [/\bprocess\.(?:on|once)\s*\(/, 'process lifecycle listener'],
-  [/\bprocess\.(?:exit|kill)\s*\(/, 'host termination call'],
-  [/\b(?:stderr|process\.stderr)\.(?:on|once)\s*\(/, 'global stderr error listener'],
-  [/\b(?:stdout|process\.stdout)\.write\s*\(/, 'stdout write'],
-  [/SIGINT|SIGTERM/, 'signal ownership'],
-]) {
-  require(!pattern.test(runtimeSource), `runtime source must not contain ${description}`)
 }
 
 try {

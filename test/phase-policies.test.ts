@@ -1,4 +1,6 @@
-import { readFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
@@ -8,6 +10,9 @@ import {
   validateTypeScriptConfig,
 } from '../scripts/phase1-toolchain-policy.mjs'
 import { APPROVED_PACKAGE_FILES, validatePackOutput } from '../scripts/pack-policy.mjs'
+import { APPROVED_SCRIPTS, validatePackagePolicy } from '../scripts/package-policy.mjs'
+import { inspectRuntimeDirectory, validateRuntimePolicy } from '../scripts/runtime-policy.mjs'
+import { validateWorkflowPolicy } from '../scripts/workflow-policy.mjs'
 
 function loadPhaseDocuments() {
   return Object.fromEntries(
@@ -187,5 +192,134 @@ describe('package payload policy', () => {
     const report = validPackReport()
     report[0].bundled = ['unexpected-runtime']
     expect(validatePackOutput(report)).toContain('tarball must contain zero bundled dependencies')
+  })
+})
+
+describe('package installation policy', () => {
+  const packageJson = JSON.parse(readFileSync('package.json', 'utf8'))
+
+  it('accepts the exact approved package manifest', () => {
+    expect(validatePackagePolicy(packageJson, ['package.json'])).toEqual([])
+    expect(packageJson.scripts).toEqual(APPROVED_SCRIPTS)
+  })
+
+  it.each([
+    'preinstall',
+    'install',
+    'postinstall',
+    'prepare',
+    'prepack',
+    'postpack',
+    'prepublish',
+    'prepublishOnly',
+    'publish',
+    'postpublish',
+    'version',
+    'postversion',
+    'pretest',
+  ])('rejects the %s lifecycle or hook script', (name) => {
+    const mutated = {
+      ...packageJson,
+      scripts: { ...packageJson.scripts, [name]: 'node hostile.mjs' },
+    }
+
+    expect(validatePackagePolicy(mutated)).toEqual(
+      expect.arrayContaining(['scripts must exactly match the approved command map']),
+    )
+  })
+
+  it('rejects an altered approved command and native-install metadata', () => {
+    const altered = { ...packageJson, scripts: { ...packageJson.scripts, test: 'echo unsafe' } }
+    const native = { ...packageJson, gypfile: true }
+
+    expect(validatePackagePolicy(altered)).toContain(
+      'scripts must exactly match the approved command map',
+    )
+    expect(validatePackagePolicy(native, ['binding.gyp'])).toEqual(
+      expect.arrayContaining([
+        'native-install metadata is forbidden: gypfile',
+        'binding.gyp is forbidden',
+      ]),
+    )
+  })
+})
+
+describe('runtime source policy', () => {
+  const sources = inspectRuntimeDirectory('src').files
+
+  it('accepts the approved runtime topology', () => {
+    expect(validateRuntimePolicy(sources)).toEqual([])
+  })
+
+  it.each([
+    ['nested source', { path: 'nested/hostile.ts', text: "import process from 'node:process'" }],
+    [
+      'aliased process import',
+      { path: 'spinner.ts', text: "import { stdout as output } from 'node:process'" },
+    ],
+    ['process listener', { path: 'spinner.ts', text: "process.on('SIGINT', () => undefined)" }],
+    ['termination call', { path: 'spinner.ts', text: 'process.exit(1)' }],
+    [
+      'stdout write',
+      { path: 'spinner.ts', text: "import { stdout } from 'node:process'\nstdout.write('unsafe')" },
+    ],
+  ])('rejects %s before accepting a changed architecture', (_name, hostile) => {
+    const mutated = sources.map((source) => (source.path === hostile.path ? hostile : source))
+    if (!mutated.some((source) => source.path === hostile.path)) mutated.push(hostile)
+
+    expect(validateRuntimePolicy(mutated)).not.toEqual([])
+  })
+
+  it('rejects a symlinked runtime module', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'spinlog-runtime-policy-'))
+    const target = join(directory, 'target')
+    const link = join(directory, 'linked')
+    mkdirSync(target)
+    writeFileSync(join(target, 'entry.ts'), 'export {}\n')
+    symlinkSync(target, link, process.platform === 'win32' ? 'junction' : 'dir')
+
+    try {
+      expect(inspectRuntimeDirectory(directory).failures).toContain(
+        'runtime source must not contain symlinks: linked',
+      )
+    } finally {
+      rmSync(directory, { force: true, recursive: true })
+    }
+  })
+})
+
+describe('workflow policy', () => {
+  const workflows = {
+    'ci.yml': readFileSync('.github/workflows/ci.yml', 'utf8'),
+    'release-readiness.yml': readFileSync('.github/workflows/release-readiness.yml', 'utf8'),
+  }
+
+  it('accepts the read-only pre-Phase-5 workflows', () => {
+    expect(validateWorkflowPolicy(workflows)).toEqual([])
+  })
+
+  it.each([
+    [
+      'writable permission',
+      (source: string) => source.replace('contents: read', 'contents: write'),
+    ],
+    [
+      'tag trigger',
+      (source: string) => source.replace('pull_request:', "pull_request:\n    tags: ['v*']"),
+    ],
+    [
+      'OIDC permission',
+      (source: string) => source.replace('contents: read', 'contents: read\n  id-token: write'),
+    ],
+    [
+      'publication command',
+      (source: string) => source.replace('npm run check:phases', 'npm publish'),
+    ],
+    ['unpinned action', (source: string) => source.replace(/@[a-f0-9]{40}/, '@main')],
+    ['unapproved action', (source: string) => source.replace('actions/checkout@', 'evil/action@')],
+  ])('rejects %s structurally', (_name, mutate) => {
+    expect(
+      validateWorkflowPolicy({ ...workflows, 'ci.yml': mutate(workflows['ci.yml']) }),
+    ).not.toEqual([])
   })
 })

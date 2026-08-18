@@ -15,16 +15,16 @@
       "description": "A zero-runtime-dependency, ESM-only terminal color and spinner primitive capped at 2,560 bytes gzipped.",
       "externalReferences": [
         {
+          "type": "issue-tracker",
+          "url": "https://github.com/YankeyBright/spinlog/issues"
+        },
+        {
           "type": "vcs",
           "url": "git+https://github.com/YankeyBright/spinlog.git"
         },
         {
           "type": "website",
           "url": "https://github.com/YankeyBright/spinlog#readme"
-        },
-        {
-          "type": "issue-tracker",
-          "url": "https://github.com/YankeyBright/spinlog/issues"
         }
       ],
       "licenses": [
@@ -35,7 +35,6 @@
         }
       ],
       "name": "spinlog",
-      "properties": [],
       "purl": "pkg:npm/spinlog@0.1.0",
       "scope": "required",
       "type": "library",

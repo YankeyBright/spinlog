@@ -142,6 +142,15 @@ describe('Phase 0 contract policy', () => {
     )
   })
 
+  it('rejects terminal validation that can be skipped by idempotency', () => {
+    const fixture = loadFixture()
+    fixture.contract.inputValidation.invalidTerminalOverride = 'ignore-after-settlement'
+
+    expect(validatePhase0Contract(fixture)).toContain(
+      'inputValidation must match the frozen contract',
+    )
+  })
+
   it('rejects ambiguous active and terminal write-failure behavior', () => {
     const fixture = loadFixture()
     fixture.contract.writeFailures.activeFailureState = 'spinning'

@@ -79,11 +79,15 @@ jobs:
           npm run test:consumer
           npm run pack:check
 
-  supply-chain:
-    name: Supply Chain (Node 24)
+  benchmark-baseline-run:
+    name: Baseline Run ${{ matrix.slot }} (Node 24)
     needs: [quality, cross-platform]
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        slot: [1, 2, 3, 4, 5]
     steps:
       - name: Checkout Repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -99,8 +103,82 @@ jobs:
       - name: Install Dependencies Without Lifecycle Hooks
         run: npm ci --ignore-scripts
 
-      - name: Verify Release-Readiness Controls
-        run: npm run check:phase1:release
+      - name: Build And Measure Baseline Input
+        env:
+          BENCHMARK_RUN_SLOT: ${{ matrix.slot }}
+        run: |
+          npm run build
+          npm run benchmark
 
-      - name: Audit Dependency Graph
-        run: npm audit --audit-level=low
+      - name: Upload Immutable Baseline Input
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: phase3-baseline-run-${{ matrix.slot }}
+          path: artifacts/phase3/benchmark.json
+          if-no-files-found: error
+          retention-days: 14
+
+  benchmark-baseline-candidate:
+    name: Aggregate Reviewable Baseline Candidate
+    needs: benchmark-baseline-run
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '24.x'
+          package-manager-cache: false
+
+      - name: Download Baseline Inputs
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          pattern: phase3-baseline-run-*
+          path: artifacts/phase3/baseline-runs
+
+      - name: Aggregate Baseline Candidate Without Modifying The Contract
+        run: node bench/aggregate-baseline.mjs artifacts/phase3/baseline-runs/phase3-baseline-run-1/benchmark.json artifacts/phase3/baseline-runs/phase3-baseline-run-2/benchmark.json artifacts/phase3/baseline-runs/phase3-baseline-run-3/benchmark.json artifacts/phase3/baseline-runs/phase3-baseline-run-4/benchmark.json artifacts/phase3/baseline-runs/phase3-baseline-run-5/benchmark.json --out artifacts/phase3/baseline-candidate.json
+
+      - name: Upload Baseline Candidate For Review
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: phase3-baseline-candidate
+          path: artifacts/phase3/baseline-candidate.json
+          if-no-files-found: error
+          retention-days: 14
+
+  candidate:
+    name: Phase 3 Candidate Verification (Node 24)
+    needs: [quality, cross-platform]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '24.x'
+          package-manager-cache: false
+
+      - name: Install Dependencies Without Lifecycle Hooks
+        run: npm ci --ignore-scripts
+
+      - name: Verify Candidate Against The Committed Baseline
+        run: npm run verify:candidate
+
+      - name: Upload Phase 3 Evidence
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: phase3-node24-evidence
+          path: artifacts/phase3
+          if-no-files-found: error
+          retention-days: 14

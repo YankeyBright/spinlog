@@ -28,6 +28,8 @@ OIDC provenance supplies cryptographic build-origin evidence. It does not prove 
 
 `npm run sbom` invokes npm's native lockfile-only SBOM command, omits development, optional, and peer classes, and canonicalizes volatile metadata into a reproducible CycloneDX 1.5 library document. `npm run sbom:check` requires the package name/version, repository, purl, library type, root-only dependency graph, reproducibility marker, and an empty runtime component list.
 
+Phase 3 also emits a separate build-tool CycloneDX inventory and candidate manifest outside the npm payload. Those artifacts prove development dependency composition and digest identity without misrepresenting build tools as consumer runtime dependencies.
+
 The SBOM represents the consumer runtime package, not the development workstation or GitHub-hosted build environment. Attach it to both the npm package and GitHub Release.
 
 ## Evidence Discipline
