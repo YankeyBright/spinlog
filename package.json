@@ -100,7 +100,7 @@
     "@babel/parser": "7.29.8",
     "@biomejs/biome": "2.5.8",
     "@size-limit/preset-small-lib": "13.0.3",
-    "@types/node": "22.20.1",
+    "@types/node": "26.2.0",
     "@vitest/coverage-v8": "4.1.10",
     "esbuild": "0.28.2",
     "marked": "9.1.6",
