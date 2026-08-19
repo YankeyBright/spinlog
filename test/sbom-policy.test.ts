@@ -2,7 +2,13 @@ import { readFileSync } from 'node:fs'
 
 import { describe, expect, it } from 'vitest'
 
-import { normalizeSbom, validateSbom } from '../scripts/sbom-policy.mjs'
+import {
+  normalizeBuildSbom,
+  normalizeSbom,
+  validateBuildSbom,
+  validateRawRuntimeSbom,
+  validateSbom,
+} from '../scripts/sbom-policy.mjs'
 
 const packageJson = JSON.parse(readFileSync('package.json', 'utf8'))
 
@@ -31,9 +37,15 @@ function rawSbom({
         externalReferences: [{ type: 'vcs', url: packageJson.repository.url }],
       },
     },
-    components: [],
+    components: [] as Array<Record<string, unknown>>,
     dependencies: [{ ref, dependsOn: [] }],
   }
+}
+
+function externalReference(bom: ReturnType<typeof rawSbom>, type: string) {
+  const reference = bom.metadata.component.externalReferences.find((entry) => entry.type === type)
+  if (!reference) throw new Error(`missing ${type} external reference in test fixture`)
+  return reference
 }
 
 describe('runtime SBOM policy', () => {
@@ -58,14 +70,70 @@ describe('runtime SBOM policy', () => {
   })
 
   it('rejects runtime components and repository drift', () => {
-    const bom = normalizeSbom(rawSbom(), packageJson)
-    bom.components.push({ name: 'unexpected-runtime-package' })
-    bom.metadata.component.externalReferences[0].url = 'https://example.invalid/repository.git'
+    const raw = rawSbom()
+    raw.components.push({ name: 'unexpected-runtime-package' })
+    const bom = normalizeSbom(raw, packageJson)
+    externalReference(bom, 'vcs').url = 'https://example.invalid/repository.git'
 
     expect(validateSbom(bom, packageJson)).toEqual(
       expect.arrayContaining([
         'components must be empty, found 1',
         'SBOM VCS reference must match package.json',
+      ]),
+    )
+  })
+
+  it('requires canonical runtime identity fields', () => {
+    const bom = normalizeSbom(rawSbom(), packageJson)
+    bom.metadata.component.licenses = []
+    externalReference(bom, 'vcs').url = 'https://example.invalid/repository.git'
+
+    expect(validateSbom(bom, packageJson)).toEqual(
+      expect.arrayContaining([
+        'SBOM component identity, license, description, and repository references must match package.json',
+        'SBOM VCS reference must match package.json',
+      ]),
+    )
+  })
+
+  it('rejects unexpected npm runtime inventory before normalization', () => {
+    const raw = rawSbom()
+    raw.components.push({ name: 'unexpected-runtime-package' })
+
+    expect(validateRawRuntimeSbom(raw, packageJson)).toEqual([
+      'raw runtime SBOM components must be empty, found 1',
+    ])
+  })
+})
+
+describe('build SBOM policy', () => {
+  it('accepts the full direct development inventory', () => {
+    const ref = `${packageJson.name}@${packageJson.version}`
+    const components = Object.entries(packageJson.devDependencies).map(([name, version]) => ({
+      'bom-ref': `pkg:npm/${name}@${version}`,
+      name,
+      version,
+    }))
+    const bom = normalizeBuildSbom(
+      {
+        ...rawSbom(),
+        components,
+        dependencies: [{ ref, dependsOn: components.map((component) => component['bom-ref']) }],
+      },
+      packageJson,
+    )
+
+    expect(validateBuildSbom(bom, packageJson)).toEqual([])
+  })
+
+  it('rejects a missing direct build dependency', () => {
+    const bom = normalizeBuildSbom({ ...rawSbom(), components: [], dependencies: [] }, packageJson)
+
+    expect(validateBuildSbom(bom, packageJson)).toEqual(
+      expect.arrayContaining([
+        'build SBOM must include development components',
+        'build SBOM must include the root dependency graph',
+        `build SBOM must include direct development dependency: typescript@${packageJson.devDependencies.typescript}`,
       ]),
     )
   })

@@ -1,5 +1,3 @@
-type Style = (text: string) => string
-
 /** Built-in spinner animation names. */
 export type SpinnerName = 'dots' | 'line'
 
@@ -30,7 +28,7 @@ export interface SpinnerOptions {
   spinner?: SpinnerName
 }
 
-/** Options used by {@link Spinlog.promise}. */
+/** Options used by the `Spinlog.promise` overloads. */
 export interface PromiseOptions extends SpinnerOptions {
   text?: string
 }
@@ -62,46 +60,46 @@ export interface Spinlog {
   promise<T>(task: () => PromiseLike<T>, options?: PromiseOptions): Promise<T>
 }
 
-export declare const reset: Style
-export declare const bold: Style
-export declare const dim: Style
-export declare const italic: Style
-export declare const underline: Style
-export declare const strikethrough: Style
+export declare const reset: (text: string) => string
+export declare const bold: (text: string) => string
+export declare const dim: (text: string) => string
+export declare const italic: (text: string) => string
+export declare const underline: (text: string) => string
+export declare const strikethrough: (text: string) => string
 
-export declare const black: Style
-export declare const red: Style
-export declare const green: Style
-export declare const yellow: Style
-export declare const blue: Style
-export declare const magenta: Style
-export declare const cyan: Style
-export declare const white: Style
-export declare const blackBright: Style
-export declare const redBright: Style
-export declare const greenBright: Style
-export declare const yellowBright: Style
-export declare const blueBright: Style
-export declare const magentaBright: Style
-export declare const cyanBright: Style
-export declare const whiteBright: Style
+export declare const black: (text: string) => string
+export declare const red: (text: string) => string
+export declare const green: (text: string) => string
+export declare const yellow: (text: string) => string
+export declare const blue: (text: string) => string
+export declare const magenta: (text: string) => string
+export declare const cyan: (text: string) => string
+export declare const white: (text: string) => string
+export declare const blackBright: (text: string) => string
+export declare const redBright: (text: string) => string
+export declare const greenBright: (text: string) => string
+export declare const yellowBright: (text: string) => string
+export declare const blueBright: (text: string) => string
+export declare const magentaBright: (text: string) => string
+export declare const cyanBright: (text: string) => string
+export declare const whiteBright: (text: string) => string
 
-export declare const bgBlack: Style
-export declare const bgRed: Style
-export declare const bgGreen: Style
-export declare const bgYellow: Style
-export declare const bgBlue: Style
-export declare const bgMagenta: Style
-export declare const bgCyan: Style
-export declare const bgWhite: Style
-export declare const bgBlackBright: Style
-export declare const bgRedBright: Style
-export declare const bgGreenBright: Style
-export declare const bgYellowBright: Style
-export declare const bgBlueBright: Style
-export declare const bgMagentaBright: Style
-export declare const bgCyanBright: Style
-export declare const bgWhiteBright: Style
+export declare const bgBlack: (text: string) => string
+export declare const bgRed: (text: string) => string
+export declare const bgGreen: (text: string) => string
+export declare const bgYellow: (text: string) => string
+export declare const bgBlue: (text: string) => string
+export declare const bgMagenta: (text: string) => string
+export declare const bgCyan: (text: string) => string
+export declare const bgWhite: (text: string) => string
+export declare const bgBlackBright: (text: string) => string
+export declare const bgRedBright: (text: string) => string
+export declare const bgGreenBright: (text: string) => string
+export declare const bgYellowBright: (text: string) => string
+export declare const bgBlueBright: (text: string) => string
+export declare const bgMagentaBright: (text: string) => string
+export declare const bgCyanBright: (text: string) => string
+export declare const bgWhiteBright: (text: string) => string
 
 declare const spinlog: Spinlog
 

@@ -22,7 +22,7 @@ The `spinlog/styles` subpath exports exactly the 38 style functions and the `Sty
 
 The mutable instance properties are exactly `text`, `color`, `prefix`, and `suffix`. Lifecycle methods return the same instance for chaining and accept no undocumented parameters.
 
-At runtime, invalid factory text, option objects, option values, terminal text overrides, and mutable assignments throw `TypeError` before output. A failed mutation preserves its previous value. Invalid promise options reject before spinner start, direct thenable observation, or task invocation. Unknown option keys are ignored for forward compatibility.
+At runtime, invalid factory text, option objects, option values, terminal text overrides, and mutable assignments throw `TypeError` before output. Terminal overrides are validated before idempotency, state changes, mutation, timer cleanup, or writes; a failed validation preserves the current text, state, timer ownership, and output history. A failed mutation preserves its previous value. Invalid promise options reject before spinner start, direct thenable observation, or task invocation. Unknown option keys are ignored for forward compatibility.
 
 ## Lifecycle
 

@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-import { normalizeSbom, validateSbom } from './sbom-policy.mjs'
+import { normalizeSbom, validateRawRuntimeSbom, validateSbom } from './sbom-policy.mjs'
 
 const NPM_SBOM_ARGUMENTS = Object.freeze([
   'sbom',
@@ -16,11 +16,29 @@ const NPM_SBOM_ARGUMENTS = Object.freeze([
 ])
 
 export function generateSbom({ npmExecPath = process.env.npm_execpath } = {}) {
+  const packageJson = JSON.parse(readFileSync('package.json', 'utf8'))
+  const raw = runNpmSbom(NPM_SBOM_ARGUMENTS, npmExecPath)
+  const rawFailures = validateRawRuntimeSbom(raw, packageJson)
+  if (rawFailures.length > 0) {
+    throw new Error(`npm produced a non-runtime SBOM:\n${rawFailures.join('\n')}`)
+  }
+
+  const bom = normalizeSbom(raw, packageJson)
+  const failures = validateSbom(bom, packageJson)
+
+  if (failures.length > 0) {
+    throw new Error(failures.join('\n'))
+  }
+
+  writeFileSync('sbom.json', `${JSON.stringify(bom, null, 2)}\n`)
+}
+
+export function runNpmSbom(arguments_, npmExecPath = process.env.npm_execpath) {
   if (!npmExecPath) {
     throw new Error('npm_execpath is required; run this generator through npm run sbom')
   }
 
-  const result = spawnSync(process.execPath, [npmExecPath, ...NPM_SBOM_ARGUMENTS], {
+  const result = spawnSync(process.execPath, [npmExecPath, ...arguments_], {
     cwd: process.cwd(),
     encoding: 'utf8',
     maxBuffer: 10 * 1024 * 1024,
@@ -33,16 +51,7 @@ export function generateSbom({ npmExecPath = process.env.npm_execpath } = {}) {
   if (result.status !== 0) {
     throw new Error(result.stderr.trim() || `npm sbom exited with status ${result.status}`)
   }
-
-  const packageJson = JSON.parse(readFileSync('package.json', 'utf8'))
-  const bom = normalizeSbom(JSON.parse(result.stdout), packageJson)
-  const failures = validateSbom(bom, packageJson)
-
-  if (failures.length > 0) {
-    throw new Error(failures.join('\n'))
-  }
-
-  writeFileSync('sbom.json', `${JSON.stringify(bom, null, 2)}\n`)
+  return JSON.parse(result.stdout)
 }
 
 const isMain = process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url

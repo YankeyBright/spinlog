@@ -187,6 +187,7 @@ const EXPECTED_INPUT_VALIDATION = Object.freeze({
   unknownOptionKeys: 'ignore',
   invalidFactoryInput: 'throw-TypeError-before-output',
   invalidMutation: 'throw-TypeError-and-preserve-value',
+  invalidTerminalOverride: 'throw-TypeError-before-idempotency-state-mutation-timer-or-output',
   invalidPromiseOptions: 'reject-TypeError-before-start-or-input',
   invalidStyleInput: 'throw-TypeError-before-capability-detection',
 })
@@ -354,13 +355,12 @@ function exactKeys(value, expected, path, failures) {
 
 export function renderPublicApiDeclaration(contract) {
   const colorUnion = SPINNER_COLORS.map((color) => `  | '${color}'`).join('\n')
+  const styleSignature = '(text: string) => string'
   const styleDeclarations = contract.publicApi.styleExports
-    .map((name) => `export declare const ${name}: Style`)
+    .map((name) => `export declare const ${name}: ${styleSignature}`)
     .join('\n')
 
-  return `type Style = (text: string) => string
-
-/** Built-in spinner animation names. */
+  return `/** Built-in spinner animation names. */
 export type SpinnerName = 'dots' | 'line'
 
 /** ANSI-16 foreground colors available to spinner frames. */
@@ -375,7 +375,7 @@ export interface SpinnerOptions {
   spinner?: SpinnerName
 }
 
-/** Options used by {@link Spinlog.promise}. */
+/** Options used by the \`Spinlog.promise\` overloads. */
 export interface PromiseOptions extends SpinnerOptions {
   text?: string
 }
@@ -407,7 +407,7 @@ export interface Spinlog {
   promise<T>(task: () => PromiseLike<T>, options?: PromiseOptions): Promise<T>
 }
 
-${styleDeclarations.replace('export declare const black: Style', '\nexport declare const black: Style').replace('export declare const bgBlack: Style', '\nexport declare const bgBlack: Style')}
+${styleDeclarations.replace(`export declare const black: ${styleSignature}`, `\nexport declare const black: ${styleSignature}`).replace(`export declare const bgBlack: ${styleSignature}`, `\nexport declare const bgBlack: ${styleSignature}`)}
 
 declare const spinlog: Spinlog
 
@@ -617,8 +617,8 @@ export function validatePhase0Contract({
     'contract',
     failures,
   )
-  require(contract.schemaVersion === 4 &&
-    contract.phase === 0, 'contract version and phase must be 4 and 0', failures)
+  require(contract.schemaVersion === 5 &&
+    contract.phase === 0, 'contract version and phase must be 5 and 0', failures)
   requireExact(
     contract.identity,
     {

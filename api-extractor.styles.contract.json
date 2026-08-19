@@ -1,0 +1,25 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/api-extractor/v7/api-extractor.schema.json",
+  "projectFolder": ".",
+  "mainEntryPointFilePath": "<projectFolder>/specs/v1-styles-api.d.ts",
+  "compiler": {
+    "tsconfigFilePath": "<projectFolder>/tsconfig.api-extractor.json"
+  },
+  "apiReport": {
+    "enabled": true,
+    "includeForgottenExports": true,
+    "reportFileName": "spinlog-styles.api.md",
+    "reportFolder": "<projectFolder>/etc",
+    "reportTempFolder": "<projectFolder>/temp/api-extractor/styles-contract"
+  },
+  "docModel": { "enabled": false },
+  "dtsRollup": { "enabled": false },
+  "tsdocMetadata": { "enabled": false },
+  "messages": {
+    "compilerMessageReporting": { "default": { "logLevel": "warning" } },
+    "extractorMessageReporting": {
+      "default": { "logLevel": "warning" },
+      "ae-missing-release-tag": { "logLevel": "none" }
+    }
+  }
+}

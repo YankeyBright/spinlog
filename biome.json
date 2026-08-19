@@ -26,6 +26,6 @@
     }
   },
   "files": {
-    "includes": ["**", "!**/dist", "!**/coverage", "!**/sbom.json"]
+    "includes": ["**", "!**/artifacts", "!**/coverage", "!**/dist", "!**/sbom.json", "!**/temp"]
   }
 }

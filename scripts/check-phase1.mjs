@@ -174,8 +174,8 @@ require(!existsSync(
 ), 'tsup.config.ts must be removed after direct esbuild migration')
 
 for (const value of [
-  "index: 'src/index.ts'",
-  "styles: 'src/styles.ts'",
+  "index: resolve(projectRoot, 'src/index.ts')",
+  "styles: resolve(projectRoot, 'src/styles.ts')",
   'process.chdir(projectRoot)',
   'bundle: true',
   "format: 'esm'",

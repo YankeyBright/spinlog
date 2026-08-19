@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "phase": 0,
   "identity": {
     "packageName": "spinlog",
@@ -191,6 +191,7 @@
     "unknownOptionKeys": "ignore",
     "invalidFactoryInput": "throw-TypeError-before-output",
     "invalidMutation": "throw-TypeError-and-preserve-value",
+    "invalidTerminalOverride": "throw-TypeError-before-idempotency-state-mutation-timer-or-output",
     "invalidPromiseOptions": "reject-TypeError-before-start-or-input",
     "invalidStyleInput": "throw-TypeError-before-capability-detection"
   },

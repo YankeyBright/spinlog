@@ -282,6 +282,63 @@ describe('spinner lifecycle and rendering', () => {
     }
   })
 
+  it.each(['succeed', 'fail', 'warn', 'info'] as const)(
+    'validates an invalid %s override before terminal idempotency',
+    (method) => {
+      setTTY(false)
+      const spinner = spinlog('first')
+      spinner.succeed('settled')
+      const timerCount = vi.getTimerCount()
+      const writes = output()
+
+      expect(() => spinner[method](123 as never)).toThrow('text must be a string')
+      expect(spinner.text).toBe('settled')
+      expect(vi.getTimerCount()).toBe(timerCount)
+      expect(output()).toEqual(writes)
+    },
+  )
+
+  it.each(['idle', 'spinning', 'stopped'] as const)(
+    'rejects invalid terminal overrides from the %s state without side effects',
+    (source) => {
+      const spinner = spinlog('first', { spinner: 'line' })
+      if (source === 'spinning') spinner.start()
+      if (source === 'stopped') spinner.stop()
+      const timerCount = vi.getTimerCount()
+      const writes = output()
+
+      expect(() => spinner.fail(null as never)).toThrow('text must be a string')
+      expect(spinner.text).toBe('first')
+      expect(vi.getTimerCount()).toBe(timerCount)
+      expect(output()).toEqual(writes)
+    },
+  )
+
+  it.each(['idle', 'spinning', 'stopped', 'succeeded', 'failed', 'warned', 'informed'] as const)(
+    'rejects invalid overrides for every terminal method from %s',
+    (source) => {
+      setTTY(false)
+      const spinner = spinlog('first', { spinner: 'line' })
+      if (source === 'spinning') spinner.start()
+      if (source === 'stopped') spinner.stop()
+      if (source === 'succeeded') spinner.succeed()
+      if (source === 'failed') spinner.fail()
+      if (source === 'warned') spinner.warn()
+      if (source === 'informed') spinner.info()
+      const timerCount = vi.getTimerCount()
+      const writes = output()
+
+      for (const method of ['succeed', 'fail', 'warn', 'info'] as const) {
+        expect(() => spinner[method](Symbol('invalid') as never), `${source}.${method}`).toThrow(
+          'text must be a string',
+        )
+      }
+      expect(spinner.text).toBe('first')
+      expect(vi.getTimerCount()).toBe(timerCount)
+      expect(output()).toEqual(writes)
+    },
+  )
+
   it('treats a false stream backpressure result as a successful cosmetic write', () => {
     write.mockImplementation(() => false)
     const spinner = spinlog('work', { spinner: 'line' }).start()

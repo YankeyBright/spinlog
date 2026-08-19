@@ -11,6 +11,12 @@ if (!npmCli) throw new Error('check-pack.mjs must run through npm')
 
 const cache = mkdtempSync(join(tmpdir(), 'spinlog-pack-check-'))
 
+function selectPackResult(parsed) {
+  if (Array.isArray(parsed)) return parsed[0]
+  if (parsed.files) return parsed
+  return Object.values(parsed)[0]
+}
+
 try {
   const output = execFileSync(
     process.execPath,
@@ -28,7 +34,7 @@ try {
     for (const failure of failures) console.error(`pack: ${failure}`)
     process.exitCode = 1
   } else {
-    const pack = Array.isArray(parsed) ? parsed[0] : parsed.files ? parsed : Object.values(parsed)[0]
+    const pack = selectPackResult(parsed)
     console.log(`pack=valid files=${pack.files.length}`)
   }
 } finally {

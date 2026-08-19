@@ -13,8 +13,8 @@ process.chdir(projectRoot)
 
 await build({
   entryPoints: {
-    index: 'src/index.ts',
-    styles: 'src/styles.ts',
+    index: resolve(projectRoot, 'src/index.ts'),
+    styles: resolve(projectRoot, 'src/styles.ts'),
   },
   bundle: true,
   platform: 'node',

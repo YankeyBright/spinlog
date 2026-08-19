@@ -26,12 +26,13 @@
 - Phase 0 policy tests mutate the machine contract and prove that drift is rejected.
 - Phase 2 behavior tests use fake timers and controlled stderr writes without network access.
 - Phase 2 uses Node's built-in `styleText` and `stripVTControlCharacters` for stable SGR composition and VT removal without adding a runtime dependency.
-- The TypeScript CLI compiles both frozen declarations and the emitted consumer surface. Pinned Biome canonicalizes already-valid declarations for exact parity because TypeScript 7's public compiler API is not ready.
+- API Extractor `7.58.12` compares the frozen and emitted root/styles declarations through tracked semantic API reports; TSDoc wording alone does not create a public signature diff.
 - publint and Are The Types Wrong validate the packed manifest and ESM-only resolution profiles.
 - A clean packed-consumer test covers package-name imports, Node16/NodeNext/Bundler resolution, stderr behavior, and unreferenced timer exit.
 - An in-memory esbuild proof enforces the style-only tree-shaking budget.
 - Size Limit `13.0.3` independently checks the gzip byte budget with Node built-ins explicitly externalized.
 - Biome `2.5.7` owns formatting and linting.
+- YAML `2.9.0` parses GitHub Actions structurally for trigger, permission, job, cache, and immutable-action policy checks.
 
 ## Security Tooling
 

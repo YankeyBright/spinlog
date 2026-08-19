@@ -22,7 +22,7 @@ describe('Phase 0 contract policy', () => {
   it('rejects a missing style export', () => {
     const fixture = loadFixture()
     fixture.declaration = fixture.declaration.replace(
-      'export declare const bgWhiteBright: Style\n',
+      'export declare const bgWhiteBright: (text: string) => string\n',
       '',
     )
 
@@ -41,6 +41,13 @@ describe('Phase 0 contract policy', () => {
     expect(validatePhase0Contract(fixture)).toContain(
       'styles API declaration must match the generated closed contract',
     )
+  })
+
+  it('reports the required contract version and phase accurately', () => {
+    const fixture = loadFixture()
+    fixture.contract.schemaVersion = 4
+
+    expect(validatePhase0Contract(fixture)).toContain('contract version and phase must be 5 and 0')
   })
 
   it('rejects changed promise overload semantics', () => {
@@ -139,6 +146,15 @@ describe('Phase 0 contract policy', () => {
         'textSafety must match the frozen contract',
         'inputValidation must match the frozen contract',
       ]),
+    )
+  })
+
+  it('rejects terminal validation that can be skipped by idempotency', () => {
+    const fixture = loadFixture()
+    fixture.contract.inputValidation.invalidTerminalOverride = 'ignore-after-settlement'
+
+    expect(validatePhase0Contract(fixture)).toContain(
+      'inputValidation must match the frozen contract',
     )
   })
 
