@@ -4,7 +4,7 @@
 
 No production version of `spinlog` has been published. Security fixes currently target the default branch and the completed Phase 0 through Phase 2 implementation.
 
-The v1 runtime requires Node.js `^22.13.0 || ^24.0.0`. Users must run security-supported patch releases from those lines.
+The v1 runtime requires Node.js `^22.13.0 || ^24.0.0 || ^26.0.0`. Users must run security-supported patch releases from those lines.
 
 ## Reporting A Vulnerability
 

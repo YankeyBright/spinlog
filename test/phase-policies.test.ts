@@ -274,7 +274,7 @@ describe('runtime source policy', () => {
 
   it('accepts the approved process import with a trailing semicolon', () => {
     const semicolonTerminated = sources.map((source) =>
-      source.path === 'spinner.ts'
+      source.path === 'text.ts'
         ? { ...source, text: "import { stderr } from 'node:process';" }
         : source,
     )
@@ -334,6 +334,12 @@ describe('workflow policy', () => {
     ],
     ['unpinned action', (source: string) => source.replace(/@[a-f0-9]{40}/, '@main')],
     ['unapproved action', (source: string) => source.replace('actions/checkout@', 'evil/action@')],
+    ['missing Node 26 coverage', (source: string) => source.replace(", '26.0.0', '26.x'", '')],
+    ['unsupported Node 23 major', (source: string) => source.replace("'22.x'", "'23.x'")],
+    ['unsupported Node 25 major', (source: string) => source.replace("'26.0.0'", "'25.0.0'")],
+    ['unsupported Node 27 major', (source: string) => source.replace("'26.x'", "'27.x'")],
+    ['floating Current alias', (source: string) => source.replace("'26.x'", "'current'")],
+    ['changed runtime floor', (source: string) => source.replace("'22.13.0'", "'22.12.0'")],
   ])('rejects %s structurally', (_name, mutate) => {
     expect(
       validateWorkflowPolicy({ ...workflows, 'ci.yml': mutate(workflows['ci.yml']) }),

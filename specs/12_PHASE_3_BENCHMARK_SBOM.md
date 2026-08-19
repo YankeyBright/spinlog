@@ -6,7 +6,7 @@ Produce reproducible performance and supply-chain evidence for the completed Pha
 
 ## Benchmark Evidence
 
-- The dependency-free benchmark harness measures built root and `spinlog/styles` cold imports, enabled and disabled style throughput, static spinner settlement, and resolved promise-wrapper overhead.
+- The dependency-free benchmark harness measures built root and `spinlog/styles` cold imports, enabled and disabled style throughput, static spinner settlement, resolved promise-wrapper overhead, and intro/outro flow-message throughput.
 - Every full run uses warmups, calibrated iterations, at least 30 samples, median, p95, median absolute deviation, and a deterministic bootstrap confidence interval.
 - Relative median absolute deviation above 15% is inconclusive. The harness retries a scenario up to three times, then fails instead of accepting noisy evidence.
 - `bench/baseline.json` is tracked only after aggregation of five independent Node 24 Linux CI matrix jobs. Every input records the same commit and workflow attempt, a unique matrix slot, and a unique SHA-256 artifact digest. A baseline is not fabricated from a developer workstation.
@@ -56,4 +56,4 @@ npm run check:phase3
 npm run verify:candidate
 ```
 
-`npm run check:phases` remains the ordered Phase 0-through-Phase 2 foundation gate so baseline collection can run without a circular dependency on Phase 3. Phase 3 is complete only after the Node 22/24 quality matrix passes, the five Node 24 baseline jobs produce a reviewable baseline, that baseline is committed independently, and the Node 24 candidate job validates against it. The manual release-readiness workflow remains read-only; trusted publication, provenance, and post-publication verification remain Phase 5 work.
+`npm run check:foundation` is the ordered Phase 0-through-Phase 2 gate used before baseline collection. `npm run check:phases` is the final Phase 0-through-Phase 4 gate. Phase 3 is complete only after the Node 22/24/26 foundation matrix passes, the five Node 24 baseline jobs produce a reviewable baseline, that baseline is committed independently, and the Node 24 candidate job validates against it. The manual release-readiness workflow remains read-only; trusted publication, provenance, and post-publication verification remain Phase 5 work.

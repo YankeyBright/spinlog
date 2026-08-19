@@ -127,7 +127,7 @@ function sourceFiles(directory) {
 require(packageJson.type === 'module', 'package.json type must be module')
 require(packageJson.sideEffects === false, 'package.json sideEffects must be false')
 require(packageJson.engines?.node ===
-  '^22.13.0 || ^24.0.0', 'package.json engines.node must require stable styleText on Node 22 and support Node 24 LTS')
+  '^22.13.0 || ^24.0.0 || ^26.0.0', 'package.json engines.node must match the frozen Node 22, 24, and 26 range')
 require(entryPoint.types === './dist/index.d.ts' &&
   entryPoint.import ===
     './dist/index.js', 'package.json exports must expose the ESM entrypoint and declarations')
@@ -174,9 +174,9 @@ require(!existsSync(
 ), 'tsup.config.ts must be removed after direct esbuild migration')
 
 for (const value of [
-  "index: resolve(projectRoot, 'src/index.ts')",
-  "styles: resolve(projectRoot, 'src/styles.ts')",
-  'process.chdir(projectRoot)',
+  'absWorkingDir: projectRoot',
+  "index: './src/index.ts'",
+  "styles: './src/styles.ts'",
   'bundle: true',
   "format: 'esm'",
   'minify: true',
@@ -185,7 +185,7 @@ for (const value of [
   'treeShaking: true',
   "platform: 'node'",
   "target: 'node22.13'",
-  'outdir: outputDirectory',
+  "outdir: 'dist'",
   "external: ['node:*']",
 ]) {
   require(buildConfig.includes(value), `scripts/build-js.mjs must contain ${value}`)
@@ -261,10 +261,16 @@ validateSourceMap('dist/index.js.map', sourceMap, [
   '../src/ansi.ts',
   '../src/env.ts',
   '../src/index.ts',
+  '../src/messages.ts',
   '../src/spinner.ts',
   '../src/styles.ts',
+  '../src/text.ts',
 ])
-validateSourceMap('dist/styles.js.map', stylesSourceMap, ['../src/env.ts', '../src/styles.ts'])
+validateSourceMap('dist/styles.js.map', stylesSourceMap, [
+  '../src/ansi.ts',
+  '../src/env.ts',
+  '../src/styles.ts',
+])
 require(JSON.stringify([...distEntries].sort()) ===
   JSON.stringify([
     'index.d.ts',

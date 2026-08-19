@@ -23,11 +23,11 @@ jobs:
   quality:
     name: Quality (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
-        node-version: ['22.13.0', '22.x', '24.0.0', '24.x']
+        node-version: ['22.18.0', '22.x', '24.0.0', '24.x', '26.0.0', '26.x']
     steps:
       - name: Checkout Repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -43,21 +43,19 @@ jobs:
       - name: Install Dependencies Without Lifecycle Hooks
         run: npm ci --ignore-scripts
 
-      - name: Verify Ordered Phase Gates
-        run: npm run check:phases
+      - name: Verify Foundation And Documentation
+        run: |
+          npm run check:foundation
+          npm run check:phase4
 
       - name: Audit Dependency Graph
         run: npm audit --audit-level=low
 
-  cross-platform:
-    name: Consumer Smoke (${{ matrix.os }} / Node ${{ matrix.node-version }})
-    runs-on: ${{ matrix.os }}
+  packed-artifact:
+    name: Build Packed Runtime (Node 24)
+    needs: quality
+    runs-on: ubuntu-latest
     timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-latest, macos-latest]
-        node-version: ['22.13.0', '24.x']
     steps:
       - name: Checkout Repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -67,21 +65,60 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
-          node-version: ${{ matrix.node-version }}
-          cache: 'npm'
+          node-version: '24.x'
+          package-manager-cache: false
 
-      - name: Install Dependencies Without Lifecycle Hooks
-        run: npm ci --ignore-scripts
-
-      - name: Build And Verify Packed Consumer
+      - name: Build Exact Package Artifact
         run: |
+          npm ci --ignore-scripts
           npm run build
-          npm run test:consumer
+          npm run sbom
           npm run pack:check
+          node -e "require('fs').mkdirSync('artifacts/package',{recursive:true})"
+          npm pack --json --ignore-scripts --pack-destination artifacts/package
+
+      - name: Upload Packed Runtime
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: spinlog-packed-runtime
+          path: artifacts/package/*.tgz
+          if-no-files-found: error
+          retention-days: 14
+
+  packed-consumer:
+    name: Packed Consumer (${{ matrix.os }} / Node ${{ matrix.node-version }})
+    needs: packed-artifact
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node-version: ['22.13.0', '24.x', '26.x']
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Setup Consumer Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: ${{ matrix.node-version }}
+          package-manager-cache: false
+
+      - name: Download Packed Runtime
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          name: spinlog-packed-runtime
+          path: artifacts/package
+
+      - name: Verify Runtime Without Development Dependencies
+        run: node scripts/verify-packed-runtime.mjs artifacts/package
 
   benchmark-baseline-run:
     name: Baseline Run ${{ matrix.slot }} (Node 24)
-    needs: [quality, cross-platform]
+    needs: [quality, packed-consumer]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
@@ -154,9 +191,9 @@ jobs:
 
   candidate:
     name: Phase 3 Candidate Verification (Node 24)
-    needs: [quality, cross-platform]
+    needs: [quality, packed-consumer]
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - name: Checkout Repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -173,7 +210,9 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Verify Candidate Against The Committed Baseline
-        run: npm run verify:candidate
+        run: |
+          npm run verify:candidate
+          npm run check:phases
 
       - name: Upload Phase 3 Evidence
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0

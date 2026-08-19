@@ -7,16 +7,20 @@ export const APPROVED_RUNTIME_FILES = Object.freeze([
   'ansi.ts',
   'env.ts',
   'index.ts',
+  'messages.ts',
   'spinner.ts',
   'styles.ts',
+  'text.ts',
 ])
 
 const APPROVED_IMPORTS = Object.freeze({
   'ansi.ts': ['node:util'],
   'env.ts': [],
   'index.ts': [],
-  'spinner.ts': ['node:process', 'node:util'],
+  'messages.ts': [],
+  'spinner.ts': [],
   'styles.ts': ['node:util'],
+  'text.ts': ['node:process', 'node:util'],
 })
 const FORBIDDEN_RUNTIME_OPERATIONS = Object.freeze([
   [/\bprocess\.(?:on|once|addListener|prependListener)\s*\(/, 'process listener'],

@@ -107,7 +107,15 @@ try {
       expectedExports,
     ), 'runtime exports must match the frozen value export surface exactly')
   require(typeof runtime.default === 'function', 'default export must be callable')
-  require(typeof runtime.default?.promise === 'function', 'default export must expose promise()')
+  const expectedMethods = contract.publicApi?.callableMethods ?? []
+  require(JSON.stringify(Object.keys(runtime.default).sort()) ===
+    JSON.stringify(
+      [...expectedMethods].sort(),
+    ), 'default export properties must match the frozen callable methods')
+  for (const method of expectedMethods) {
+    require(typeof runtime.default?.[method] ===
+      'function', `default export must expose ${method}()`)
+  }
   require(JSON.stringify(Object.keys(stylesRuntime).sort()) ===
     JSON.stringify(
       expectedStyleExports,

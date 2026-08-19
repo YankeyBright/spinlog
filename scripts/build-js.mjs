@@ -9,18 +9,18 @@ const outputDirectory = resolve(projectRoot, 'dist')
 
 // Resolve cleanup from this script so invocation location cannot redirect it.
 rmSync(outputDirectory, { force: true, recursive: true })
-process.chdir(projectRoot)
 
 await build({
+  absWorkingDir: projectRoot,
   entryPoints: {
-    index: resolve(projectRoot, 'src/index.ts'),
-    styles: resolve(projectRoot, 'src/styles.ts'),
+    index: './src/index.ts',
+    styles: './src/styles.ts',
   },
   bundle: true,
   platform: 'node',
   format: 'esm',
   target: 'node22.13',
-  outdir: outputDirectory,
+  outdir: 'dist',
   minify: true,
   treeShaking: true,
   sourcemap: 'linked',

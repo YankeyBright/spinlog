@@ -27,6 +27,12 @@ The status symbols are `\u2714`, `\u2716`, `\u26a0`, and `\u2139`, with ASCII fa
 
 User-controlled `text`, `prefix`, `suffix`, and terminal text overrides are sanitized only when rendered. The renderer uses Node's `stripVTControlCharacters`, replaces each remaining run of C0/C1 controls, Arabic Letter Mark, left-to-right/right-to-left marks, Unicode line separators, bidi embeddings/overrides, and bidi isolates with one ASCII space, then trims segment boundaries. The exact ranges are frozen in `specs/v1-behavior.json`. Assigned values remain unchanged. Embedded ANSI styling is therefore removed from spinner fields; the spinner `color` option is the only v1 styling control for frames.
 
+## Intro And Outro
+
+`spinlog.intro(message?)` writes `┌  Message\n`; `spinlog.outro(message?)` writes `└  Message\n`. When Unicode is unavailable, their markers are `>` and `<`. An empty or omitted message emits only the marker and newline. Each call is synchronous, stateless, repeatable, independent of active spinners, and performs exactly one `stderr.write`. Calls need not be paired and never create timers.
+
+The optional message must be a string. Validation occurs before capability detection or output. The message uses the same render-boundary sanitization as spinner text, including removal of ANSI and terminal controls. When color is enabled, only the marker receives `blackBright`; message text is never colored. Synchronous write exceptions are suppressed and backpressure returns are ignored. Asynchronous stream errors remain host-owned.
+
 Interactive `start()` hides the cursor and renders the first frame synchronously. Each subsequent frame clears the active line before rendering without a newline. `stop()` clears the line and restores the cursor. A terminal method clears the line, writes one newline-terminated status, and restores the cursor. Non-interactive `start()` writes one newline-terminated static frame; `stop()` writes nothing; a terminal method writes one newline-terminated status. Non-interactive execution never creates a timer or emits cursor-control sequences.
 
 ## Capability Policy
@@ -47,7 +53,7 @@ On Windows, the dots spinner uses its line fallback unless `WT_SESSION` indicate
 
 ## Streams And Process Ownership
 
-- Spinner frames, static fallback lines, and statuses write only to `stderr`.
+- Spinner frames, static fallback lines, statuses, intro messages, and outro messages write only to `stderr`.
 - The package never writes to `stdout`.
 - Interactive animation hides the cursor and every explicit stop or terminal transition restores it in cleanup.
 - The library installs no process signal or exit listener and never terminates the host process.

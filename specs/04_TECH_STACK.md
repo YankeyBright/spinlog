@@ -29,7 +29,7 @@
 - API Extractor `7.58.12` compares the frozen and emitted root/styles declarations through tracked semantic API reports; TSDoc wording alone does not create a public signature diff.
 - publint and Are The Types Wrong validate the packed manifest and ESM-only resolution profiles.
 - A clean packed-consumer test covers package-name imports, Node16/NodeNext/Bundler resolution, stderr behavior, and unreferenced timer exit.
-- An in-memory esbuild proof enforces the style-only tree-shaking budget.
+- An in-memory esbuild proof enforces the schema-v6 600-byte single-style tree-shaking budget.
 - Size Limit `13.0.3` independently checks the gzip byte budget with Node built-ins explicitly externalized.
 - Biome `2.5.7` owns formatting and linting.
 - YAML `2.9.0` parses GitHub Actions structurally for trigger, permission, job, cache, and immutable-action policy checks.

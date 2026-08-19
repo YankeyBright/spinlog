@@ -16,5 +16,5 @@ This specification is the single source of truth for phase numbering across the 
 - Phase 0 contains policy and contract work only.
 - Phase 1 contains package-shell and release-preparation work only; it does not implement the v1 runtime.
 - Phase 2 is the first runtime implementation phase, and tests ship with each runtime behavior.
-- Task groups, progress bars, prompts, intro/outro helpers, and structured logging remain post-MVP rather than Phase 2 scope.
+- Task groups, progress bars, prompts, and structured logging remain post-MVP rather than Phase 2 scope. Intro and outro helpers are frozen v1 behavior.
 - Local planning notes may preserve historical terminology, but tracked specifications and gates must use this map.

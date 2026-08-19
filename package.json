@@ -22,7 +22,7 @@
     "sbom.json"
   ],
   "engines": {
-    "node": "^22.13.0 || ^24.0.0"
+    "node": "^22.13.0 || ^24.0.0 || ^26.0.0"
   },
   "license": "MIT",
   "author": "spinlog contributors",
@@ -83,7 +83,12 @@
     "check:phase1": "npm run check:phase-map && npm run policy:check && npm run typecheck && npm run format:check && npm run lint && npm run test:coverage && npm run build && node scripts/check-phase1.mjs && npm run package:lint && npm run size && npm run size:limit && npm run pack:check",
     "check:phase1:release": "npm run sbom && npm run sbom:check && node scripts/check-phase1-release.mjs",
     "check:phase2": "npm run typecheck && npm run typecheck:contracts && npm run format:check && npm run lint && npm run test:coverage && npm run build && npm run typecheck:public && npm run api:check && npm run runtime:check && node scripts/check-phase2.mjs && npm run package:lint && npm run check:tree-shaking && npm run test:consumer && npm run size && npm run size:limit && npm run pack:check",
+    "check:foundation": "npm run check:phase0 && npm run check:phase1 && npm run check:phase1:release && npm run check:phase2",
     "check:phase3": "npm run policy:check && npm run build && npm run benchmark:smoke && npm run sbom && npm run sbom:check && npm run sbom:build && npm run sbom:build:check && npm run size && npm run size:limit && npm run package:lint && npm run pack:check && npm run reproducibility:check && node scripts/check-phase3.mjs",
+    "docs:update": "node scripts/sync-readme-examples.mjs",
+    "docs:check": "node scripts/sync-readme-examples.mjs --check && node scripts/check-documentation.mjs",
+    "test:examples": "node scripts/check-examples.mjs",
+    "check:phase4": "npm run build && npm run sbom && npm run sbom:check && npm run docs:check && npm run test:examples && npm run pack:check && node scripts/check-phase4.mjs",
     "check:phases": "node scripts/check-phases.mjs",
     "verify": "npm run policy:check && npm run typecheck && npm run typecheck:contracts && npm run format:check && npm run lint && npm run test:coverage && npm run build && npm run typecheck:public && npm run api:check && npm run runtime:check && node scripts/check-phase2.mjs && npm run package:lint && npm run check:tree-shaking && npm run test:consumer && npm run size && npm run size:limit && npm run pack:check",
     "verify:release": "npm run verify && npm run sbom && npm run sbom:check",

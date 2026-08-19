@@ -16,9 +16,9 @@ Freeze the exact v1 product surface and behavior that every later phase must pre
 
 ## Frozen MVP Summary
 
-- v1 includes ANSI-16 named style helpers, one spinner with `start`, `stop`, `succeed`, `fail`, `warn`, and `info`, live mutation of `text`, `color`, `prefix`, and `suffix`, and both frozen `spinlog.promise()` overloads.
-- The package is ESM-only, supports the Node 22 and Node 24 LTS majors, and has zero runtime, optional, and peer dependencies.
-- Style helpers are side-effect-free and stream-free. Spinner frames and statuses write only to `stderr`; v1 never writes to `stdout`.
+- v1 includes ANSI-16 named style helpers, one spinner with `start`, `stop`, `succeed`, `fail`, `warn`, and `info`, live mutation of `text`, `color`, `prefix`, and `suffix`, both frozen `spinlog.promise()` overloads, and stateless `spinlog.intro()`/`spinlog.outro()` flow messages.
+- The package is ESM-only, supports Node 22, Node 24, and Node 26, and has zero runtime, optional, and peer dependencies.
+- Style helpers are side-effect-free and stream-free. Spinner frames, statuses, intro lines, and outro lines write only to `stderr`; v1 never writes to `stdout`.
 - User text is sanitized only at the rendering boundary, active write failure moves the current cycle to `stopped`, and terminal state never depends on cosmetic I/O success.
 - Color precedence is frozen highest-to-lowest as `NO_COLOR`, `NODE_DISABLE_COLORS`, `FORCE_COLOR`, CI, dumb terminal, test mode, and stderr TTY capability.
 - The library installs no process signal or exit listener and never terminates the host process.
@@ -27,7 +27,9 @@ Freeze the exact v1 product surface and behavior that every later phase must pre
 
 ## Size Budget Decision
 
-Earlier pre-runtime budgets were retired before publication. After deterministic JavaScript input validation, a dedicated style-only entrypoint, direct esbuild output, and linked production source maps were finalized, the root artifact measured 2,279 bytes with Node gzip level 9. The 2,560-byte ceiling preserves every frozen API, terminal-safety, validation, stream, and host-ownership guarantee while retaining 281 bytes of explicit headroom. This is a versioned contract revision, not a checker bypass: the machine contract, independent size controls, mutation tests, and all normative documentation enforce the same ceiling.
+Earlier pre-runtime budgets were retired before publication. After intro/outro, shared terminal-text validation, cross-Node nested-style normalization, a dedicated style-only entrypoint, direct esbuild output, and linked production source maps were finalized, the root artifact measured 2,550 bytes with Node gzip level 9. The 2,560-byte ceiling preserves every frozen API, terminal-safety, validation, stream, and host-ownership guarantee while retaining 10 bytes of explicit headroom. This is a versioned contract revision, not a checker bypass: the machine contract, independent size controls, mutation tests, and all normative documentation enforce the same ceiling.
+
+The esbuild single-style consumer proof measures 550 gzip bytes after cross-Node nesting normalization. Schema v6 freezes a separate 600-byte tree-shaken style ceiling, retaining 50 bytes of headroom without weakening style behavior.
 
 ## Explicit Non-Goals
 

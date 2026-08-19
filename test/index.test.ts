@@ -1,6 +1,6 @@
 import { stderr, stdout } from 'node:process'
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 
 import spinlog, * as moduleExports from '../src/index.js'
 
@@ -50,6 +50,10 @@ describe('public runtime surface', () => {
     expect(Object.keys(moduleExports).sort()).toEqual(['default', ...STYLE_EXPORTS].sort())
     expect(spinlog).toBeTypeOf('function')
     expect(spinlog.promise).toBeTypeOf('function')
+    expect(spinlog.intro).toBeTypeOf('function')
+    expect(spinlog.outro).toBeTypeOf('function')
+    expectTypeOf(spinlog.intro).returns.toBeVoid()
+    expectTypeOf(spinlog.outro).returns.toBeVoid()
   })
 
   it('returns an instance with only the frozen fields and lifecycle methods', () => {
@@ -65,6 +69,127 @@ describe('public runtime surface', () => {
       'warn',
       'info',
     ])
+  })
+})
+
+describe('intro and outro flow messages', () => {
+  let write: ReturnType<typeof vi.spyOn>
+  let stdoutWrite: ReturnType<typeof vi.spyOn>
+  let ttyDescriptor: PropertyDescriptor | undefined
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('CI', '1')
+    vi.stubEnv('FORCE_COLOR', '0')
+    vi.stubEnv('WT_SESSION', 'test-session')
+    ttyDescriptor = Object.getOwnPropertyDescriptor(stderr, 'isTTY')
+    Object.defineProperty(stderr, 'isTTY', { configurable: true, value: true })
+    write = vi.spyOn(stderr, 'write').mockImplementation(() => true)
+    stdoutWrite = vi.spyOn(stdout, 'write').mockImplementation(() => true)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+    vi.unstubAllEnvs()
+    if (ttyDescriptor) Object.defineProperty(stderr, 'isTTY', ttyDescriptor)
+    else delete (stderr as { isTTY?: boolean }).isTTY
+  })
+
+  it('writes Unicode, empty, and repeated messages exactly once per call', () => {
+    expect(spinlog.intro('Build')).toBeUndefined()
+    spinlog.outro('Done')
+    spinlog.intro()
+    spinlog.outro('')
+    spinlog.intro('Again')
+
+    expect(write.mock.calls.map(([value]) => String(value))).toEqual([
+      '┌  Build\n',
+      '└  Done\n',
+      '┌\n',
+      '└\n',
+      '┌  Again\n',
+    ])
+    expect(stdoutWrite).not.toHaveBeenCalled()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('uses ASCII markers when Unicode is unavailable', () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
+    vi.stubEnv('WT_SESSION', '')
+
+    spinlog.intro('Build')
+    spinlog.outro('Done')
+
+    expect(write.mock.calls.map(([value]) => String(value))).toEqual(['>  Build\n', '<  Done\n'])
+  })
+
+  it('colors only the marker and honors explicit color-disable precedence', () => {
+    vi.stubEnv('FORCE_COLOR', '1')
+    vi.stubEnv('NO_COLOR', '')
+    spinlog.intro('Build')
+    expect(write).toHaveBeenLastCalledWith('\x1b[90m┌\x1b[39m  Build\n')
+
+    vi.stubEnv('NO_COLOR', '1')
+    spinlog.outro('Done')
+    expect(write).toHaveBeenLastCalledWith('└  Done\n')
+  })
+
+  it('sanitizes terminal controls without mutating caller-owned text', () => {
+    const message = '\x1b[31mred\x1b[0m\r\nnext\u202ehidden\x1b]0;title\x07'
+    spinlog.intro(message)
+
+    expect(message).toContain('\x1b[31m')
+    expect(write).toHaveBeenCalledWith('┌  red next hidden\n')
+  })
+
+  it('validates before capability detection or output', () => {
+    const environmentDescriptor = Object.getOwnPropertyDescriptor(process, 'env')
+    Object.defineProperty(process, 'env', {
+      configurable: true,
+      get() {
+        throw new Error('capability detection occurred')
+      },
+    })
+
+    try {
+      expect(() => spinlog.intro(42 as unknown as string)).toThrow('message must be a string')
+      expect(() => spinlog.outro(null as unknown as string)).toThrow('message must be a string')
+      expect(write).not.toHaveBeenCalled()
+    } finally {
+      if (environmentDescriptor) Object.defineProperty(process, 'env', environmentDescriptor)
+    }
+  })
+
+  it('suppresses write exceptions and ignores backpressure', () => {
+    write.mockImplementationOnce(() => {
+      throw new Error('stderr unavailable')
+    })
+    expect(() => spinlog.intro('Build')).not.toThrow()
+
+    write.mockImplementationOnce(() => false)
+    expect(() => spinlog.outro('Done')).not.toThrow()
+    expect(write).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not alter an active spinner or own process listeners', () => {
+    vi.stubEnv('CI', '')
+    const beforeSignals = {
+      sigint: process.listenerCount('SIGINT'),
+      sigterm: process.listenerCount('SIGTERM'),
+    }
+    const spinner = spinlog('work', { spinner: 'line' }).start()
+    expect(vi.getTimerCount()).toBe(1)
+
+    spinlog.intro('Build')
+    spinlog.outro('Done')
+
+    expect(vi.getTimerCount()).toBe(1)
+    expect(process.listenerCount('SIGINT')).toBe(beforeSignals.sigint)
+    expect(process.listenerCount('SIGTERM')).toBe(beforeSignals.sigterm)
+    spinner.succeed()
+    expect(vi.getTimerCount()).toBe(0)
   })
 })
 

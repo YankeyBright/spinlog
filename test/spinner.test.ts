@@ -3,7 +3,8 @@ import { stderr } from 'node:process'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import spinlog from '../src/index.js'
-import { sanitizeSegment, selectFrame, selectStatus } from '../src/spinner.js'
+import { selectFrame, selectStatus } from '../src/spinner.js'
+import { sanitizeSegment } from '../src/text.js'
 
 const ENV_KEYS = [
   'CI',

@@ -19,6 +19,8 @@ const spinner: Spinner = factory('working', options)
 const styled: string = red(bgBlueBright('value'))
 const direct: Promise<number> = factory.promise(Promise.resolve(1), promiseOptions)
 const task: Promise<string> = factory.promise(() => Promise.resolve('value'))
+factory.intro('starting')
+factory.outro()
 const subpathStyle: Style = subpathBlue
 
 spinner.start().stop().start().succeed().start().fail().start().warn().start().info()
@@ -35,3 +37,7 @@ factory('invalid', { spinner: 'custom' })
 spinner.color = 'orange'
 // @ts-expect-error lifecycle methods accept no undocumented options
 spinner.start({ interval: 20 })
+// @ts-expect-error flow messages accept strings only
+factory.intro(42)
+// @ts-expect-error flow messages expose no options
+factory.outro('done', {})

@@ -7,7 +7,7 @@ Create a production package shell around the frozen Phase 0 contract. Phase 1 pr
 ## Package Manifest
 
 - ESM-only with `type: "module"`, `sideEffects: false`, and an import-only export map.
-- Runtime engines `^22.13.0 || ^24.0.0` and public repository `YankeyBright/spinlog`.
+- Runtime engines `^22.13.0 || ^24.0.0 || ^26.0.0` and public repository `YankeyBright/spinlog`.
 - Publish allowlist limited to `dist`, `README.md`, `LICENSE`, `SECURITY.md`, and `sbom.json`.
 - No runtime, optional, or peer dependencies and no npm lifecycle scripts.
 - Direct development dependencies are exact-pinned and lockfile-resolved.
@@ -29,7 +29,7 @@ Create a production package shell around the frozen Phase 0 contract. Phase 1 pr
 - The exact gzip gate rejects artifacts above 2,560 bytes. Size Limit independently measures gzip output while externalizing only the Node `util` and `process` built-ins used by the ESM artifact.
 - Package dry-run validation enforces the approved eleven-file tarball.
 - publint, Are The Types Wrong, and a clean packed-consumer test validate real package consumption.
-- Required CI covers the minimum and current patch releases of Node 22 and Node 24, plus Windows and macOS smoke jobs.
+- Required CI covers the frozen Node 22, Node 24, and Node 26 matrix, plus Windows and macOS packed-consumer jobs.
 - Release readiness uses immutable action commits, disabled persisted credentials, read-only permissions, a runtime-only CycloneDX 1.5 SBOM, and no publication capability before Phase 5.
 - Direct esbuild replaced tsup; the obsolete override is prohibited and the lockfile is scanned for affected esbuild versions.
 

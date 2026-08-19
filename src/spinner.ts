@@ -1,9 +1,7 @@
-import { stderr } from 'node:process'
-import { stripVTControlCharacters } from 'node:util'
-
-import { colorize } from './ansi.js'
+import { applyAnsiStyle } from './ansi.js'
 import { type Capabilities, getCapabilities } from './env.js'
 import type { Spinner, SpinnerColor, SpinnerName, SpinnerOptions } from './index.js'
+import { requireString, sanitizeSegment, tryWrite } from './text.js'
 
 const IDLE = 0
 const SPINNING = 1
@@ -30,11 +28,6 @@ const STATUS = {
   2: [WARNED, '⚠', '!', 'yellow'],
   3: [INFORMED, 'ℹ', 'i', 'blue'],
 } as const satisfies Record<TerminalAction, Status>
-const UNSAFE_TEXT = /[\x00-\x1f\x7f-\x9f\u061c\u200e\u200f\u2028-\u202e\u2066-\u2069]+/g
-function requireString(value: unknown, field: string): string {
-  if (typeof value !== 'string') throw new TypeError(`${field} must be a string`)
-  return value
-}
 function requireColor(value: unknown): SpinnerColor {
   if (typeof value !== 'string' || !SPINNER_COLORS.includes(value)) {
     throw new TypeError('color must be a built-in spinner color')
@@ -47,7 +40,7 @@ function requireSpinnerName(value: unknown): SpinnerName {
   return value
 }
 
-function requireOptions(value: SpinnerOptions): SpinnerOptions {
+export function requireOptions<T extends object>(value: T): T {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     throw new TypeError('options must be an object')
   }
@@ -56,11 +49,6 @@ function requireOptions(value: SpinnerOptions): SpinnerOptions {
 
 function isTerminal(state: State): boolean {
   return state >= SUCCEEDED
-}
-
-/** Sanitize user-controlled text only at the terminal rendering boundary. */
-export function sanitizeSegment(value: string): string {
-  return stripVTControlCharacters(value).replace(UNSAFE_TEXT, ' ').trim()
 }
 
 export function selectFrame(spinner: SpinnerName, unicode: boolean, index: number): string {
@@ -202,14 +190,18 @@ export function createSpinner(text = '', options: SpinnerOptions = {}): Spinner 
   function renderFrame(activeCapabilities: Capabilities): string {
     const [colorEnabled, , unicodeEnabled] = activeCapabilities
     return render(
-      colorize(spinner.color, selectFrame(spinnerName, unicodeEnabled, frameIndex), colorEnabled),
+      applyAnsiStyle(
+        spinner.color,
+        selectFrame(spinnerName, unicodeEnabled, frameIndex),
+        colorEnabled,
+      ),
     )
   }
 
   function renderStatus(action: TerminalAction, activeCapabilities: Capabilities): string {
     const [colorEnabled, , unicodeEnabled] = activeCapabilities
     const [symbol, color] = selectStatus(action, unicodeEnabled)
-    return render(colorize(color, symbol, colorEnabled))
+    return render(applyAnsiStyle(color, symbol, colorEnabled))
   }
 
   function render(symbol: string): string {
@@ -221,15 +213,6 @@ export function createSpinner(text = '', options: SpinnerOptions = {}): Spinner 
     ]
       .filter(Boolean)
       .join(' ')
-  }
-
-  function tryWrite(value: string): boolean {
-    try {
-      stderr.write(value)
-      return true
-    } catch {
-      return false
-    }
   }
 
   function clearTimer(): void {

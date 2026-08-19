@@ -21,11 +21,18 @@ export const APPROVED_SCRIPTS = Object.freeze({
     'npm run sbom && npm run sbom:check && node scripts/check-phase1-release.mjs',
   'check:phase2':
     'npm run typecheck && npm run typecheck:contracts && npm run format:check && npm run lint && npm run test:coverage && npm run build && npm run typecheck:public && npm run api:check && npm run runtime:check && node scripts/check-phase2.mjs && npm run package:lint && npm run check:tree-shaking && npm run test:consumer && npm run size && npm run size:limit && npm run pack:check',
+  'check:foundation':
+    'npm run check:phase0 && npm run check:phase1 && npm run check:phase1:release && npm run check:phase2',
   'check:phase3':
     'npm run policy:check && npm run build && npm run benchmark:smoke && npm run sbom && npm run sbom:check && npm run sbom:build && npm run sbom:build:check && npm run size && npm run size:limit && npm run package:lint && npm run pack:check && npm run reproducibility:check && node scripts/check-phase3.mjs',
+  'check:phase4':
+    'npm run build && npm run sbom && npm run sbom:check && npm run docs:check && npm run test:examples && npm run pack:check && node scripts/check-phase4.mjs',
   'check:phases': 'node scripts/check-phases.mjs',
   'check:tree-shaking': 'node scripts/check-tree-shaking.mjs',
   'candidate:manifest': 'node scripts/candidate-manifest.mjs',
+  'docs:check':
+    'node scripts/sync-readme-examples.mjs --check && node scripts/check-documentation.mjs',
+  'docs:update': 'node scripts/sync-readme-examples.mjs',
   format: 'biome format . --write',
   'format:check': 'biome format .',
   lint: 'biome lint . --error-on-warnings',
@@ -42,6 +49,7 @@ export const APPROVED_SCRIPTS = Object.freeze({
   'size:limit': 'size-limit',
   test: 'vitest run',
   'test:consumer': 'node scripts/check-consumer.mjs',
+  'test:examples': 'node scripts/check-examples.mjs',
   'test:coverage': 'vitest run --coverage',
   'test:phase0': 'vitest run test/phase0-contract-policy.test.ts',
   typecheck: 'tsc --noEmit',
@@ -79,8 +87,8 @@ function validateRuntimeDependencies(packageJson, failures) {
 function validatePackageIdentity(packageJson, failures) {
   if (packageJson?.type !== 'module') failures.push('type must be module')
   if (packageJson?.sideEffects !== false) failures.push('sideEffects must be false')
-  if (packageJson?.engines?.node !== '^22.13.0 || ^24.0.0') {
-    failures.push('engines.node must require stable Node 22 APIs and support Node 24 LTS')
+  if (packageJson?.engines?.node !== '^22.13.0 || ^24.0.0 || ^26.0.0') {
+    failures.push('engines.node must match the frozen Node 22, 24, and 26 range')
   }
   if (packageJson?.name !== 'spinlog' || packageJson?.license !== 'MIT') {
     failures.push('package identity must remain spinlog under the MIT license')
