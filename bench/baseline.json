@@ -1,0 +1,91 @@
+{
+  "node": "v24.19.0",
+  "platform": "linux",
+  "provenance": {
+    "commit": "0609200ab4e430d3fd261123008f3724f715481f",
+    "githubRunAttempt": "1",
+    "githubRunId": "32279486802",
+    "inputs": [
+      {
+        "sha256": "b570e5928072704a64bd4b69de72df37c7b5f57766c4ba06cf94ffd37fda61f6",
+        "slot": 1
+      },
+      {
+        "sha256": "d35e375b9a8167aad6dd1b7812646be589b6a11d9fad853e69387b14ad67260f",
+        "slot": 2
+      },
+      {
+        "sha256": "f16810d99746e21a6ee13a24ea727065055c922b1a44560a3ad71251d0d13bdf",
+        "slot": 3
+      },
+      {
+        "sha256": "ef30f01b1fd34b08731c2b64a7a4a72d636e80e33165a09247343c9425536d34",
+        "slot": 4
+      },
+      {
+        "sha256": "16b0448f9d124315ab1daa52eac1aa998e7b9fc2527a55edea7506784885295e",
+        "slot": 5
+      }
+    ]
+  },
+  "runs": 5,
+  "scenarios": {
+    "root-cold-import-ns": {
+      "confidenceInterval": {
+        "lower": 19804365,
+        "upper": 31587634
+      },
+      "median": 31319013
+    },
+    "styles-cold-import-ns": {
+      "confidenceInterval": {
+        "lower": 19046656,
+        "upper": 30274572
+      },
+      "median": 29073129
+    },
+    "enabled-style-ns": {
+      "confidenceInterval": {
+        "lower": 1086.8775634765625,
+        "upper": 1916.3294677734375
+      },
+      "median": 1798.088623046875
+    },
+    "disabled-style-ns": {
+      "confidenceInterval": {
+        "lower": 300.8118591308594,
+        "upper": 478.1847229003906
+      },
+      "median": 441.02374267578125
+    },
+    "static-spinner-settlement-ns": {
+      "confidenceInterval": {
+        "lower": 1667.06201171875,
+        "upper": 2715.3173828125
+      },
+      "median": 2576.6689453125
+    },
+    "resolved-promise-wrapper-ns": {
+      "confidenceInterval": {
+        "lower": 2043.08,
+        "upper": 3483.53
+      },
+      "median": 3340.95
+    },
+    "intro-flow-message-ns": {
+      "confidenceInterval": {
+        "lower": 350.3333740234375,
+        "upper": 568.9577026367188
+      },
+      "median": 523.9996337890625
+    },
+    "outro-flow-message-ns": {
+      "confidenceInterval": {
+        "lower": 358.0251159667969,
+        "upper": 588.0346374511719
+      },
+      "median": 531.2406616210938
+    }
+  },
+  "schemaVersion": 3
+}
