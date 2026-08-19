@@ -27,7 +27,7 @@ Freeze the exact v1 product surface and behavior that every later phase must pre
 
 ## Size Budget Decision
 
-Earlier pre-runtime budgets were retired before publication. After intro/outro, shared terminal-text validation, cross-Node nested-style normalization, a dedicated style-only entrypoint, direct esbuild output, and linked production source maps were finalized, the root artifact measured 2,550 bytes with Node gzip level 9. The 2,560-byte ceiling preserves every frozen API, terminal-safety, validation, stream, and host-ownership guarantee while retaining 10 bytes of explicit headroom. This is a versioned contract revision, not a checker bypass: the machine contract, independent size controls, mutation tests, and all normative documentation enforce the same ceiling.
+Earlier pre-runtime budgets were retired before publication. After intro/outro, shared terminal-text validation, cross-Node nested-style normalization, a dedicated style-only entrypoint, direct esbuild output, and linked production source maps were finalized, the root artifact measured 2,552 bytes with Node gzip level 9. The 2,560-byte ceiling preserves every frozen API, terminal-safety, validation, stream, and host-ownership guarantee while retaining 8 bytes of explicit headroom. This is a versioned contract revision, not a checker bypass: the machine contract, independent size controls, mutation tests, and all normative documentation enforce the same ceiling.
 
 The esbuild single-style consumer proof measures 550 gzip bytes after cross-Node nesting normalization. Schema v6 freezes a separate 600-byte tree-shaken style ceiling, retaining 50 bytes of headroom without weakening style behavior.
 

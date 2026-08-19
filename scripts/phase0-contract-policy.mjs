@@ -1,5 +1,7 @@
 import { isDeepStrictEqual } from 'node:util'
 
+import { sortCanonicalText } from './canonical-order.mjs'
+
 const STYLE_EXPORTS = Object.freeze([
   'reset',
   'bold',
@@ -335,7 +337,7 @@ const DOCUMENT_PATHS = Object.freeze([
 ])
 
 function sorted(value) {
-  return [...value].sort()
+  return sortCanonicalText(value)
 }
 
 function sameValues(actual, expected) {
@@ -454,6 +456,73 @@ function validateDeclaration(declaration, stylesDeclaration, contract, failures)
     ), 'styles API declaration must match the generated closed contract', failures)
 }
 
+function expectedStartTransition(state) {
+  if (state === 'spinning') {
+    return { to: 'spinning', effect: 'none', idempotent: true }
+  }
+  return { to: 'spinning', effect: 'begin-cycle', idempotent: false }
+}
+
+function expectedStopTransition(state) {
+  if (state === 'spinning') {
+    return { to: 'stopped', effect: 'clear-and-restore', idempotent: false }
+  }
+  if (state === 'idle') {
+    return { to: 'stopped', effect: 'none', idempotent: false }
+  }
+  if (state === 'stopped') {
+    return { to: 'stopped', effect: 'none', idempotent: true }
+  }
+  return { to: state, effect: 'none', idempotent: true }
+}
+
+function expectedTerminalTransition(state, target) {
+  if (STATES.slice(3).includes(state)) {
+    return { to: state, effect: 'none', idempotent: true }
+  }
+  return {
+    to: target,
+    effect: state === 'spinning' ? 'stop-and-persist-status' : 'persist-status',
+    idempotent: false,
+  }
+}
+
+function validateActionLegalStates(stateMachine, failures) {
+  for (const action of ['start', 'stop', ...Object.keys(TERMINAL_ACTIONS)]) {
+    require(sameValues(
+      Object.keys(stateMachine?.[action] ?? {}),
+      STATES,
+    ), `${action} must define every legal source state`, failures)
+  }
+}
+
+function validateStateTransitions(stateMachine, failures) {
+  for (const state of STATES) {
+    const start = stateMachine?.start?.[state]
+    const stop = stateMachine?.stop?.[state]
+    exactKeys(start, ['to', 'effect', 'idempotent'], `stateMachine.start.${state}`, failures)
+    exactKeys(stop, ['to', 'effect', 'idempotent'], `stateMachine.stop.${state}`, failures)
+    requireExact(start, expectedStartTransition(state), `stateMachine.start.${state}`, failures)
+    requireExact(stop, expectedStopTransition(state), `stateMachine.stop.${state}`, failures)
+
+    for (const [action, target] of Object.entries(TERMINAL_ACTIONS)) {
+      const transition = stateMachine?.[action]?.[state]
+      exactKeys(
+        transition,
+        ['to', 'effect', 'idempotent'],
+        `stateMachine.${action}.${state}`,
+        failures,
+      )
+      requireExact(
+        transition,
+        expectedTerminalTransition(state, target),
+        `stateMachine.${action}.${state}`,
+        failures,
+      )
+    }
+  }
+}
+
 function validateTransitions(contract, failures) {
   const stateMachine = contract.stateMachine
   require(stateMachine?.initial === 'idle', 'initial state must be idle', failures)
@@ -474,55 +543,8 @@ function validateTransitions(contract, failures) {
     failures,
   )
 
-  for (const action of ['start', 'stop', ...Object.keys(TERMINAL_ACTIONS)]) {
-    require(sameValues(
-      Object.keys(stateMachine?.[action] ?? {}),
-      STATES,
-    ), `${action} must define every legal source state`, failures)
-  }
-
-  for (const state of STATES) {
-    const start = stateMachine?.start?.[state]
-    const stop = stateMachine?.stop?.[state]
-    exactKeys(start, ['to', 'effect', 'idempotent'], `stateMachine.start.${state}`, failures)
-    exactKeys(stop, ['to', 'effect', 'idempotent'], `stateMachine.stop.${state}`, failures)
-    requireExact(
-      start,
-      state === 'spinning'
-        ? { to: 'spinning', effect: 'none', idempotent: true }
-        : { to: 'spinning', effect: 'begin-cycle', idempotent: false },
-      `stateMachine.start.${state}`,
-      failures,
-    )
-
-    const expectedStop =
-      state === 'spinning'
-        ? { to: 'stopped', effect: 'clear-and-restore', idempotent: false }
-        : state === 'idle'
-          ? { to: 'stopped', effect: 'none', idempotent: false }
-          : state === 'stopped'
-            ? { to: 'stopped', effect: 'none', idempotent: true }
-            : { to: state, effect: 'none', idempotent: true }
-    requireExact(stop, expectedStop, `stateMachine.stop.${state}`, failures)
-
-    for (const [action, target] of Object.entries(TERMINAL_ACTIONS)) {
-      const transition = stateMachine?.[action]?.[state]
-      exactKeys(
-        transition,
-        ['to', 'effect', 'idempotent'],
-        `stateMachine.${action}.${state}`,
-        failures,
-      )
-      const expected = STATES.slice(3).includes(state)
-        ? { to: state, effect: 'none', idempotent: true }
-        : {
-            to: target,
-            effect: state === 'spinning' ? 'stop-and-persist-status' : 'persist-status',
-            idempotent: false,
-          }
-      requireExact(transition, expected, `stateMachine.${action}.${state}`, failures)
-    }
-  }
+  validateActionLegalStates(stateMachine, failures)
+  validateStateTransitions(stateMachine, failures)
 
   require(stateMachine?.mutationsChangeState ===
     false, 'mutations must not change lifecycle state', failures)

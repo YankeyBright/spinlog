@@ -7,7 +7,7 @@ export type Style = (text: string) => string
 function applyStyle(format: AnsiStyle, text: string): string {
   if (typeof text !== 'string') throw new TypeError('text must be a string')
   const [colorEnabled] = getCapabilities()
-  return applyAnsiStyle(format, text, colorEnabled)
+  return colorEnabled ? applyAnsiStyle(format, text) : text
 }
 
 export const reset: Style = (text) => applyStyle('reset', text)

@@ -97,6 +97,7 @@
   "devDependencies": {
     "@microsoft/api-extractor": "7.58.12",
     "@arethetypeswrong/cli": "0.18.5",
+    "@babel/parser": "7.29.8",
     "@biomejs/biome": "2.5.7",
     "@size-limit/preset-small-lib": "13.0.3",
     "@types/node": "22.20.1",

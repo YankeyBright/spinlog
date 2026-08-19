@@ -24,7 +24,6 @@ export function normalizeStyleNesting(formatted: string): string {
 }
 
 /** Apply one ANSI style while preserving deterministic nesting across supported Node versions. */
-export function applyAnsiStyle(format: AnsiStyle, text: string, enabled: boolean): string {
-  if (!enabled) return text
+export function applyAnsiStyle(format: AnsiStyle, text: string): string {
   return normalizeStyleNesting(styleText(format, text, { validateStream: false }))
 }

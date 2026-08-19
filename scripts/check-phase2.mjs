@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
+import { sortCanonicalText } from './canonical-order.mjs'
 import { inspectRuntimeDirectory, validateRuntimePolicy } from './runtime-policy.mjs'
 
 const failures = []
@@ -100,23 +101,26 @@ try {
   const stylesRuntime = await import(
     `${pathToFileURL(resolve('dist/styles.js')).href}?phase2=${Date.now()}`
   )
-  const expectedExports = ['default', ...(contract.publicApi?.styleExports ?? [])].sort()
-  const expectedStyleExports = [...(contract.publicApi?.styleExports ?? [])].sort()
-  require(JSON.stringify(Object.keys(runtime).sort()) ===
+  const expectedExports = sortCanonicalText([
+    'default',
+    ...(contract.publicApi?.styleExports ?? []),
+  ])
+  const expectedStyleExports = sortCanonicalText(contract.publicApi?.styleExports ?? [])
+  require(JSON.stringify(sortCanonicalText(Object.keys(runtime))) ===
     JSON.stringify(
       expectedExports,
     ), 'runtime exports must match the frozen value export surface exactly')
   require(typeof runtime.default === 'function', 'default export must be callable')
   const expectedMethods = contract.publicApi?.callableMethods ?? []
-  require(JSON.stringify(Object.keys(runtime.default).sort()) ===
+  require(JSON.stringify(sortCanonicalText(Object.keys(runtime.default))) ===
     JSON.stringify(
-      [...expectedMethods].sort(),
+      sortCanonicalText(expectedMethods),
     ), 'default export properties must match the frozen callable methods')
   for (const method of expectedMethods) {
     require(typeof runtime.default?.[method] ===
       'function', `default export must expose ${method}()`)
   }
-  require(JSON.stringify(Object.keys(stylesRuntime).sort()) ===
+  require(JSON.stringify(sortCanonicalText(Object.keys(stylesRuntime))) ===
     JSON.stringify(
       expectedStyleExports,
     ), 'styles subpath exports must match the frozen style surface exactly')

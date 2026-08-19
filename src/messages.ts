@@ -6,14 +6,11 @@ function writeFlow(unicodeSymbol: string, asciiSymbol: string, message: unknown)
   // Validate before capability detection so invalid calls have no observable effects.
   const validated = message === undefined ? '' : requireString(message, 'message')
   const [colorEnabled, , unicodeEnabled] = getCapabilities()
-  const marker = applyAnsiStyle(
-    'blackBright',
-    unicodeEnabled ? unicodeSymbol : asciiSymbol,
-    colorEnabled,
-  )
+  const symbol = unicodeEnabled ? unicodeSymbol : asciiSymbol
+  const marker = colorEnabled ? applyAnsiStyle('blackBright', symbol) : symbol
   const text = sanitizeSegment(validated)
 
-  tryWrite(`${marker}${text ? `  ${text}` : ''}\n`)
+  tryWrite(text ? `${marker}  ${text}\n` : `${marker}\n`)
 }
 
 /** Write an independent opening flow marker to stderr. */

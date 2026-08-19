@@ -18,10 +18,11 @@ const SHOW_CURSOR = '\x1b[?25h'
 const CLEAR_LINE = '\x1b[2K\r'
 const DOTS_FRAMES = '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
 const LINE_FRAMES = String.raw`-\|/`
-const SPINNER_COLORS =
+const SPINNER_COLORS = new Set(
   'black red green yellow blue magenta cyan white blackBright redBright greenBright yellowBright blueBright magentaBright cyanBright whiteBright'.split(
     ' ',
-  )
+  ),
+)
 const STATUS = {
   0: [SUCCEEDED, '✔', '+', 'green'],
   1: [FAILED, '✖', 'x', 'red'],
@@ -29,7 +30,7 @@ const STATUS = {
   3: [INFORMED, 'ℹ', 'i', 'blue'],
 } as const satisfies Record<TerminalAction, Status>
 function requireColor(value: unknown): SpinnerColor {
-  if (typeof value !== 'string' || !SPINNER_COLORS.includes(value)) {
+  if (typeof value !== 'string' || !SPINNER_COLORS.has(value)) {
     throw new TypeError('color must be a built-in spinner color')
   }
   return value as SpinnerColor
@@ -45,10 +46,6 @@ export function requireOptions<T extends object>(value: T): T {
     throw new TypeError('options must be an object')
   }
   return value
-}
-
-function isTerminal(state: State): boolean {
-  return state >= SUCCEEDED
 }
 
 export function selectFrame(spinner: SpinnerName, unicode: boolean, index: number): string {
@@ -125,7 +122,7 @@ export function createSpinner(text = '', options: SpinnerOptions = {}): Spinner 
       return this
     },
     stop() {
-      if (isTerminal(state) || state === STOPPED) return this
+      if (state >= STOPPED) return this
 
       const wasSpinning = state === SPINNING
       const activeCapabilities = capabilities
@@ -134,7 +131,7 @@ export function createSpinner(text = '', options: SpinnerOptions = {}): Spinner 
       if (!wasSpinning) return this
 
       clearTimer()
-      if (activeCapabilities?.[1] === true) {
+      if (activeCapabilities?.[1]) {
         tryWrite(CLEAR_LINE)
         tryWrite(SHOW_CURSOR)
       }
@@ -161,7 +158,7 @@ export function createSpinner(text = '', options: SpinnerOptions = {}): Spinner 
   function terminal(action: TerminalAction, value?: string): void {
     // Validation must precede terminal idempotency to preserve the input contract.
     const nextText = value === undefined ? undefined : requireString(value, 'text')
-    if (isTerminal(state)) return
+    if (state >= SUCCEEDED) return
     if (nextText !== undefined) spinner.text = nextText
 
     const activeCapabilities = state === SPINNING && capabilities ? capabilities : getCapabilities()
@@ -189,19 +186,14 @@ export function createSpinner(text = '', options: SpinnerOptions = {}): Spinner 
 
   function renderFrame(activeCapabilities: Capabilities): string {
     const [colorEnabled, , unicodeEnabled] = activeCapabilities
-    return render(
-      applyAnsiStyle(
-        spinner.color,
-        selectFrame(spinnerName, unicodeEnabled, frameIndex),
-        colorEnabled,
-      ),
-    )
+    const symbol = selectFrame(spinnerName, unicodeEnabled, frameIndex)
+    return render(colorEnabled ? applyAnsiStyle(spinner.color, symbol) : symbol)
   }
 
   function renderStatus(action: TerminalAction, activeCapabilities: Capabilities): string {
     const [colorEnabled, , unicodeEnabled] = activeCapabilities
     const [symbol, color] = selectStatus(action, unicodeEnabled)
-    return render(applyAnsiStyle(color, symbol, colorEnabled))
+    return render(colorEnabled ? applyAnsiStyle(color, symbol) : symbol)
   }
 
   function render(symbol: string): string {

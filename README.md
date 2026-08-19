@@ -103,7 +103,7 @@ See [`MIGRATION.md`](MIGRATION.md) for behavior-based guidance from Chalk, Ora, 
 - Zero runtime, optional, and peer dependencies.
 - No npm lifecycle scripts.
 - Exactly eleven files in the npm tarball.
-- `dist/index.js` currently measures 2,550 bytes using gzip level 9, below the 2,560-byte hard ceiling.
+- `dist/index.js` currently measures 2,552 bytes using gzip level 9, below the 2,560-byte hard ceiling.
 - A one-style `spinlog/styles` consumer measures 550 gzip bytes against a 600-byte tree-shaking ceiling.
 - A canonical CycloneDX 1.5 runtime SBOM with zero runtime components is included in the tarball.
 - Build-tool SBOM, benchmark, reproducibility, and candidate-manifest evidence remain outside the tarball.

@@ -1,5 +1,4 @@
 import { readFileSync } from 'node:fs'
-import { gzipSync } from 'node:zlib'
 
 import { describe, expect, it } from 'vitest'
 
@@ -9,11 +8,17 @@ import {
   validateDocumentation,
 } from '../scripts/documentation-policy.mjs'
 
+const FIXTURE_SIZE_BYTES = 1234
+
 function fixture() {
   const documents = {
     'MIGRATION.md': readFileSync('MIGRATION.md', 'utf8'),
     'README.md': readFileSync('README.md', 'utf8'),
   }
+  documents['README.md'] = documents['README.md'].replace(
+    /currently measures [\d,]+ bytes using gzip level 9/u,
+    `currently measures ${FIXTURE_SIZE_BYTES.toLocaleString('en-US')} bytes using gzip level 9`,
+  )
   const examples = Object.fromEntries(
     DOCUMENTED_EXAMPLES.map(({ path }) => [path, readFileSync(path, 'utf8')]),
   )
@@ -31,7 +36,7 @@ function fixture() {
     examples,
     packageJson: JSON.parse(readFileSync('package.json', 'utf8')),
     runtimeSbom: JSON.parse(readFileSync('sbom.json', 'utf8')),
-    sizeBytes: gzipSync(readFileSync('dist/index.js'), { level: 9 }).length,
+    sizeBytes: FIXTURE_SIZE_BYTES,
   }
 }
 

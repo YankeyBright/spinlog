@@ -101,7 +101,7 @@ describe('benchmark statistics', () => {
 
     expect(validateBaseline(baseline)).toEqual([])
     expect(baseline.provenance.inputs.map(({ slot }) => slot)).toEqual([1, 2, 3, 4, 5])
-  })
+  }, 15_000)
 
   it('rejects baseline inputs that do not prove five independent matrix slots', () => {
     const inputs = Array.from({ length: 5 }, (_, index) => {

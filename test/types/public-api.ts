@@ -25,9 +25,9 @@ const subpathStyle: Style = subpathBlue
 
 spinner.start().stop().start().succeed().start().fail().start().warn().start().info()
 spinner.text = styled
-void direct
-void task
-void subpathStyle
+subpathStyle(styled)
+await direct
+await task
 
 // @ts-expect-error post-MVP task groups are not public
 factory.group()

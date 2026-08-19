@@ -2,6 +2,7 @@ import { stderr, stdout } from 'node:process'
 
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 
+import { sortCanonicalText } from '../scripts/canonical-order.mjs'
 import spinlog, * as moduleExports from '../src/index.js'
 
 const STYLE_EXPORTS = [
@@ -47,7 +48,9 @@ const STYLE_EXPORTS = [
 
 describe('public runtime surface', () => {
   it('exports only the callable default and frozen named styles', () => {
-    expect(Object.keys(moduleExports).sort()).toEqual(['default', ...STYLE_EXPORTS].sort())
+    expect(sortCanonicalText(Object.keys(moduleExports))).toEqual(
+      sortCanonicalText(['default', ...STYLE_EXPORTS]),
+    )
     expect(spinlog).toBeTypeOf('function')
     expect(spinlog.promise).toBeTypeOf('function')
     expect(spinlog.intro).toBeTypeOf('function')

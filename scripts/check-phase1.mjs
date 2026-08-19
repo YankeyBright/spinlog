@@ -2,6 +2,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { isAbsolute, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
+import { sortCanonicalText } from './canonical-order.mjs'
 import {
   validateEsbuildSecurityPolicy,
   validateTypeScriptConfig,
@@ -136,7 +137,7 @@ require(stylesEntryPoint.types === './dist/styles.d.ts' &&
   stylesEntryPoint.import ===
     './dist/styles.js', 'package.json exports must expose the ESM styles subpath and declarations')
 require(!('require' in stylesEntryPoint), 'styles subpath must not expose CommonJS')
-require(JSON.stringify(Object.keys(packageJson.exports ?? {}).sort()) ===
+require(JSON.stringify(sortCanonicalText(Object.keys(packageJson.exports ?? {}))) ===
   JSON.stringify([
     '.',
     './styles',
@@ -150,8 +151,10 @@ require(JSON.stringify(packageJson.files) ===
     'sbom.json',
   ]), 'package.json files must match the publish allowlist')
 
-failures.push(...validateTypeScriptConfig(tsconfig))
-failures.push(...validateEsbuildSecurityPolicy(packageJson, packageLock))
+failures.push(
+  ...validateTypeScriptConfig(tsconfig),
+  ...validateEsbuildSecurityPolicy(packageJson, packageLock),
+)
 require(packageJson.devDependencies?.typescript === '7.0.2', 'TypeScript must be pinned to 7.0.2')
 require(packageJson.devDependencies?.['@types/node'] ===
   '22.20.1', '@types/node must be a direct exact-pinned development dependency')
@@ -241,9 +244,9 @@ require(stylesOutput.includes(
 function validateSourceMap(path, map, expectedSources) {
   require(map.version === 3, `${path} must use source map version 3`)
   require(Array.isArray(map.sources) &&
-    JSON.stringify([...map.sources].sort()) ===
+    JSON.stringify(sortCanonicalText(map.sources)) ===
       JSON.stringify(
-        [...expectedSources].sort(),
+        sortCanonicalText(expectedSources),
       ), `${path} must describe its complete source graph`)
   require(Array.isArray(map.sourcesContent) &&
     map.sourcesContent.length === map.sources?.length &&
@@ -271,7 +274,7 @@ validateSourceMap('dist/styles.js.map', stylesSourceMap, [
   '../src/env.ts',
   '../src/styles.ts',
 ])
-require(JSON.stringify([...distEntries].sort()) ===
+require(JSON.stringify(sortCanonicalText(distEntries)) ===
   JSON.stringify([
     'index.d.ts',
     'index.js',

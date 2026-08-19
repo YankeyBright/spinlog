@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { normalizeStyleNesting } from '../src/ansi.js'
+import { applyAnsiStyle, normalizeStyleNesting } from '../src/ansi.js'
 import * as spinlog from '../src/index.js'
 import * as styles from '../src/styles.js'
 
@@ -153,5 +153,12 @@ describe('ANSI styles', () => {
 
   it('treats reset as a hard SGR boundary', () => {
     expect(spinlog.red(`a ${spinlog.reset('b')} c`)).toBe('\x1b[31ma \x1b[0mb\x1b[0m c\x1b[39m')
+  })
+
+  it('applies ANSI styling and normalizes nesting directly through applyAnsiStyle', () => {
+    expect(applyAnsiStyle('red', 'text')).toBe('\x1b[31mtext\x1b[39m')
+    expect(applyAnsiStyle('red', `a ${applyAnsiStyle('blue', 'b')} c`)).toBe(
+      '\x1b[31ma \x1b[34mb\x1b[31m c\x1b[39m',
+    )
   })
 })
