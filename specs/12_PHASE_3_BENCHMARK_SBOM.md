@@ -11,6 +11,7 @@ Produce reproducible performance and supply-chain evidence for the completed Pha
 - Relative median absolute deviation above 15% is inconclusive. The harness retries a scenario up to three times, then fails instead of accepting noisy evidence.
 - `bench/baseline.json` is tracked only after aggregation of five independent Node 24 Linux CI matrix jobs. Every input records the same commit and workflow attempt, a unique matrix slot, and a unique SHA-256 artifact digest. A baseline is not fabricated from a developer workstation.
 - CI writes the aggregate only to `artifacts/phase3/baseline-candidate.json`. A reviewer must accept and commit it in a separate change; candidate verification never overwrites the tracked baseline or compares a candidate against a baseline produced from itself.
+- CI reports when the reviewed baseline is absent and defers candidate verification until it is committed. Once present, candidate verification still validates the baseline and fails on malformed or regressive evidence.
 - A median regression above 25% with a non-overlapping confidence interval is a warning. Candidate verification fails above 2x baseline when the candidate lower confidence bound is above 1.5x baseline median.
 
 ```bash

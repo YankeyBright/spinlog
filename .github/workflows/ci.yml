@@ -116,6 +116,28 @@ jobs:
       - name: Verify Runtime Without Development Dependencies
         run: node scripts/verify-packed-runtime.mjs artifacts/package
 
+  baseline-status:
+    name: Detect Committed Benchmark Baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      present: ${{ steps.baseline.outputs.present }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Report Baseline Availability
+        id: baseline
+        run: |
+          if test -f bench/baseline.json; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Committed benchmark baseline is absent; candidate verification is deferred."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
   benchmark-baseline-run:
     name: Baseline Run ${{ matrix.slot }} (Node 24)
     needs: [quality, packed-consumer]
@@ -191,7 +213,8 @@ jobs:
 
   candidate:
     name: Phase 3 Candidate Verification (Node 24)
-    needs: [quality, packed-consumer]
+    needs: [quality, packed-consumer, baseline-status]
+    if: ${{ needs.baseline-status.outputs.present == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:

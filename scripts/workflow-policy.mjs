@@ -11,6 +11,14 @@ const ALLOWED_ACTIONS = new Set([
 ])
 const CI_CONCURRENCY_GROUP = `ci-\${{ github.workflow }}-\${{ github.ref }}`
 const WORKFLOW_NAMES = ['ci.yml', 'release-readiness.yml']
+const BASELINE_STATUS_OUTPUT = `\${{ steps.baseline.outputs.present }}`
+const CANDIDATE_BASELINE_CONDITION = `\${{ needs.baseline-status.outputs.present == 'true' }}`
+const BASELINE_STATUS_COMMAND = `if test -f bench/baseline.json; then
+  echo "present=true" >> "$GITHUB_OUTPUT"
+else
+  echo "Committed benchmark baseline is absent; candidate verification is deferred."
+  echo "present=false" >> "$GITHUB_OUTPUT"
+fi`
 const READINESS_COMMANDS = new Set([
   'npm ci --ignore-scripts',
   'npm run check:phases',
@@ -24,6 +32,7 @@ const CI_COMMANDS = new Set([
   'npm audit --audit-level=low',
   "npm ci --ignore-scripts\nnpm run build\nnpm run sbom\nnpm run pack:check\nnode -e \"require('fs').mkdirSync('artifacts/package',{recursive:true})\"\nnpm pack --json --ignore-scripts --pack-destination artifacts/package",
   'node scripts/verify-packed-runtime.mjs artifacts/package',
+  BASELINE_STATUS_COMMAND,
   'npm run build\nnpm run benchmark',
   'node bench/aggregate-baseline.mjs artifacts/phase3/baseline-runs/phase3-baseline-run-1/benchmark.json artifacts/phase3/baseline-runs/phase3-baseline-run-2/benchmark.json artifacts/phase3/baseline-runs/phase3-baseline-run-3/benchmark.json artifacts/phase3/baseline-runs/phase3-baseline-run-4/benchmark.json artifacts/phase3/baseline-runs/phase3-baseline-run-5/benchmark.json --out artifacts/phase3/baseline-candidate.json',
   'npm run verify:candidate\nnpm run check:phases',
@@ -99,6 +108,7 @@ function validateCi(workflow, failures) {
   const quality = workflow.jobs?.quality
   const packedArtifact = workflow.jobs?.['packed-artifact']
   const consumer = workflow.jobs?.['packed-consumer']
+  const baselineStatus = workflow.jobs?.['baseline-status']
   if (
     !equals(quality?.strategy?.matrix?.['node-version'], [
       '22.18.0',
@@ -131,6 +141,7 @@ function validateCi(workflow, failures) {
   const baselineRun = workflow.jobs?.['benchmark-baseline-run']
   const baselineCandidate = workflow.jobs?.['benchmark-baseline-candidate']
   const candidate = workflow.jobs?.candidate
+  const baselineReport = steps({ jobs: { baselineStatus } }).find((step) => step?.id === 'baseline')
   if (!equals(baselineRun?.strategy?.matrix?.slot, [1, 2, 3, 4, 5])) {
     failures.push('ci.yml must collect baseline inputs in five independent matrix slots')
   }
@@ -140,8 +151,18 @@ function validateCi(workflow, failures) {
   if (baselineCandidate?.needs !== 'benchmark-baseline-run') {
     failures.push('ci.yml baseline candidate must aggregate only after all baseline inputs pass')
   }
-  if (!equals(candidate?.needs, ['quality', 'packed-consumer']) || 'if' in (candidate ?? {})) {
-    failures.push('ci.yml candidate verification must fail closed after quality and consumer jobs')
+  if (
+    baselineStatus?.['runs-on'] !== 'ubuntu-latest' ||
+    baselineStatus?.outputs?.present !== BASELINE_STATUS_OUTPUT ||
+    baselineReport?.run?.trim() !== BASELINE_STATUS_COMMAND
+  ) {
+    failures.push('ci.yml must report whether the reviewed benchmark baseline is committed')
+  }
+  if (
+    !equals(candidate?.needs, ['quality', 'packed-consumer', 'baseline-status']) ||
+    candidate?.if !== CANDIDATE_BASELINE_CONDITION
+  ) {
+    failures.push('ci.yml candidate verification must run only with a committed benchmark baseline')
   }
   if (JSON.stringify(workflow).includes('--out bench/baseline.json')) {
     failures.push('ci.yml must never overwrite the committed benchmark baseline')

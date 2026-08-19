@@ -1,3 +1,5 @@
+import { lexer, walkTokens } from 'marked'
+
 export const DOCUMENTED_EXAMPLES = Object.freeze([
   { document: 'README.md', id: 'spinner', path: 'examples/spinner.mjs' },
   { document: 'README.md', id: 'promise', path: 'examples/promise.mjs' },
@@ -7,6 +9,33 @@ export const DOCUMENTED_EXAMPLES = Object.freeze([
   { document: 'MIGRATION.md', id: 'migration-ora', path: 'examples/migration-ora.mjs' },
   { document: 'MIGRATION.md', id: 'migration-clack', path: 'examples/migration-clack.mjs' },
 ])
+const ENGINE = '^22.13.0 || ^24.0.0 || ^26.0.0'
+const REQUIRED_README_CLAIMS = Object.freeze([
+  ENGINE,
+  'spinlog(text?, options?)',
+  'spinlog.promise(input, options?)',
+  'spinlog.intro(message?)',
+  'spinlog.outro(message?)',
+  'Color precedence is `NO_COLOR`, `NODE_DISABLE_COLORS`, `FORCE_COLOR`',
+  'never writes to `stdout`',
+  'installs no process signal listeners',
+  'Exactly eleven files in the npm tarball',
+  'zero runtime components',
+  'No production version has been published',
+])
+const REQUIRED_MIGRATION_CLAIMS = Object.freeze([
+  'not API-compatible with Chalk, Ora, or Clack',
+  '## From Chalk',
+  '## From Ora',
+  '## From Clack',
+  'custom streams',
+  'custom frame sets',
+  'simultaneous spinners',
+  'prompts',
+  'task groups',
+  'progress bars',
+])
+const EXTERNAL_LINK_PREFIXES = Object.freeze(['http:', 'https:', 'mailto:'])
 
 function exampleBlock(id, source) {
   return `<!-- example:${id}:start -->\n\`\`\`js\n${source.trimEnd()}\n\`\`\`\n<!-- example:${id}:end -->`
@@ -25,7 +54,7 @@ export function synchronizeExamples(documents, examples) {
     const end = `<!-- example:${id}:end -->`
     const startIndex = contents.indexOf(start)
     const endIndex = contents.indexOf(end, startIndex + start.length)
-    if (startIndex === -1 || endIndex === -1 || contents.indexOf(start, startIndex + 1) !== -1) {
+    if (startIndex === -1 || endIndex === -1 || contents.includes(start, startIndex + 1)) {
       throw new Error(`${document} must contain exactly one complete ${id} example block`)
     }
     synchronized[document] =
@@ -47,54 +76,57 @@ export function validateDocumentation({
   sizeBytes,
 }) {
   const failures = []
-  let synchronized
+  const synchronized = synchronizeDocumentedExamples(documents, examples, failures)
+  validateSynchronizedExamples(documents, synchronized, failures)
+  validateRequiredClaims(documents, sizeBytes, failures)
+  validateDocumentationContract(packageJson, contract, runtimeSbom, failures)
+  validateExamples(examples, failures)
+  validateRelativeLinks(documents, availablePaths, failures)
+  return [...new Set(failures)]
+}
+
+function synchronizeDocumentedExamples(documents, examples, failures) {
   try {
-    synchronized = synchronizeExamples(documents, examples)
+    return synchronizeExamples(documents, examples)
   } catch (error) {
     failures.push(error.message)
-    synchronized = documents
+    return documents
   }
+}
 
+function validateSynchronizedExamples(documents, synchronized, failures) {
   for (const [path, contents] of Object.entries(documents)) {
     if (synchronized[path] !== contents) failures.push(`${path} example snippets are out of date`)
   }
+}
 
-  const readme = documents['README.md'] ?? ''
-  const migration = documents['MIGRATION.md'] ?? ''
-  const engine = '^22.13.0 || ^24.0.0 || ^26.0.0'
-  for (const text of [
-    engine,
-    'spinlog(text?, options?)',
-    'spinlog.promise(input, options?)',
-    'spinlog.intro(message?)',
-    'spinlog.outro(message?)',
-    'Color precedence is `NO_COLOR`, `NODE_DISABLE_COLORS`, `FORCE_COLOR`',
-    'never writes to `stdout`',
-    'installs no process signal listeners',
+function validateRequiredClaims(documents, sizeBytes, failures) {
+  const readmeClaims = [
+    ...REQUIRED_README_CLAIMS,
     `currently measures ${sizeBytes.toLocaleString('en-US')} bytes using gzip level 9`,
-    'Exactly eleven files in the npm tarball',
-    'zero runtime components',
-    'No production version has been published',
-  ]) {
-    if (!readme.includes(text)) failures.push(`README.md must contain verified claim: ${text}`)
-  }
+  ]
+  validateClaims(
+    documents['README.md'] ?? '',
+    readmeClaims,
+    'README.md must contain verified claim',
+    failures,
+  )
+  validateClaims(
+    documents['MIGRATION.md'] ?? '',
+    REQUIRED_MIGRATION_CLAIMS,
+    'MIGRATION.md must contain bounded claim',
+    failures,
+  )
+}
 
-  for (const text of [
-    'not API-compatible with Chalk, Ora, or Clack',
-    '## From Chalk',
-    '## From Ora',
-    '## From Clack',
-    'custom streams',
-    'custom frame sets',
-    'simultaneous spinners',
-    'prompts',
-    'task groups',
-    'progress bars',
-  ]) {
-    if (!migration.includes(text)) failures.push(`MIGRATION.md must contain bounded claim: ${text}`)
+function validateClaims(document, claims, failurePrefix, failures) {
+  for (const claim of claims) {
+    if (!document.includes(claim)) failures.push(`${failurePrefix}: ${claim}`)
   }
+}
 
-  if (packageJson?.engines?.node !== engine || contract?.runtime?.engines !== engine) {
+function validateDocumentationContract(packageJson, contract, runtimeSbom, failures) {
+  if (packageJson?.engines?.node !== ENGINE || contract?.runtime?.engines !== ENGINE) {
     failures.push('README Node support must derive from the frozen package and behavior contract')
   }
   if (JSON.stringify(contract?.runtime?.supportedMajors) !== JSON.stringify([22, 24, 26])) {
@@ -111,24 +143,50 @@ export function validateDocumentation({
       'README zero-runtime-component claim requires an empty runtime SBOM component list',
     )
   }
+}
 
+function validateExamples(examples, failures) {
   for (const [path, source] of Object.entries(examples)) {
-    if (/\b(?:console\.log|process\.stdout|stdout\.write)\b/u.test(source)) {
-      failures.push(`${path} must not write example output to stdout`)
-    }
-    if (!/from ['"]spinlog(?:\/styles)?['"]/u.test(source)) {
-      failures.push(`${path} must exercise a public package entrypoint`)
-    }
+    validateExampleOutput(path, source, failures)
+    validateExampleEntrypoint(path, source, failures)
   }
+}
 
+function validateExampleOutput(path, source, failures) {
+  if (/\b(?:console\.log|process\.stdout|stdout\.write)\b/u.test(source)) {
+    failures.push(`${path} must not write example output to stdout`)
+  }
+}
+
+function validateExampleEntrypoint(path, source, failures) {
+  if (!/from ['"]spinlog(?:\/styles)?['"]/u.test(source)) {
+    failures.push(`${path} must exercise a public package entrypoint`)
+  }
+}
+
+function validateRelativeLinks(documents, availablePaths, failures) {
   for (const [document, source] of Object.entries(documents)) {
-    for (const match of source.matchAll(/\[[^\]]+\]\(([^)]+)\)/gu)) {
-      const target = match[1].split('#')[0]
-      if (target === '' || /^(?:https?:|mailto:)/u.test(target)) continue
-      if (!availablePaths.has(target))
-        failures.push(`${document} contains a broken relative link: ${target}`)
+    for (const target of markdownLinkTargets(source)) {
+      validateRelativeLink(document, target, availablePaths, failures)
     }
   }
+}
 
-  return [...new Set(failures)]
+function markdownLinkTargets(source) {
+  const targets = []
+  walkTokens(lexer(source), (token) => {
+    if (token.type === 'link') targets.push(token.href)
+  })
+  return targets
+}
+
+function validateRelativeLink(document, href, availablePaths, failures) {
+  const target = href.split('#')[0]
+  if (target === '' || isExternalLink(target)) return
+  if (!availablePaths.has(target))
+    failures.push(`${document} contains a broken relative link: ${target}`)
+}
+
+function isExternalLink(target) {
+  return EXTERNAL_LINK_PREFIXES.some((prefix) => target.startsWith(prefix))
 }

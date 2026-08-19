@@ -197,16 +197,15 @@ function isApprovedProcessImport(declaration) {
 
 function validateRuntimeOperations(path, program, failures) {
   const operations = new Set()
-  sourceContains(program, (node) => {
+  forEachSourceNode(program, (node) => {
     if (node.type === 'StringLiteral' && SIGNALS.has(node.value)) operations.add('signal ownership')
-    if (node.type !== 'CallExpression' && node.type !== 'OptionalCallExpression') return false
-
-    const target = memberAccessPath(node.callee)
-    if (PROCESS_LISTENERS.has(target)) operations.add('process listener')
-    if (HOST_TERMINATION_CALLS.has(target)) operations.add('host termination call')
-    if (STDERR_LISTENERS.has(target)) operations.add('stderr listener')
-    if (STDOUT_WRITES.has(target)) operations.add('stdout write')
-    return false
+    if (node.type === 'CallExpression' || node.type === 'OptionalCallExpression') {
+      const target = memberAccessPath(node.callee)
+      if (PROCESS_LISTENERS.has(target)) operations.add('process listener')
+      if (HOST_TERMINATION_CALLS.has(target)) operations.add('host termination call')
+      if (STDERR_LISTENERS.has(target)) operations.add('stderr listener')
+      if (STDOUT_WRITES.has(target)) operations.add('stdout write')
+    }
   })
 
   for (const operation of operations) failures.push(`${path} must not contain ${operation}`)
@@ -214,12 +213,16 @@ function validateRuntimeOperations(path, program, failures) {
 
 function sourceContains(program, predicate) {
   let found = false
+  forEachSourceNode(program, (node) => {
+    if (predicate(node)) found = true
+  })
+  return found
+}
+
+function forEachSourceNode(program, visitor) {
   function visit(node) {
     if (!node || typeof node !== 'object' || typeof node.type !== 'string') return
-    if (predicate(node)) {
-      found = true
-      return
-    }
+    visitor(node)
     for (const [key, value] of Object.entries(node)) {
       if (key === 'extra' || key === 'loc') continue
       if (Array.isArray(value)) {
@@ -230,7 +233,6 @@ function sourceContains(program, predicate) {
     }
   }
   visit(program)
-  return found
 }
 
 function memberAccessPath(node) {

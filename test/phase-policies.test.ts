@@ -393,6 +393,15 @@ describe('workflow policy', () => {
     ['unsupported Node 27 major', (source: string) => source.replace("'26.x'", "'27.x'")],
     ['floating Current alias', (source: string) => source.replace("'26.x'", "'current'")],
     ['changed runtime floor', (source: string) => source.replace("'22.13.0'", "'22.12.0'")],
+    [
+      'ungated candidate verification',
+      (source: string) =>
+        source.replace(`    if: \${{ needs.baseline-status.outputs.present == 'true' }}\n`, ''),
+    ],
+    [
+      'unreported baseline availability',
+      (source: string) => source.replace('id: baseline', 'id: unavailable'),
+    ],
   ])('rejects %s structurally', (_name, mutate) => {
     expect(
       validateWorkflowPolicy({ ...workflows, 'ci.yml': mutate(workflows['ci.yml']) }),

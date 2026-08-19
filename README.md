@@ -130,7 +130,7 @@ The final aggregate is fail-fast and emits this only after all Phase 0 through P
 {"phase0":"pass","phase1":"pass","phase1Release":"pass","phase2":"pass","phase3":"pass","phase4":"pass"}
 ```
 
-Until a reviewed benchmark baseline exists, Phase 3 and the final aggregate intentionally fail. Baseline collection uses `check:foundation` to avoid circularly accepting its own evidence.
+Until a reviewed benchmark baseline exists, CI collects the five-run baseline candidate and visibly defers candidate verification. The final aggregate can pass only after a reviewer commits that independent baseline. Baseline collection uses `check:foundation` to avoid circularly accepting its own evidence.
 
 ## Security
 

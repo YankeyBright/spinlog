@@ -57,6 +57,16 @@ describe('Phase 4 documentation policy', () => {
     expect(validateDocumentation(current)).toContain('README.md example snippets are out of date')
   })
 
+  it('rejects a duplicated example marker', () => {
+    const current = fixture()
+    const { id } = DOCUMENTED_EXAMPLES[0]
+    current.documents['README.md'] += `\n<!-- example:${id}:start -->\n`
+
+    expect(() => synchronizeExamples(current.documents, current.examples)).toThrow(
+      `README.md must contain exactly one complete ${id} example block`,
+    )
+  })
+
   it('rejects size, Node, and SBOM claim drift', () => {
     const current = fixture()
     current.sizeBytes += 1
@@ -82,6 +92,29 @@ describe('Phase 4 documentation policy', () => {
         'README.md contains a broken relative link: missing.md',
         'examples/flow.mjs must not write example output to stdout',
       ]),
+    )
+  })
+
+  it('validates parsed inline and reference links without treating code spans as links', () => {
+    const current = fixture()
+    current.availablePaths.add('docs/nested(path).md')
+    current.documents['README.md'] += `
+[Nested [label]](docs/nested(path).md)
+[Missing reference][missing]
+
+[missing]: missing.md
+
+\`[example](not-a-link.md)\`
+`
+
+    expect(validateDocumentation(current)).toContain(
+      'README.md contains a broken relative link: missing.md',
+    )
+    expect(validateDocumentation(current)).not.toContain(
+      'README.md contains a broken relative link: docs/nested(path).md',
+    )
+    expect(validateDocumentation(current)).not.toContain(
+      'README.md contains a broken relative link: not-a-link.md',
     )
   })
 })
