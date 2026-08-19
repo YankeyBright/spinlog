@@ -5,6 +5,12 @@ function disablesTerminalFeatures(env: NodeJS.ProcessEnv, isTTY: boolean): boole
   return Boolean(env.CI) || env.TERM === 'dumb' || env.NODE_ENV === 'test' || !isTTY
 }
 
+function resolveColor(env: NodeJS.ProcessEnv, terminalDisabled: boolean): boolean {
+  if (env.NO_COLOR || env.NODE_DISABLE_COLORS) return false
+  if (env.FORCE_COLOR !== undefined) return env.FORCE_COLOR !== '0' && env.FORCE_COLOR !== 'false'
+  return !terminalDisabled
+}
+
 /** Resolve terminal capabilities without writing to, or taking ownership of, a stream. */
 export function getCapabilities(
   env: NodeJS.ProcessEnv = process.env,
@@ -12,15 +18,9 @@ export function getCapabilities(
   platform: NodeJS.Platform = process.platform,
 ): Capabilities {
   const terminalDisabled = disablesTerminalFeatures(env, isTTY)
-  const colorDisabled = Boolean(env.NO_COLOR) || Boolean(env.NODE_DISABLE_COLORS)
-  const forceColor = env.FORCE_COLOR
-
-  // Explicit disable requests outrank FORCE_COLOR; FORCE_COLOR affects color only.
-  const color = colorDisabled
-    ? false
-    : forceColor === undefined
-      ? !terminalDisabled
-      : forceColor !== '0' && forceColor !== 'false'
-
-  return [color, !terminalDisabled, platform !== 'win32' || Boolean(env.WT_SESSION)]
+  return [
+    resolveColor(env, terminalDisabled),
+    !terminalDisabled,
+    platform !== 'win32' || Boolean(env.WT_SESSION),
+  ]
 }

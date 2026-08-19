@@ -16,6 +16,8 @@ Aliases, style chaining, advanced color modes, named factory aliases, and Common
 
 The `spinlog/styles` subpath exports exactly the 38 style functions and the `Style` type. It omits the spinner runtime so style-only consumers receive the smallest tree-shakeable entrypoint.
 
+The callable default export also has exactly three properties: `promise`, `intro`, and `outro`. `intro(message?)` and `outro(message?)` return `void`; they add no named exports or option types.
+
 ## Factory And Defaults
 
 `spinlog(text?, options?)` returns `Spinner`. Options are limited to `color`, `prefix`, `suffix`, and `spinner`. Defaults are empty text/prefix/suffix, cyan, dots, and an 80ms interval. Spinner names are exactly `dots` and `line`; spinner colors are the 16 foreground names.
@@ -42,10 +44,16 @@ Mutation never changes state and becomes visible on the next render. An optional
 
 The spinner starts before a direct input is observed or a callback is invoked. The callback runs once, thenables are assimilated, synchronous callback throws become rejections, and resolution calls `succeed` while rejection calls `fail`. The fulfillment value or original rejection reason is preserved. Cosmetic failures never replace action settlement.
 
+## Flow Messages
+
+`spinlog.intro(message?)` and `spinlog.outro(message?)` emit one sanitized, newline-terminated line to `stderr`. Unicode markers are `┌` and `└`; ASCII fallbacks are `>` and `<`. Two ASCII spaces separate a marker from a non-empty message. Only the marker is styled with `blackBright` when color is enabled.
+
+Flow calls are synchronous, stateless, repeatable, and independent. They do not inspect or mutate a spinner, create a timer, own a signal, terminate the process, or write to `stdout`. Invalid messages throw `TypeError` before capability detection or output. Synchronous write failures are cosmetic and suppressed.
+
 ## Terminal Degradation
 
 Interactive rendering uses stderr and unreferenced timers. Non-interactive execution creates no timer and emits deterministic static start and terminal lines. An active synchronous write failure ends only that rendering cycle in `stopped`; terminal state and promise settlement remain logical outcomes rather than I/O outcomes. Style helpers remain side-effect-free and stream-free while using stderr capability only to decide whether ANSI is appropriate. Non-empty `NO_COLOR` and `NODE_DISABLE_COLORS` values outrank `FORCE_COLOR`; color forcing never enables animation.
 
 ## Explicitly Excluded From v1
 
-The complete deferred list and rationale are in `specs/16_POST_MVP_FEATURES.md`. Phase 2 may not export task groups, progress, prompts, intro/outro helpers, structured logs, custom streams, custom animations, concurrent spinners, or advanced color APIs.
+The complete deferred list and rationale are in `specs/16_POST_MVP_FEATURES.md`. Phase 2 may not export task groups, progress, prompts, structured logs, custom streams, custom animations, concurrent spinners, or advanced color APIs.

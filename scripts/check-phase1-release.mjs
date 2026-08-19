@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 
 import { NPM_SBOM_ARGUMENTS } from './generate-sbom.mjs'
+import { sortCanonicalText } from './canonical-order.mjs'
 import { validateSbom } from './sbom-policy.mjs'
 import { validateWorkflowPolicy } from './workflow-policy.mjs'
 
@@ -9,9 +10,9 @@ const readText = (path) => readFileSync(path, 'utf8')
 const packageJson = JSON.parse(readText('package.json'))
 const bom = JSON.parse(readText('sbom.json'))
 const workflowDirectory = '.github/workflows'
-const workflowNames = readdirSync(workflowDirectory)
-  .filter((name) => /\.ya?ml$/.test(name))
-  .sort()
+const workflowNames = sortCanonicalText(
+  readdirSync(workflowDirectory).filter((name) => /\.ya?ml$/.test(name)),
+)
 const workflows = Object.fromEntries(
   workflowNames.map((name) => [name, readText(`${workflowDirectory}/${name}`)]),
 )

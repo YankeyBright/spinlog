@@ -7,8 +7,10 @@ src/
   index.ts    public ESM factory, promise wrapper, types, and style re-exports
   ansi.ts     internal spinner-frame color adapter
   env.ts      color, animation, TTY, CI, and Unicode decisions
+  messages.ts stateless intro/outro stderr renderer
   spinner.ts  lifecycle state machine and stderr renderer
   styles.ts   public side-effect-free ANSI-16 style entrypoint
+  text.ts     shared validation and render-boundary sanitization
 ```
 
 Phase 0 and Phase 1 did not create these runtime modules beyond the inert entry point. The declarations in `specs/v1-public-api.d.ts` and `specs/v1-styles-api.d.ts` were specification artifacts until Phase 2 implemented them.
@@ -29,11 +31,19 @@ Separates color capability from animation capability and implements the exact en
 
 ### `spinner.ts`
 
-Owns lifecycle state, unreferenced timer creation and cleanup, mutable properties, render-boundary text sanitization, cursor visibility during active animation, static degradation, and synchronous write containment. It writes only to stderr and does not install process or stream-global listeners.
+Owns lifecycle state, unreferenced timer creation and cleanup, mutable properties, cursor visibility during active animation, static degradation, and synchronous write containment. It writes only to stderr and does not install process or stream-global listeners.
+
+### `text.ts`
+
+Owns shared string validation, render-boundary sanitization, and the contained synchronous stderr write primitive. It preserves caller-owned values, ignores backpressure, and installs no stream listener.
+
+### `messages.ts`
+
+Owns stateless intro/outro line composition and its single contained stderr write. It reuses `env.ts`, `ansi.ts`, and `text.ts` and never observes spinner state.
 
 ### `index.ts`
 
-Exports the callable default factory, promise overload implementation, type surface, and exact named style functions. It adds no CommonJS wrapper or post-MVP API; style-only users may import `spinlog/styles` without bundling the spinner.
+Exports the callable default factory, promise overload implementation, intro/outro methods, type surface, and exact named style functions. It adds no CommonJS wrapper or post-MVP API; style-only users may import `spinlog/styles` without bundling the spinner.
 
 ## Ownership Rules
 

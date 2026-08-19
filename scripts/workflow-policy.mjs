@@ -11,6 +11,14 @@ const ALLOWED_ACTIONS = new Set([
 ])
 const CI_CONCURRENCY_GROUP = `ci-\${{ github.workflow }}-\${{ github.ref }}`
 const WORKFLOW_NAMES = ['ci.yml', 'release-readiness.yml']
+const BASELINE_STATUS_OUTPUT = `\${{ steps.baseline.outputs.present }}`
+const CANDIDATE_BASELINE_CONDITION = `\${{ needs.baseline-status.outputs.present == 'true' }}`
+const BASELINE_STATUS_COMMAND = `if test -f bench/baseline.json; then
+  echo "present=true" >> "$GITHUB_OUTPUT"
+else
+  echo "Committed benchmark baseline is absent; candidate verification is deferred."
+  echo "present=false" >> "$GITHUB_OUTPUT"
+fi`
 const READINESS_COMMANDS = new Set([
   'npm ci --ignore-scripts',
   'npm run check:phases',
@@ -20,12 +28,14 @@ const READINESS_COMMANDS = new Set([
 ])
 const CI_COMMANDS = new Set([
   'npm ci --ignore-scripts',
-  'npm run check:phases',
+  'npm run check:foundation\nnpm run check:phase4',
   'npm audit --audit-level=low',
-  'npm run build\nnpm run test:consumer\nnpm run pack:check',
+  "npm ci --ignore-scripts\nnpm run build\nnpm run sbom\nnpm run pack:check\nnode -e \"require('fs').mkdirSync('artifacts/package',{recursive:true})\"\nnpm pack --json --ignore-scripts --pack-destination artifacts/package",
+  'node scripts/verify-packed-runtime.mjs artifacts/package',
+  BASELINE_STATUS_COMMAND,
   'npm run build\nnpm run benchmark',
   'node bench/aggregate-baseline.mjs artifacts/phase3/baseline-runs/phase3-baseline-run-1/benchmark.json artifacts/phase3/baseline-runs/phase3-baseline-run-2/benchmark.json artifacts/phase3/baseline-runs/phase3-baseline-run-3/benchmark.json artifacts/phase3/baseline-runs/phase3-baseline-run-4/benchmark.json artifacts/phase3/baseline-runs/phase3-baseline-run-5/benchmark.json --out artifacts/phase3/baseline-candidate.json',
-  'npm run verify:candidate',
+  'npm run verify:candidate\nnpm run check:phases',
 ])
 
 function equals(left, right) {
@@ -96,33 +106,69 @@ function validateCi(workflow, failures) {
     failures.push('ci.yml must use the frozen cancellation concurrency policy')
   }
   const quality = workflow.jobs?.quality
-  const consumer = workflow.jobs?.['cross-platform']
-  if (!equals(quality?.strategy?.matrix?.['node-version'], ['22.13.0', '22.x', '24.0.0', '24.x'])) {
+  const packedArtifact = workflow.jobs?.['packed-artifact']
+  const consumer = workflow.jobs?.['packed-consumer']
+  const baselineStatus = workflow.jobs?.['baseline-status']
+  if (
+    !equals(quality?.strategy?.matrix?.['node-version'], [
+      '22.18.0',
+      '22.x',
+      '24.0.0',
+      '24.x',
+      '26.0.0',
+      '26.x',
+    ])
+  ) {
     failures.push('ci.yml quality must test the complete supported Node matrix')
   }
-  if (!equals(consumer?.strategy?.matrix?.os, ['windows-latest', 'macos-latest'])) {
-    failures.push('ci.yml consumer job must test Windows and macOS')
+  if (packedArtifact?.needs !== 'quality') {
+    failures.push('ci.yml packed artifact must be built only after the quality matrix')
   }
-  if (!equals(consumer?.strategy?.matrix?.['node-version'], ['22.13.0', '24.x'])) {
-    failures.push('ci.yml consumer job must test minimum and current Node versions')
+  if (
+    !equals(consumer?.strategy?.matrix?.os, ['ubuntu-latest', 'windows-latest', 'macos-latest'])
+  ) {
+    failures.push('ci.yml consumer job must test Ubuntu, Windows, and macOS')
+  }
+  if (!equals(consumer?.strategy?.matrix?.['node-version'], ['22.13.0', '24.x', '26.x'])) {
+    failures.push('ci.yml consumer job must test the frozen runtime major matrix')
+  }
+  if (
+    consumer?.needs !== 'packed-artifact' ||
+    steps({ jobs: { consumer } }).some((step) => step.run === 'npm ci --ignore-scripts')
+  ) {
+    failures.push('ci.yml consumer job must install only the prebuilt packed runtime')
   }
   const baselineRun = workflow.jobs?.['benchmark-baseline-run']
   const baselineCandidate = workflow.jobs?.['benchmark-baseline-candidate']
   const candidate = workflow.jobs?.candidate
+  const baselineReport = steps({ jobs: { baselineStatus } }).find((step) => step?.id === 'baseline')
   if (!equals(baselineRun?.strategy?.matrix?.slot, [1, 2, 3, 4, 5])) {
     failures.push('ci.yml must collect baseline inputs in five independent matrix slots')
   }
-  if (!equals(baselineRun?.needs, ['quality', 'cross-platform']) || 'if' in (baselineRun ?? {})) {
+  if (!equals(baselineRun?.needs, ['quality', 'packed-consumer']) || 'if' in (baselineRun ?? {})) {
     failures.push('ci.yml baseline inputs must run only after successful quality and consumer jobs')
   }
   if (baselineCandidate?.needs !== 'benchmark-baseline-run') {
     failures.push('ci.yml baseline candidate must aggregate only after all baseline inputs pass')
   }
-  if (!equals(candidate?.needs, ['quality', 'cross-platform']) || 'if' in (candidate ?? {})) {
-    failures.push('ci.yml candidate verification must fail closed after quality and consumer jobs')
+  if (
+    baselineStatus?.['runs-on'] !== 'ubuntu-latest' ||
+    baselineStatus?.outputs?.present !== BASELINE_STATUS_OUTPUT ||
+    baselineReport?.run?.trim() !== BASELINE_STATUS_COMMAND
+  ) {
+    failures.push('ci.yml must report whether the reviewed benchmark baseline is committed')
+  }
+  if (
+    !equals(candidate?.needs, ['quality', 'packed-consumer', 'baseline-status']) ||
+    candidate?.if !== CANDIDATE_BASELINE_CONDITION
+  ) {
+    failures.push('ci.yml candidate verification must run only with a committed benchmark baseline')
   }
   if (JSON.stringify(workflow).includes('--out bench/baseline.json')) {
     failures.push('ci.yml must never overwrite the committed benchmark baseline')
+  }
+  if (/node-version:\s*(?:current|latest)/iu.test(JSON.stringify(workflow))) {
+    failures.push('ci.yml must not use floating Current or latest Node aliases')
   }
   validateCommands(workflow, 'ci.yml', CI_COMMANDS, failures)
 }

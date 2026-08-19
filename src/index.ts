@@ -1,79 +1,6 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// index.ts — Public API surface of the spinlog library
-//
-// This is the MAIN entrypoint that consumers import:
-//
-//   import spinlog, { bold, cyan } from 'spinlog'
-//
-// It re-exports:
-//   • All style functions (bold, red, bgCyan, …) from styles.ts
-//   • The `spinlog` default export — a callable spinner factory
-//   • A `spinlog.promise()` helper for automatic spinner lifecycle
-//
-// It also declares the library's public TypeScript types:
-//   • SpinnerName, SpinnerColor — union types for built-in names & colors
-//   • SpinnerOptions, PromiseOptions — option bags
-//   • Spinner — the mutable spinner instance interface
-//   • Spinlog — the callable factory interface
-//
-// HOW TO ADD A NEW PUBLIC TYPE:
-//   1. Declare it in this file.
-//   2. Add it to the `export` statements (TypeScript will include it in the
-//      generated .d.ts declarations automatically).
-//
-// HOW TO ADD A NEW PUBLIC STYLE:
-//   1. Add the style function in styles.ts.
-//   2. Import and re-export it from this file.
-// ─────────────────────────────────────────────────────────────────────────────
-
-// ── Style Re-exports ────────────────────────────────────────────────────────
-// Import every individual style from the internal styles module, renaming
-// with an `ansi` prefix to avoid name collisions with the public aliases
-// we export below.
-
-import {
-  bgBlack as ansiBgBlack,
-  bgBlackBright as ansiBgBlackBright,
-  bgBlue as ansiBgBlue,
-  bgBlueBright as ansiBgBlueBright,
-  bgCyan as ansiBgCyan,
-  bgCyanBright as ansiBgCyanBright,
-  bgGreen as ansiBgGreen,
-  bgGreenBright as ansiBgGreenBright,
-  bgMagenta as ansiBgMagenta,
-  bgMagentaBright as ansiBgMagentaBright,
-  bgRed as ansiBgRed,
-  bgRedBright as ansiBgRedBright,
-  bgWhite as ansiBgWhite,
-  bgWhiteBright as ansiBgWhiteBright,
-  bgYellow as ansiBgYellow,
-  bgYellowBright as ansiBgYellowBright,
-  black as ansiBlack,
-  blackBright as ansiBlackBright,
-  blue as ansiBlue,
-  blueBright as ansiBlueBright,
-  bold as ansiBold,
-  cyan as ansiCyan,
-  cyanBright as ansiCyanBright,
-  dim as ansiDim,
-  green as ansiGreen,
-  greenBright as ansiGreenBright,
-  italic as ansiItalic,
-  magenta as ansiMagenta,
-  magentaBright as ansiMagentaBright,
-  red as ansiRed,
-  redBright as ansiRedBright,
-  reset as ansiReset,
-  strikethrough as ansiStrikethrough,
-  underline as ansiUnderline,
-  white as ansiWhite,
-  whiteBright as ansiWhiteBright,
-  yellow as ansiYellow,
-  yellowBright as ansiYellowBright,
-} from './styles.js'
-import { createSpinner } from './spinner.js'
-
-// ── Type Definitions ────────────────────────────────────────────────────────
+import { intro, outro } from './messages.js'
+import { createSpinner, requireOptions } from './spinner.js'
+import * as styles from './styles.js'
 
 /** Built-in spinner animation names. */
 export type SpinnerName = 'dots' | 'line'
@@ -130,101 +57,65 @@ export interface Spinner {
   info(text?: string): this
 }
 
-/** Callable spinner factory with promise-settlement integration. */
+/** Callable spinner factory with promise and flow-message integration. */
 export interface Spinlog {
   (text?: string, options?: SpinnerOptions): Spinner
   promise<T>(input: PromiseLike<T>, options?: PromiseOptions): Promise<T>
   promise<T>(task: () => PromiseLike<T>, options?: PromiseOptions): Promise<T>
+  intro(message?: string): void
+  outro(message?: string): void
 }
 
-// ── Public Style Exports ────────────────────────────────────────────────────
-// Re-export style functions under their short, ergonomic names.
-// Consumers use these as:  import { bold, red } from 'spinlog'
+export const reset: (text: string) => string = styles.reset
+export const bold: (text: string) => string = styles.bold
+export const dim: (text: string) => string = styles.dim
+export const italic: (text: string) => string = styles.italic
+export const underline: (text: string) => string = styles.underline
+export const strikethrough: (text: string) => string = styles.strikethrough
 
-// Text decoration styles
-export const reset: (text: string) => string = ansiReset
-export const bold: (text: string) => string = ansiBold
-export const dim: (text: string) => string = ansiDim
-export const italic: (text: string) => string = ansiItalic
-export const underline: (text: string) => string = ansiUnderline
-export const strikethrough: (text: string) => string = ansiStrikethrough
+export const black: (text: string) => string = styles.black
+export const red: (text: string) => string = styles.red
+export const green: (text: string) => string = styles.green
+export const yellow: (text: string) => string = styles.yellow
+export const blue: (text: string) => string = styles.blue
+export const magenta: (text: string) => string = styles.magenta
+export const cyan: (text: string) => string = styles.cyan
+export const white: (text: string) => string = styles.white
+export const blackBright: (text: string) => string = styles.blackBright
+export const redBright: (text: string) => string = styles.redBright
+export const greenBright: (text: string) => string = styles.greenBright
+export const yellowBright: (text: string) => string = styles.yellowBright
+export const blueBright: (text: string) => string = styles.blueBright
+export const magentaBright: (text: string) => string = styles.magentaBright
+export const cyanBright: (text: string) => string = styles.cyanBright
+export const whiteBright: (text: string) => string = styles.whiteBright
 
-// Foreground colors (standard 8)
-export const black: (text: string) => string = ansiBlack
-export const red: (text: string) => string = ansiRed
-export const green: (text: string) => string = ansiGreen
-export const yellow: (text: string) => string = ansiYellow
-export const blue: (text: string) => string = ansiBlue
-export const magenta: (text: string) => string = ansiMagenta
-export const cyan: (text: string) => string = ansiCyan
-export const white: (text: string) => string = ansiWhite
+export const bgBlack: (text: string) => string = styles.bgBlack
+export const bgRed: (text: string) => string = styles.bgRed
+export const bgGreen: (text: string) => string = styles.bgGreen
+export const bgYellow: (text: string) => string = styles.bgYellow
+export const bgBlue: (text: string) => string = styles.bgBlue
+export const bgMagenta: (text: string) => string = styles.bgMagenta
+export const bgCyan: (text: string) => string = styles.bgCyan
+export const bgWhite: (text: string) => string = styles.bgWhite
+export const bgBlackBright: (text: string) => string = styles.bgBlackBright
+export const bgRedBright: (text: string) => string = styles.bgRedBright
+export const bgGreenBright: (text: string) => string = styles.bgGreenBright
+export const bgYellowBright: (text: string) => string = styles.bgYellowBright
+export const bgBlueBright: (text: string) => string = styles.bgBlueBright
+export const bgMagentaBright: (text: string) => string = styles.bgMagentaBright
+export const bgCyanBright: (text: string) => string = styles.bgCyanBright
+export const bgWhiteBright: (text: string) => string = styles.bgWhiteBright
 
-// Foreground colors (bright variants)
-export const blackBright: (text: string) => string = ansiBlackBright
-export const redBright: (text: string) => string = ansiRedBright
-export const greenBright: (text: string) => string = ansiGreenBright
-export const yellowBright: (text: string) => string = ansiYellowBright
-export const blueBright: (text: string) => string = ansiBlueBright
-export const magentaBright: (text: string) => string = ansiMagentaBright
-export const cyanBright: (text: string) => string = ansiCyanBright
-export const whiteBright: (text: string) => string = ansiWhiteBright
-
-// Background colors (standard 8)
-export const bgBlack: (text: string) => string = ansiBgBlack
-export const bgRed: (text: string) => string = ansiBgRed
-export const bgGreen: (text: string) => string = ansiBgGreen
-export const bgYellow: (text: string) => string = ansiBgYellow
-export const bgBlue: (text: string) => string = ansiBgBlue
-export const bgMagenta: (text: string) => string = ansiBgMagenta
-export const bgCyan: (text: string) => string = ansiBgCyan
-export const bgWhite: (text: string) => string = ansiBgWhite
-
-// Background colors (bright variants)
-export const bgBlackBright: (text: string) => string = ansiBgBlackBright
-export const bgRedBright: (text: string) => string = ansiBgRedBright
-export const bgGreenBright: (text: string) => string = ansiBgGreenBright
-export const bgYellowBright: (text: string) => string = ansiBgYellowBright
-export const bgBlueBright: (text: string) => string = ansiBgBlueBright
-export const bgMagentaBright: (text: string) => string = ansiBgMagentaBright
-export const bgCyanBright: (text: string) => string = ansiBgCyanBright
-export const bgWhiteBright: (text: string) => string = ansiBgWhiteBright
-
-// ── Spinner Factory ─────────────────────────────────────────────────────────
-
-/**
- * The default spinner factory.
- * Creates a new `Spinner` instance with the given text and options.
- * Delegates all the real work to `createSpinner` in spinner.ts.
- */
 const factory = (text = '', options: SpinnerOptions = {}): Spinner => createSpinner(text, options)
 
-// ── Promise Helper ──────────────────────────────────────────────────────────
-
-/**
- * Wraps a promise (or a function that returns one) with an automatic spinner.
- *
- * Behaviour:
- *   1. Creates a spinner with the given options and starts it.
- *   2. Awaits the promise or invokes the function.
- *   3. On success → calls `spinner.succeed()` and returns the resolved value.
- *   4. On failure → calls `spinner.fail()` and re-throws the error.
- *
- * This lets you write one-liner progress indicators:
- *   const data = await spinlog.promise(fetchData(), { text: 'Loading…' })
- */
 const promise: Spinlog['promise'] = async <T>(
   input: PromiseLike<T> | (() => PromiseLike<T>),
   options: PromiseOptions = {},
 ) => {
-  // Guard: options must be a plain object, not null/array/primitive.
-  if (options === null || typeof options !== 'object' || Array.isArray(options)) {
-    throw new TypeError('options must be an object')
-  }
-
-  // Start the spinner immediately.
-  const spinner = factory(options.text, options).start()
+  const safeOptions = requireOptions(options)
+  const spinner = factory(safeOptions.text, safeOptions).start()
   try {
-    // If `input` is a function, call it to obtain the promise; otherwise use it directly.
     const value = await (typeof input === 'function' ? input() : input)
     spinner.succeed()
     return value
@@ -234,8 +125,6 @@ const promise: Spinlog['promise'] = async <T>(
   }
 }
 
-// ── Default Export ───────────────────────────────────────────────────────────
-
-const spinlog: Spinlog = /* @__PURE__ */ Object.assign(factory, { promise })
+const spinlog: Spinlog = /* @__PURE__ */ Object.assign(factory, { promise, intro, outro })
 
 export default spinlog

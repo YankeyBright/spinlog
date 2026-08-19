@@ -6,7 +6,7 @@
 2. Configure npm Trusted Publishing for owner `YankeyBright`, repository `spinlog`, workflow `release.yml`, environment `release`, and permission to publish.
 3. Confirm the repository and package are public and revoke any long-lived npm publish token.
 4. Confirm the GitHub-hosted release job uses Node 24 and npm at or above the trusted-publishing minimum.
-5. Pass the required Node 22 and Node 24 quality jobs plus the Node 24 supply-chain job.
+5. Pass the required Node 22, Node 24, and Node 26 quality jobs plus the Node 24 supply-chain job.
 
 ## Tag-Driven Protocol
 

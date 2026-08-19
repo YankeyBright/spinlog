@@ -111,6 +111,10 @@ export interface Spinlog {
     // (undocumented)
     (text?: string, options?: SpinnerOptions): Spinner
     // (undocumented)
+    intro(message?: string): void
+    // (undocumented)
+    outro(message?: string): void
+    // (undocumented)
     promise<T>(input: PromiseLike<T>, options?: PromiseOptions): Promise<T>
     // (undocumented)
     promise<T>(task: () => PromiseLike<T>, options?: PromiseOptions): Promise<T>

@@ -71,22 +71,21 @@ function normalizeTitle(value) {
   return value.trim().replace(/\s+/g, ' ').toLowerCase()
 }
 
-export function validatePhaseMap(documents) {
+function validateAuthoritativePresence(documents) {
   const failures = []
-  const expectedTitles = new Map(CANONICAL_PHASES.map(({ number, title }) => [number, title]))
-
   for (const path of AUTHORITATIVE_PHASE_FILES) {
     if (typeof documents[path] !== 'string') {
       failures.push(`missing authoritative phase document: ${path}`)
     }
   }
+  return failures
+}
 
+function validateRequiredTextEntries(documents) {
+  const failures = []
   for (const [path, requiredText] of Object.entries(REQUIRED_TEXT)) {
     const content = documents[path]
-
-    if (typeof content !== 'string') {
-      continue
-    }
+    if (typeof content !== 'string') continue
 
     for (const value of requiredText) {
       if (!content.includes(value)) {
@@ -94,13 +93,14 @@ export function validatePhaseMap(documents) {
       }
     }
   }
+  return failures
+}
 
+function validateRequiredPatternEntries(documents) {
+  const failures = []
   for (const [path, requirements] of Object.entries(REQUIRED_PATTERNS)) {
     const content = documents[path]
-
-    if (typeof content !== 'string') {
-      continue
-    }
+    if (typeof content !== 'string') continue
 
     for (const { pattern, description } of requirements) {
       if (!pattern.test(content)) {
@@ -108,21 +108,64 @@ export function validatePhaseMap(documents) {
       }
     }
   }
+  return failures
+}
 
+function validateLegacyTaxonomyEntries(documents) {
+  const failures = []
   for (const [path, content] of Object.entries(documents)) {
-    if (!AUTHORITATIVE_PHASE_FILES.includes(path) || typeof content !== 'string') {
-      continue
-    }
+    if (!AUTHORITATIVE_PHASE_FILES.includes(path) || typeof content !== 'string') continue
 
     for (const legacyText of LEGACY_TAXONOMY) {
       if (content.includes(legacyText)) {
         failures.push(`${path} contains legacy phase taxonomy: ${legacyText}`)
       }
     }
+  }
+  return failures
+}
 
-    for (const match of content.matchAll(/^#{1,6}\s+Phase\s+([0-5]):\s*(.+?)\s*$/gim)) {
-      const phaseNumber = Number(match[1])
-      const actualTitle = match[2]
+function isHeadingWhitespace(character) {
+  return character === ' ' || character === '\t'
+}
+
+function skipHeadingWhitespace(line, index) {
+  let cursor = index
+  while (isHeadingWhitespace(line[cursor])) cursor += 1
+  return cursor
+}
+
+function parsePhaseHeading(line) {
+  let cursor = 0
+  while (line[cursor] === '#') cursor += 1
+  if (cursor === 0 || cursor > 6) return undefined
+
+  const afterHashes = skipHeadingWhitespace(line, cursor)
+  if (afterHashes === cursor || !line.startsWith('Phase', afterHashes)) return undefined
+
+  cursor = afterHashes + 'Phase'.length
+  const afterPhase = skipHeadingWhitespace(line, cursor)
+  if (afterPhase === cursor) return undefined
+
+  const phase = line[afterPhase]
+  if (!'012345'.includes(phase) || line[afterPhase + 1] !== ':') return undefined
+
+  const title = line.slice(afterPhase + 2)
+  if (title.length === 0) return undefined
+
+  return { number: Number(phase), title: title.trim() }
+}
+
+function validatePhaseHeadingEntries(documents, expectedTitles) {
+  const failures = []
+  for (const [path, content] of Object.entries(documents)) {
+    if (!AUTHORITATIVE_PHASE_FILES.includes(path) || typeof content !== 'string') continue
+
+    for (const rawLine of content.split('\n')) {
+      const heading = parsePhaseHeading(rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine)
+      if (!heading) continue
+
+      const { number: phaseNumber, title: actualTitle } = heading
       const expectedTitle = expectedTitles.get(phaseNumber)
 
       if (normalizeTitle(actualTitle) !== normalizeTitle(expectedTitle)) {
@@ -132,8 +175,19 @@ export function validatePhaseMap(documents) {
       }
     }
   }
-
   return failures
+}
+
+export function validatePhaseMap(documents) {
+  const expectedTitles = new Map(CANONICAL_PHASES.map(({ number, title }) => [number, title]))
+
+  return [
+    ...validateAuthoritativePresence(documents),
+    ...validateRequiredTextEntries(documents),
+    ...validateRequiredPatternEntries(documents),
+    ...validateLegacyTaxonomyEntries(documents),
+    ...validatePhaseHeadingEntries(documents, expectedTitles),
+  ]
 }
 
 function run() {

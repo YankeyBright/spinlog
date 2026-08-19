@@ -58,6 +58,8 @@ export interface Spinlog {
   (text?: string, options?: SpinnerOptions): Spinner
   promise<T>(input: PromiseLike<T>, options?: PromiseOptions): Promise<T>
   promise<T>(task: () => PromiseLike<T>, options?: PromiseOptions): Promise<T>
+  intro(message?: string): void
+  outro(message?: string): void
 }
 
 export declare const reset: (text: string) => string

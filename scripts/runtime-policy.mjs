@@ -1,5 +1,6 @@
 import { lstatSync, readdirSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
+import { parse } from '@babel/parser'
 
 import { compareCanonicalText, sortCanonicalText } from './canonical-order.mjs'
 
@@ -7,24 +8,40 @@ export const APPROVED_RUNTIME_FILES = Object.freeze([
   'ansi.ts',
   'env.ts',
   'index.ts',
+  'messages.ts',
   'spinner.ts',
   'styles.ts',
+  'text.ts',
 ])
 
 const APPROVED_IMPORTS = Object.freeze({
   'ansi.ts': ['node:util'],
   'env.ts': [],
   'index.ts': [],
-  'spinner.ts': ['node:process', 'node:util'],
+  'messages.ts': [],
+  'spinner.ts': [],
   'styles.ts': ['node:util'],
+  'text.ts': ['node:process', 'node:util'],
 })
-const FORBIDDEN_RUNTIME_OPERATIONS = Object.freeze([
-  [/\bprocess\.(?:on|once|addListener|prependListener)\s*\(/, 'process listener'],
-  [/\bprocess\.(?:exit|kill|abort)\s*\(/, 'host termination call'],
-  [/\b(?:stderr|process\.stderr)\.(?:on|once|addListener|prependListener)\s*\(/, 'stderr listener'],
-  [/\b(?:stdout|process\.stdout)\.write\s*\(/, 'stdout write'],
-  [/\bSIG(?:INT|TERM)\b/, 'signal ownership'],
+const PROCESS_LISTENERS = new Set([
+  'process.on',
+  'process.once',
+  'process.addListener',
+  'process.prependListener',
 ])
+const HOST_TERMINATION_CALLS = new Set(['process.exit', 'process.kill', 'process.abort'])
+const STDERR_LISTENERS = new Set([
+  'stderr.on',
+  'stderr.once',
+  'stderr.addListener',
+  'stderr.prependListener',
+  'process.stderr.on',
+  'process.stderr.once',
+  'process.stderr.addListener',
+  'process.stderr.prependListener',
+])
+const STDOUT_WRITES = new Set(['stdout.write', 'process.stdout.write'])
+const SIGNALS = new Set(['SIGINT', 'SIGTERM'])
 
 function normalize(path) {
   return path.replaceAll('\\', '/')
@@ -78,22 +95,31 @@ export function validateRuntimePolicy(files) {
 }
 
 function validateRuntimeFile({ path, text }, failures) {
-  validateImports(path, text, failures)
-  if (/\b(?:import\s*\(|require\s*\()\s*['"]node:/.test(text)) {
+  const program = parseRuntimeSource(path, text, failures)
+  if (!program) return
+
+  validateImports(path, program, failures)
+  if (hasDynamicNodeBuiltinLoad(program)) {
     failures.push(`${path} must not dynamically load Node built-ins`)
   }
-  if (hasUnapprovedProcessImport(text)) {
+  if (hasUnapprovedProcessImport(program)) {
     failures.push(`${path} may import only stderr from node:process`)
   }
-  for (const [pattern, description] of FORBIDDEN_RUNTIME_OPERATIONS) {
-    if (pattern.test(text)) failures.push(`${path} must not contain ${description}`)
+  validateRuntimeOperations(path, program, failures)
+}
+
+function parseRuntimeSource(path, text, failures) {
+  try {
+    return parse(text, { plugins: ['typescript'], sourceFilename: path, sourceType: 'module' })
+      .program
+  } catch {
+    failures.push(`${path} must contain valid TypeScript`)
+    return undefined
   }
 }
 
-function validateImports(path, text, failures) {
-  const imports = [...text.matchAll(/(?:from\s+|import\s+)['"](node:[^'"]+)['"]/g)].map(
-    (match) => match[1],
-  )
+function validateImports(path, program, failures) {
+  const imports = [...staticNodeBuiltinSpecifiers(program)]
   const approved = APPROVED_IMPORTS[path] ?? []
   for (const specifier of imports) {
     if (!approved.includes(specifier)) {
@@ -102,9 +128,123 @@ function validateImports(path, text, failures) {
   }
 }
 
-function hasUnapprovedProcessImport(text) {
-  return (
-    /(?:from\s+|import\s+)['"]node:process['"]/.test(text) &&
-    !/^import\s+\{\s*stderr\s*\}\s+from\s+['"]node:process['"]\s*;?\s*$/m.test(text)
+function* staticNodeBuiltinSpecifiers(program) {
+  for (const statement of program.body) {
+    if (
+      statement.type === 'ImportDeclaration' ||
+      statement.type === 'ExportAllDeclaration' ||
+      statement.type === 'ExportNamedDeclaration'
+    ) {
+      const specifier = nodeBuiltinSpecifier(statement.source)
+      if (specifier?.startsWith('node:')) yield specifier
+      continue
+    }
+
+    if (
+      statement.type === 'TSImportEqualsDeclaration' &&
+      statement.moduleReference.type === 'TSExternalModuleReference'
+    ) {
+      const specifier = nodeBuiltinSpecifier(statement.moduleReference.expression)
+      if (specifier?.startsWith('node:')) yield specifier
+    }
+  }
+}
+
+function hasDynamicNodeBuiltinLoad(program) {
+  return sourceContains(program, (node) => {
+    if (
+      node.type === 'TSImportEqualsDeclaration' &&
+      node.moduleReference.type === 'TSExternalModuleReference'
+    ) {
+      return nodeBuiltinSpecifier(node.moduleReference.expression)?.startsWith('node:') === true
+    }
+    if (node.type !== 'CallExpression' || node.arguments.length === 0) return false
+
+    const specifier = nodeBuiltinSpecifier(node.arguments[0])
+    return (
+      specifier?.startsWith('node:') === true &&
+      (node.callee.type === 'Import' ||
+        (node.callee.type === 'Identifier' && node.callee.name === 'require'))
+    )
+  })
+}
+
+function hasUnapprovedProcessImport(program) {
+  return sourceContains(
+    program,
+    (node) =>
+      (node.type === 'ImportDeclaration' &&
+        nodeBuiltinSpecifier(node.source) === 'node:process' &&
+        !isApprovedProcessImport(node)) ||
+      (node.type === 'TSImportEqualsDeclaration' &&
+        node.moduleReference.type === 'TSExternalModuleReference' &&
+        nodeBuiltinSpecifier(node.moduleReference.expression) === 'node:process'),
   )
+}
+
+function isApprovedProcessImport(declaration) {
+  if (declaration.importKind === 'type' || declaration.specifiers.length !== 1) return false
+
+  const [binding] = declaration.specifiers
+  return (
+    binding.type === 'ImportSpecifier' &&
+    binding.importKind !== 'type' &&
+    binding.imported.type === 'Identifier' &&
+    binding.imported.name === 'stderr' &&
+    binding.local.name === 'stderr'
+  )
+}
+
+function validateRuntimeOperations(path, program, failures) {
+  const operations = new Set()
+  forEachSourceNode(program, (node) => {
+    if (node.type === 'StringLiteral' && SIGNALS.has(node.value)) operations.add('signal ownership')
+    if (node.type === 'CallExpression' || node.type === 'OptionalCallExpression') {
+      const target = memberAccessPath(node.callee)
+      if (PROCESS_LISTENERS.has(target)) operations.add('process listener')
+      if (HOST_TERMINATION_CALLS.has(target)) operations.add('host termination call')
+      if (STDERR_LISTENERS.has(target)) operations.add('stderr listener')
+      if (STDOUT_WRITES.has(target)) operations.add('stdout write')
+    }
+  })
+
+  for (const operation of operations) failures.push(`${path} must not contain ${operation}`)
+}
+
+function sourceContains(program, predicate) {
+  let found = false
+  forEachSourceNode(program, (node) => {
+    if (predicate(node)) found = true
+  })
+  return found
+}
+
+function forEachSourceNode(program, visitor) {
+  function visit(node) {
+    if (!node || typeof node !== 'object' || typeof node.type !== 'string') return
+    visitor(node)
+    for (const [key, value] of Object.entries(node)) {
+      if (key === 'extra' || key === 'loc') continue
+      if (Array.isArray(value)) {
+        for (const child of value) visit(child)
+      } else {
+        visit(value)
+      }
+    }
+  }
+  visit(program)
+}
+
+function memberAccessPath(node) {
+  if (node.type === 'Identifier') return node.name
+  if (node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression') {
+    const receiver = memberAccessPath(node.object)
+    const property = node.computed ? nodeBuiltinSpecifier(node.property) : node.property.name
+    return receiver === undefined || property === undefined ? undefined : `${receiver}.${property}`
+  }
+  return undefined
+}
+
+function nodeBuiltinSpecifier(node) {
+  return node?.type === 'StringLiteral' ? node.value : undefined
 }

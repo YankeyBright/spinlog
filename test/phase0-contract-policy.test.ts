@@ -47,7 +47,7 @@ describe('Phase 0 contract policy', () => {
     const fixture = loadFixture()
     fixture.contract.schemaVersion = 4
 
-    expect(validatePhase0Contract(fixture)).toContain('contract version and phase must be 5 and 0')
+    expect(validatePhase0Contract(fixture)).toContain('contract version and phase must be 6 and 0')
   })
 
   it('rejects changed promise overload semantics', () => {
@@ -59,6 +59,42 @@ describe('Phase 0 contract policy', () => {
 
     expect(validatePhase0Contract(fixture)).toContain(
       'public API declaration must match the generated closed contract',
+    )
+  })
+
+  it('rejects missing flow methods and altered flow semantics', () => {
+    const fixture = loadFixture()
+    fixture.declaration = fixture.declaration.replace('  intro(message?: string): void\n', '')
+    fixture.contract.rendering.flowMessages.writesPerCall = 2
+
+    expect(validatePhase0Contract(fixture)).toEqual(
+      expect.arrayContaining([
+        'public API declaration must match the generated closed contract',
+        'rendering must match the frozen contract',
+      ]),
+    )
+  })
+
+  it('rejects Node major drift and the obsolete LTS-only field', () => {
+    const fixture = loadFixture()
+    fixture.contract.runtime.supportedMajors = [22, 24, 25, 26]
+    fixture.contract.runtime.supportedLtsMajors = [22, 24]
+
+    expect(validatePhase0Contract(fixture)).toContain('runtime must match the frozen contract')
+  })
+
+  it('rejects weakened flow-message validation and sanitization', () => {
+    const fixture = loadFixture()
+    fixture.contract.inputValidation.invalidFlowMessage = 'coerce'
+    fixture.contract.textSafety.fields = fixture.contract.textSafety.fields.filter(
+      (field) => field !== 'flowMessage',
+    )
+
+    expect(validatePhase0Contract(fixture)).toEqual(
+      expect.arrayContaining([
+        'inputValidation must match the frozen contract',
+        'textSafety must match the frozen contract',
+      ]),
     )
   })
 

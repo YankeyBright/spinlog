@@ -1,5 +1,7 @@
 import { isDeepStrictEqual } from 'node:util'
 
+import { sortCanonicalText } from './canonical-order.mjs'
+
 const STYLE_EXPORTS = Object.freeze([
   'reset',
   'bold',
@@ -133,10 +135,28 @@ const EXPECTED_RENDERING = Object.freeze({
     stopSequence: [],
     terminalSequence: ['render-status', 'newline'],
   },
+  flowMessages: {
+    stream: 'stderr',
+    writesPerCall: 1,
+    lineEnding: '\n',
+    separator: '  ',
+    markerColor: 'blackBright',
+    messageColor: 'none',
+    emptyMessage: 'marker-only',
+    unicodeSymbols: { intro: '┌', outro: '└' },
+    asciiSymbols: { intro: '>', outro: '<' },
+    stateless: true,
+    paired: false,
+    touchesSpinnerState: false,
+    createsTimer: false,
+    synchronousWriteFailure: 'suppress',
+    backpressure: 'ignore',
+    asynchronousErrors: 'host-owned',
+  },
 })
 
 const EXPECTED_TEXT_SAFETY = Object.freeze({
-  fields: ['text', 'prefix', 'suffix', 'terminalText'],
+  fields: ['text', 'prefix', 'suffix', 'terminalText', 'flowMessage'],
   boundary: 'render-only',
   preserveAssignedValues: true,
   stripVTControlCharacters: true,
@@ -180,7 +200,7 @@ const EXPECTED_ENVIRONMENT = Object.freeze({
 const EXPECTED_INPUT_VALIDATION = Object.freeze({
   factoryText: 'string',
   options: 'non-null-non-array-object',
-  textFields: ['text', 'prefix', 'suffix', 'terminalText'],
+  textFields: ['text', 'prefix', 'suffix', 'terminalText', 'flowMessage'],
   spinnerNames: ['dots', 'line'],
   colors: 'publicApi.SpinnerColor',
   mutableFields: ['text', 'color', 'prefix', 'suffix'],
@@ -188,6 +208,7 @@ const EXPECTED_INPUT_VALIDATION = Object.freeze({
   invalidFactoryInput: 'throw-TypeError-before-output',
   invalidMutation: 'throw-TypeError-and-preserve-value',
   invalidTerminalOverride: 'throw-TypeError-before-idempotency-state-mutation-timer-or-output',
+  invalidFlowMessage: 'throw-TypeError-before-capability-or-output',
   invalidPromiseOptions: 'reject-TypeError-before-start-or-input',
   invalidStyleInput: 'throw-TypeError-before-capability-detection',
 })
@@ -267,11 +288,6 @@ const EXPECTED_DEFERRED = Object.freeze([
       'Raw input, cancellation, and cross-platform terminal behavior form a separate security boundary.',
   },
   {
-    id: 'intro-outro',
-    api: 'spinlog.intro() and spinlog.outro()',
-    reason: 'Flow decoration is not required by the core color and spinner primitive.',
-  },
-  {
     id: 'structured-logs',
     api: 'structured: true',
     reason: 'Machine output requires a separately versioned stdout schema.',
@@ -321,7 +337,7 @@ const DOCUMENT_PATHS = Object.freeze([
 ])
 
 function sorted(value) {
-  return [...value].sort()
+  return sortCanonicalText(value)
 }
 
 function sameValues(actual, expected) {
@@ -405,6 +421,8 @@ export interface Spinlog {
   (text?: string, options?: SpinnerOptions): Spinner
   promise<T>(input: PromiseLike<T>, options?: PromiseOptions): Promise<T>
   promise<T>(task: () => PromiseLike<T>, options?: PromiseOptions): Promise<T>
+  intro(message?: string): void
+  outro(message?: string): void
 }
 
 ${styleDeclarations.replace(`export declare const black: ${styleSignature}`, `\nexport declare const black: ${styleSignature}`).replace(`export declare const bgBlack: ${styleSignature}`, `\nexport declare const bgBlack: ${styleSignature}`)}
@@ -438,6 +456,73 @@ function validateDeclaration(declaration, stylesDeclaration, contract, failures)
     ), 'styles API declaration must match the generated closed contract', failures)
 }
 
+function expectedStartTransition(state) {
+  if (state === 'spinning') {
+    return { to: 'spinning', effect: 'none', idempotent: true }
+  }
+  return { to: 'spinning', effect: 'begin-cycle', idempotent: false }
+}
+
+function expectedStopTransition(state) {
+  if (state === 'spinning') {
+    return { to: 'stopped', effect: 'clear-and-restore', idempotent: false }
+  }
+  if (state === 'idle') {
+    return { to: 'stopped', effect: 'none', idempotent: false }
+  }
+  if (state === 'stopped') {
+    return { to: 'stopped', effect: 'none', idempotent: true }
+  }
+  return { to: state, effect: 'none', idempotent: true }
+}
+
+function expectedTerminalTransition(state, target) {
+  if (STATES.slice(3).includes(state)) {
+    return { to: state, effect: 'none', idempotent: true }
+  }
+  return {
+    to: target,
+    effect: state === 'spinning' ? 'stop-and-persist-status' : 'persist-status',
+    idempotent: false,
+  }
+}
+
+function validateActionLegalStates(stateMachine, failures) {
+  for (const action of ['start', 'stop', ...Object.keys(TERMINAL_ACTIONS)]) {
+    require(sameValues(
+      Object.keys(stateMachine?.[action] ?? {}),
+      STATES,
+    ), `${action} must define every legal source state`, failures)
+  }
+}
+
+function validateStateTransitions(stateMachine, failures) {
+  for (const state of STATES) {
+    const start = stateMachine?.start?.[state]
+    const stop = stateMachine?.stop?.[state]
+    exactKeys(start, ['to', 'effect', 'idempotent'], `stateMachine.start.${state}`, failures)
+    exactKeys(stop, ['to', 'effect', 'idempotent'], `stateMachine.stop.${state}`, failures)
+    requireExact(start, expectedStartTransition(state), `stateMachine.start.${state}`, failures)
+    requireExact(stop, expectedStopTransition(state), `stateMachine.stop.${state}`, failures)
+
+    for (const [action, target] of Object.entries(TERMINAL_ACTIONS)) {
+      const transition = stateMachine?.[action]?.[state]
+      exactKeys(
+        transition,
+        ['to', 'effect', 'idempotent'],
+        `stateMachine.${action}.${state}`,
+        failures,
+      )
+      requireExact(
+        transition,
+        expectedTerminalTransition(state, target),
+        `stateMachine.${action}.${state}`,
+        failures,
+      )
+    }
+  }
+}
+
 function validateTransitions(contract, failures) {
   const stateMachine = contract.stateMachine
   require(stateMachine?.initial === 'idle', 'initial state must be idle', failures)
@@ -458,55 +543,8 @@ function validateTransitions(contract, failures) {
     failures,
   )
 
-  for (const action of ['start', 'stop', ...Object.keys(TERMINAL_ACTIONS)]) {
-    require(sameValues(
-      Object.keys(stateMachine?.[action] ?? {}),
-      STATES,
-    ), `${action} must define every legal source state`, failures)
-  }
-
-  for (const state of STATES) {
-    const start = stateMachine?.start?.[state]
-    const stop = stateMachine?.stop?.[state]
-    exactKeys(start, ['to', 'effect', 'idempotent'], `stateMachine.start.${state}`, failures)
-    exactKeys(stop, ['to', 'effect', 'idempotent'], `stateMachine.stop.${state}`, failures)
-    requireExact(
-      start,
-      state === 'spinning'
-        ? { to: 'spinning', effect: 'none', idempotent: true }
-        : { to: 'spinning', effect: 'begin-cycle', idempotent: false },
-      `stateMachine.start.${state}`,
-      failures,
-    )
-
-    const expectedStop =
-      state === 'spinning'
-        ? { to: 'stopped', effect: 'clear-and-restore', idempotent: false }
-        : state === 'idle'
-          ? { to: 'stopped', effect: 'none', idempotent: false }
-          : state === 'stopped'
-            ? { to: 'stopped', effect: 'none', idempotent: true }
-            : { to: state, effect: 'none', idempotent: true }
-    requireExact(stop, expectedStop, `stateMachine.stop.${state}`, failures)
-
-    for (const [action, target] of Object.entries(TERMINAL_ACTIONS)) {
-      const transition = stateMachine?.[action]?.[state]
-      exactKeys(
-        transition,
-        ['to', 'effect', 'idempotent'],
-        `stateMachine.${action}.${state}`,
-        failures,
-      )
-      const expected = STATES.slice(3).includes(state)
-        ? { to: state, effect: 'none', idempotent: true }
-        : {
-            to: target,
-            effect: state === 'spinning' ? 'stop-and-persist-status' : 'persist-status',
-            idempotent: false,
-          }
-      requireExact(transition, expected, `stateMachine.${action}.${state}`, failures)
-    }
-  }
+  validateActionLegalStates(stateMachine, failures)
+  validateStateTransitions(stateMachine, failures)
 
   require(stateMachine?.mutationsChangeState ===
     false, 'mutations must not change lifecycle state', failures)
@@ -545,7 +583,7 @@ function validateDocuments(documents, contract, failures) {
 
   for (const [path, snippets] of Object.entries({
     'README.md': [
-      '^22.13.0 || ^24.0.0',
+      '^22.13.0 || ^24.0.0 || ^26.0.0',
       'spinlog/styles',
       'https://github.com/YankeyBright/spinlog',
     ],
@@ -554,11 +592,11 @@ function validateDocuments(documents, contract, failures) {
       'specs/v1-public-api.d.ts',
       'specs/v1-styles-api.d.ts',
       'specs/v1-behavior.json',
-      '`^22.13.0 || ^24.0.0`',
+      '`^22.13.0 || ^24.0.0 || ^26.0.0`',
     ],
     'specs/05_TERMINAL_SPEC.md': ['never writes to `stdout`', 'installs no process signal'],
     'specs/09_PHASE_0_PRODUCT_SPEC_LOCK.md': [
-      'Node 22 and Node 24',
+      'Node 22, Node 24, and Node 26',
       '2,560 bytes',
       'only to `stderr`',
     ],
@@ -617,8 +655,8 @@ export function validatePhase0Contract({
     'contract',
     failures,
   )
-  require(contract.schemaVersion === 5 &&
-    contract.phase === 0, 'contract version and phase must be 5 and 0', failures)
+  require(contract.schemaVersion === 6 &&
+    contract.phase === 0, 'contract version and phase must be 6 and 0', failures)
   requireExact(
     contract.identity,
     {
@@ -635,8 +673,8 @@ export function validatePhase0Contract({
   requireExact(
     contract.runtime,
     {
-      engines: '^22.13.0 || ^24.0.0',
-      supportedLtsMajors: [22, 24],
+      engines: '^22.13.0 || ^24.0.0 || ^26.0.0',
+      supportedMajors: [22, 24, 26],
       moduleFormat: 'esm',
       browserSupport: false,
     },
@@ -650,6 +688,7 @@ export function validatePhase0Contract({
       compression: 'gzip',
       level: 9,
       maximumBytes: 2560,
+      singleStyleMaximumBytes: 600,
     },
     'size',
     failures,
@@ -661,6 +700,7 @@ export function validatePhase0Contract({
       stylesDeclaration: 'specs/v1-styles-api.d.ts',
       stylesSubpath: 'spinlog/styles',
       defaultExport: 'spinlog',
+      callableMethods: ['promise', 'intro', 'outro'],
       typeExports: TYPE_EXPORTS,
       styleExports: STYLE_EXPORTS,
     },
@@ -740,16 +780,17 @@ export function validatePhase0Contract({
   require(contract.identity?.visibility ===
     'public', 'repository visibility must be public', failures)
   require(contract.runtime?.engines ===
-    '^22.13.0 || ^24.0.0', 'runtime engines must require stable APIs on supported LTS majors', failures)
-  require(JSON.stringify(contract.runtime?.supportedLtsMajors) ===
-    JSON.stringify([22, 24]), 'supported runtime majors must be Node 22 and 24', failures)
+    '^22.13.0 || ^24.0.0 || ^26.0.0', 'runtime engines must require stable APIs on supported majors', failures)
+  require(JSON.stringify(contract.runtime?.supportedMajors) ===
+    JSON.stringify([22, 24, 26]), 'supported runtime majors must be Node 22, 24, and 26', failures)
   require(contract.runtime?.moduleFormat === 'esm' &&
     contract.runtime?.browserSupport === false, 'runtime must be ESM-only and Node-only', failures)
   require(contract.size?.artifact === 'dist/index.js' &&
     contract.size?.compression === 'gzip' &&
     contract.size?.level === 9 &&
-    contract.size?.maximumBytes ===
-      2560, 'size contract must be dist/index.js at 2,560 bytes using gzip level 9', failures)
+    contract.size?.maximumBytes === 2560 &&
+    contract.size?.singleStyleMaximumBytes ===
+      600, 'size contract must enforce 2,560 root bytes and 600 single-style bytes using gzip level 9', failures)
   require(sameValues(
     contract.publicApi?.typeExports ?? [],
     TYPE_EXPORTS,
@@ -789,7 +830,7 @@ export function validatePhase0Contract({
     contract.writeFailures?.futureStartRetries ===
       true, 'write failure must stop only the active cycle and preserve terminal state', failures)
   require(Array.isArray(contract.deferred) &&
-    contract.deferred.length === 9 &&
+    contract.deferred.length === 8 &&
     contract.deferred.every(
       ({ id, api, reason }) => id && api && reason,
     ), 'every deferred feature must have an id, API, and rationale', failures)

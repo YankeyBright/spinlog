@@ -1,5 +1,7 @@
 import { isDeepStrictEqual } from 'node:util'
 
+import { sortCanonicalText } from './canonical-order.mjs'
+
 export const APPROVED_PACKAGE_FILES = Object.freeze([
   'LICENSE',
   'README.md',
@@ -46,7 +48,9 @@ export function validatePackOutput(value) {
     failures.push('packaged file paths must not contain duplicates')
   }
 
-  if (!isDeepStrictEqual([...validPaths].sort(), [...APPROVED_PACKAGE_FILES].sort())) {
+  if (
+    !isDeepStrictEqual(sortCanonicalText(validPaths), sortCanonicalText(APPROVED_PACKAGE_FILES))
+  ) {
     const unexpected = validPaths.filter((path) => !APPROVED_PACKAGE_FILES.includes(path))
     const missing = APPROVED_PACKAGE_FILES.filter((path) => !validPaths.includes(path))
 

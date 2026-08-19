@@ -1,16 +1,13 @@
-import { styleText } from 'node:util'
-
+import { applyAnsiStyle, type AnsiStyle } from './ansi.js'
 import { getCapabilities } from './env.js'
 
 /** A side-effect-free style transformation that follows stderr color capability. */
 export type Style = (text: string) => string
 
-type StyleFormat = Extract<Parameters<typeof styleText>[0], string>
-
-function applyStyle(format: StyleFormat, text: string): string {
+function applyStyle(format: AnsiStyle, text: string): string {
   if (typeof text !== 'string') throw new TypeError('text must be a string')
   const [colorEnabled] = getCapabilities()
-  return colorEnabled ? styleText(format, text, { validateStream: false }) : text
+  return colorEnabled ? applyAnsiStyle(format, text) : text
 }
 
 export const reset: Style = (text) => applyStyle('reset', text)

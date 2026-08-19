@@ -79,6 +79,23 @@ describe('phase-map policy', () => {
       ]),
     )
   })
+
+  it('parses only single-line Markdown Phase headings without regex backtracking', () => {
+    const documents = loadPhaseDocuments()
+    const conflictingTitle = `Not ${'canonical '.repeat(10_000)}`
+    documents['README.md'] += `\r\n######\tPhase\t1:\t${conflictingTitle}\r\n`
+
+    expect(validatePhaseMap(documents)).toContain(
+      `README.md has conflicting Phase 1 heading: expected "Package Scaffolding", found "${conflictingTitle.trim()}"`,
+    )
+  })
+
+  it('does not treat a multiline construct as a Markdown Phase heading', () => {
+    const documents = loadPhaseDocuments()
+    documents['README.md'] += '\n#\nPhase 1: Not a heading\n'
+
+    expect(validatePhaseMap(documents)).toEqual([])
+  })
 })
 
 describe('Phase 1 TypeScript policy', () => {
@@ -255,16 +272,21 @@ describe('runtime source policy', () => {
     ['nested source', { path: 'nested/hostile.ts', text: "import process from 'node:process'" }],
     [
       'aliased process import',
-      { path: 'spinner.ts', text: "import { stdout as output } from 'node:process'" },
+      { path: 'text.ts', text: "import { stderr as output } from 'node:process'" },
     ],
-    ['process listener', { path: 'spinner.ts', text: "process.on('SIGINT', () => undefined)" }],
-    ['termination call', { path: 'spinner.ts', text: 'process.exit(1)' }],
-    [
-      'stdout write',
-      { path: 'spinner.ts', text: "import { stdout } from 'node:process'\nstdout.write('unsafe')" },
-    ],
+    ['process listener', { path: 'text.ts', text: "process.on('SIGINT', () => undefined)" }],
+    ['termination call', { path: 'text.ts', text: 'process.exit(1)' }],
+    ['stdout write', { path: 'text.ts', text: "process.stdout.write('unsafe')" }],
     ['bare Node built-in import', { path: 'spinner.ts', text: "import 'node:fs'" }],
-    ['bare process import', { path: 'spinner.ts', text: "import 'node:process'" }],
+    ['bare process import', { path: 'text.ts', text: "import 'node:process'" }],
+    ['Node built-in re-export', { path: 'spinner.ts', text: "export * from 'node:fs'" }],
+    ['dynamic Node built-in import', { path: 'text.ts', text: "void import('node:fs')" }],
+    ['CommonJS Node built-in import', { path: 'text.ts', text: "const fs = require('node:fs')" }],
+    [
+      'TypeScript import-equals Node built-in import',
+      { path: 'text.ts', text: "import stderr = require('node:process')" },
+    ],
+    ['computed host termination call', { path: 'text.ts', text: "process['exit'](1)" }],
   ])('rejects %s before accepting a changed architecture', (_name, hostile) => {
     const mutated = sources.map((source) => (source.path === hostile.path ? hostile : source))
     if (!mutated.some((source) => source.path === hostile.path)) mutated.push(hostile)
@@ -274,12 +296,43 @@ describe('runtime source policy', () => {
 
   it('accepts the approved process import with a trailing semicolon', () => {
     const semicolonTerminated = sources.map((source) =>
-      source.path === 'spinner.ts'
+      source.path === 'text.ts'
         ? { ...source, text: "import { stderr } from 'node:process';" }
         : source,
     )
 
     expect(validateRuntimePolicy(semicolonTerminated)).toEqual([])
+  })
+
+  it('accepts the approved process import regardless of layout', () => {
+    const formatted = sources.map((source) =>
+      source.path === 'text.ts'
+        ? { ...source, text: "import {\n  stderr,\n} from 'node:process'" }
+        : source,
+    )
+
+    expect(validateRuntimePolicy(formatted)).toEqual([])
+  })
+
+  it('does not interpret comments or strings as runtime operations', () => {
+    const commentsAndStrings = sources.map((source) =>
+      source.path === 'text.ts'
+        ? {
+            ...source,
+            text: `// import { stdout } from 'node:process'\nconst example = 'process.exit(1)'`,
+          }
+        : source,
+    )
+
+    expect(validateRuntimePolicy(commentsAndStrings)).toEqual([])
+  })
+
+  it('reports invalid TypeScript without crashing the policy check', () => {
+    const invalid = sources.map((source) =>
+      source.path === 'text.ts' ? { ...source, text: 'import {' } : source,
+    )
+
+    expect(validateRuntimePolicy(invalid)).toContain('text.ts must contain valid TypeScript')
   })
 
   it('rejects a symlinked runtime module', () => {
@@ -334,6 +387,21 @@ describe('workflow policy', () => {
     ],
     ['unpinned action', (source: string) => source.replace(/@[a-f0-9]{40}/, '@main')],
     ['unapproved action', (source: string) => source.replace('actions/checkout@', 'evil/action@')],
+    ['missing Node 26 coverage', (source: string) => source.replace(", '26.0.0', '26.x'", '')],
+    ['unsupported Node 23 major', (source: string) => source.replace("'22.x'", "'23.x'")],
+    ['unsupported Node 25 major', (source: string) => source.replace("'26.0.0'", "'25.0.0'")],
+    ['unsupported Node 27 major', (source: string) => source.replace("'26.x'", "'27.x'")],
+    ['floating Current alias', (source: string) => source.replace("'26.x'", "'current'")],
+    ['changed runtime floor', (source: string) => source.replace("'22.13.0'", "'22.12.0'")],
+    [
+      'ungated candidate verification',
+      (source: string) =>
+        source.replace(`    if: \${{ needs.baseline-status.outputs.present == 'true' }}\n`, ''),
+    ],
+    [
+      'unreported baseline availability',
+      (source: string) => source.replace('id: baseline', 'id: unavailable'),
+    ],
   ])('rejects %s structurally', (_name, mutate) => {
     expect(
       validateWorkflowPolicy({ ...workflows, 'ci.yml': mutate(workflows['ci.yml']) }),

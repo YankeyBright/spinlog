@@ -146,6 +146,20 @@ const scenarios = [
       ),
     ),
   ),
+  await stableMeasurement('intro-flow-message-ns', () =>
+    withSilentStderr(() =>
+      withEnvironment({ CI: '1', FORCE_COLOR: '0', NO_COLOR: '1', NODE_ENV: 'production' }, () =>
+        measureSync(() => rootModule.default.intro('benchmark')),
+      ),
+    ),
+  ),
+  await stableMeasurement('outro-flow-message-ns', () =>
+    withSilentStderr(() =>
+      withEnvironment({ CI: '1', FORCE_COLOR: '0', NO_COLOR: '1', NODE_ENV: 'production' }, () =>
+        measureSync(() => rootModule.default.outro('benchmark')),
+      ),
+    ),
+  ),
 ]
 
 if (JSON.stringify(scenarios.map(({ name }) => name)) !== JSON.stringify(BENCHMARK_SCENARIOS)) {

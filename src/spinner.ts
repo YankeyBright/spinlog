@@ -1,9 +1,7 @@
-import { stderr } from 'node:process'
-import { stripVTControlCharacters } from 'node:util'
-
-import { colorize } from './ansi.js'
+import { applyAnsiStyle } from './ansi.js'
 import { type Capabilities, getCapabilities } from './env.js'
 import type { Spinner, SpinnerColor, SpinnerName, SpinnerOptions } from './index.js'
+import { requireString, sanitizeSegment, tryWrite } from './text.js'
 
 const IDLE = 0
 const SPINNING = 1
@@ -20,23 +18,19 @@ const SHOW_CURSOR = '\x1b[?25h'
 const CLEAR_LINE = '\x1b[2K\r'
 const DOTS_FRAMES = '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
 const LINE_FRAMES = String.raw`-\|/`
-const SPINNER_COLORS =
+const SPINNER_COLORS = new Set(
   'black red green yellow blue magenta cyan white blackBright redBright greenBright yellowBright blueBright magentaBright cyanBright whiteBright'.split(
     ' ',
-  )
+  ),
+)
 const STATUS = {
   0: [SUCCEEDED, '✔', '+', 'green'],
   1: [FAILED, '✖', 'x', 'red'],
   2: [WARNED, '⚠', '!', 'yellow'],
   3: [INFORMED, 'ℹ', 'i', 'blue'],
 } as const satisfies Record<TerminalAction, Status>
-const UNSAFE_TEXT = /[\x00-\x1f\x7f-\x9f\u061c\u200e\u200f\u2028-\u202e\u2066-\u2069]+/g
-function requireString(value: unknown, field: string): string {
-  if (typeof value !== 'string') throw new TypeError(`${field} must be a string`)
-  return value
-}
 function requireColor(value: unknown): SpinnerColor {
-  if (typeof value !== 'string' || !SPINNER_COLORS.includes(value)) {
+  if (typeof value !== 'string' || !SPINNER_COLORS.has(value)) {
     throw new TypeError('color must be a built-in spinner color')
   }
   return value as SpinnerColor
@@ -47,20 +41,11 @@ function requireSpinnerName(value: unknown): SpinnerName {
   return value
 }
 
-function requireOptions(value: SpinnerOptions): SpinnerOptions {
+export function requireOptions<T extends object>(value: T): T {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     throw new TypeError('options must be an object')
   }
   return value
-}
-
-function isTerminal(state: State): boolean {
-  return state >= SUCCEEDED
-}
-
-/** Sanitize user-controlled text only at the terminal rendering boundary. */
-export function sanitizeSegment(value: string): string {
-  return stripVTControlCharacters(value).replace(UNSAFE_TEXT, ' ').trim()
 }
 
 export function selectFrame(spinner: SpinnerName, unicode: boolean, index: number): string {
@@ -137,7 +122,7 @@ export function createSpinner(text = '', options: SpinnerOptions = {}): Spinner 
       return this
     },
     stop() {
-      if (isTerminal(state) || state === STOPPED) return this
+      if (state >= STOPPED) return this
 
       const wasSpinning = state === SPINNING
       const activeCapabilities = capabilities
@@ -146,7 +131,7 @@ export function createSpinner(text = '', options: SpinnerOptions = {}): Spinner 
       if (!wasSpinning) return this
 
       clearTimer()
-      if (activeCapabilities?.[1] === true) {
+      if (activeCapabilities?.[1]) {
         tryWrite(CLEAR_LINE)
         tryWrite(SHOW_CURSOR)
       }
@@ -173,7 +158,7 @@ export function createSpinner(text = '', options: SpinnerOptions = {}): Spinner 
   function terminal(action: TerminalAction, value?: string): void {
     // Validation must precede terminal idempotency to preserve the input contract.
     const nextText = value === undefined ? undefined : requireString(value, 'text')
-    if (isTerminal(state)) return
+    if (state >= SUCCEEDED) return
     if (nextText !== undefined) spinner.text = nextText
 
     const activeCapabilities = state === SPINNING && capabilities ? capabilities : getCapabilities()
@@ -201,15 +186,14 @@ export function createSpinner(text = '', options: SpinnerOptions = {}): Spinner 
 
   function renderFrame(activeCapabilities: Capabilities): string {
     const [colorEnabled, , unicodeEnabled] = activeCapabilities
-    return render(
-      colorize(spinner.color, selectFrame(spinnerName, unicodeEnabled, frameIndex), colorEnabled),
-    )
+    const symbol = selectFrame(spinnerName, unicodeEnabled, frameIndex)
+    return render(colorEnabled ? applyAnsiStyle(spinner.color, symbol) : symbol)
   }
 
   function renderStatus(action: TerminalAction, activeCapabilities: Capabilities): string {
     const [colorEnabled, , unicodeEnabled] = activeCapabilities
     const [symbol, color] = selectStatus(action, unicodeEnabled)
-    return render(colorize(color, symbol, colorEnabled))
+    return render(colorEnabled ? applyAnsiStyle(color, symbol) : symbol)
   }
 
   function render(symbol: string): string {
@@ -221,15 +205,6 @@ export function createSpinner(text = '', options: SpinnerOptions = {}): Spinner 
     ]
       .filter(Boolean)
       .join(' ')
-  }
-
-  function tryWrite(value: string): boolean {
-    try {
-      stderr.write(value)
-      return true
-    } catch {
-      return false
-    }
   }
 
   function clearTimer(): void {

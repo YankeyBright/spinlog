@@ -11,6 +11,8 @@ const phases = [
   ['phase1', 'check:phase1'],
   ['phase1Release', 'check:phase1:release'],
   ['phase2', 'check:phase2'],
+  ['phase3', 'check:phase3'],
+  ['phase4', 'check:phase4'],
 ]
 const summary = {}
 

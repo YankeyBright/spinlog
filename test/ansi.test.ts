@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { applyAnsiStyle, normalizeStyleNesting } from '../src/ansi.js'
 import * as spinlog from '../src/index.js'
 import * as styles from '../src/styles.js'
 
@@ -129,7 +130,35 @@ describe('ANSI styles', () => {
     )
   })
 
+  it('normalizes legacy and already-restored Node nesting without duplication', () => {
+    const foreground = '\x1b[31ma \x1b[34mb\x1b[31m c\x1b[39m'
+    const background = '\x1b[41ma \x1b[44mb\x1b[41m c\x1b[49m'
+    const modifier = '\x1b[1ma \x1b[2mb\x1b[22m\x1b[1m c\x1b[22m'
+    const resetBoundary = '\x1b[31ma \x1b[0mb\x1b[0m c\x1b[39m'
+
+    expect(normalizeStyleNesting('\x1b[31ma \x1b[34mb\x1b[39m c\x1b[39m')).toBe(foreground)
+    expect(normalizeStyleNesting(foreground)).toBe(foreground)
+    expect(normalizeStyleNesting('\x1b[41ma \x1b[44mb\x1b[49m c\x1b[49m')).toBe(background)
+    expect(normalizeStyleNesting(background)).toBe(background)
+    expect(normalizeStyleNesting('\x1b[1ma \x1b[2mb\x1b[22m c\x1b[22m')).toBe(modifier)
+    expect(normalizeStyleNesting(modifier)).toBe(modifier)
+    expect(normalizeStyleNesting(resetBoundary)).toBe(resetBoundary)
+  })
+
+  it('leaves non-SGR and incomplete values unchanged', () => {
+    expect(normalizeStyleNesting('plain')).toBe('plain')
+    expect(normalizeStyleNesting('\x1b[broken')).toBe('\x1b[broken')
+    expect(normalizeStyleNesting('\x1b[31mvalue')).toBe('\x1b[31mvalue')
+  })
+
   it('treats reset as a hard SGR boundary', () => {
     expect(spinlog.red(`a ${spinlog.reset('b')} c`)).toBe('\x1b[31ma \x1b[0mb\x1b[0m c\x1b[39m')
+  })
+
+  it('applies ANSI styling and normalizes nesting directly through applyAnsiStyle', () => {
+    expect(applyAnsiStyle('red', 'text')).toBe('\x1b[31mtext\x1b[39m')
+    expect(applyAnsiStyle('red', `a ${applyAnsiStyle('blue', 'b')} c`)).toBe(
+      '\x1b[31ma \x1b[34mb\x1b[31m c\x1b[39m',
+    )
   })
 })

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 5,
+  "schemaVersion": 6,
   "phase": 0,
   "identity": {
     "packageName": "spinlog",
@@ -10,8 +10,8 @@
     "visibility": "public"
   },
   "runtime": {
-    "engines": "^22.13.0 || ^24.0.0",
-    "supportedLtsMajors": [22, 24],
+    "engines": "^22.13.0 || ^24.0.0 || ^26.0.0",
+    "supportedMajors": [22, 24, 26],
     "moduleFormat": "esm",
     "browserSupport": false
   },
@@ -19,13 +19,15 @@
     "artifact": "dist/index.js",
     "compression": "gzip",
     "level": 9,
-    "maximumBytes": 2560
+    "maximumBytes": 2560,
+    "singleStyleMaximumBytes": 600
   },
   "publicApi": {
     "declaration": "specs/v1-public-api.d.ts",
     "stylesDeclaration": "specs/v1-styles-api.d.ts",
     "stylesSubpath": "spinlog/styles",
     "defaultExport": "spinlog",
+    "callableMethods": ["promise", "intro", "outro"],
     "typeExports": [
       "PromiseOptions",
       "Spinlog",
@@ -139,10 +141,28 @@
       "startSequence": ["render-frame", "newline"],
       "stopSequence": [],
       "terminalSequence": ["render-status", "newline"]
+    },
+    "flowMessages": {
+      "stream": "stderr",
+      "writesPerCall": 1,
+      "lineEnding": "\n",
+      "separator": "  ",
+      "markerColor": "blackBright",
+      "messageColor": "none",
+      "emptyMessage": "marker-only",
+      "unicodeSymbols": { "intro": "┌", "outro": "└" },
+      "asciiSymbols": { "intro": ">", "outro": "<" },
+      "stateless": true,
+      "paired": false,
+      "touchesSpinnerState": false,
+      "createsTimer": false,
+      "synchronousWriteFailure": "suppress",
+      "backpressure": "ignore",
+      "asynchronousErrors": "host-owned"
     }
   },
   "textSafety": {
-    "fields": ["text", "prefix", "suffix", "terminalText"],
+    "fields": ["text", "prefix", "suffix", "terminalText", "flowMessage"],
     "boundary": "render-only",
     "preserveAssignedValues": true,
     "stripVTControlCharacters": true,
@@ -184,7 +204,7 @@
   "inputValidation": {
     "factoryText": "string",
     "options": "non-null-non-array-object",
-    "textFields": ["text", "prefix", "suffix", "terminalText"],
+    "textFields": ["text", "prefix", "suffix", "terminalText", "flowMessage"],
     "spinnerNames": ["dots", "line"],
     "colors": "publicApi.SpinnerColor",
     "mutableFields": ["text", "color", "prefix", "suffix"],
@@ -192,6 +212,7 @@
     "invalidFactoryInput": "throw-TypeError-before-output",
     "invalidMutation": "throw-TypeError-and-preserve-value",
     "invalidTerminalOverride": "throw-TypeError-before-idempotency-state-mutation-timer-or-output",
+    "invalidFlowMessage": "throw-TypeError-before-capability-or-output",
     "invalidPromiseOptions": "reject-TypeError-before-start-or-input",
     "invalidStyleInput": "throw-TypeError-before-capability-detection"
   },
@@ -360,11 +381,6 @@
       "id": "prompts",
       "api": "spinlog.confirm() and spinlog.text()",
       "reason": "Raw input, cancellation, and cross-platform terminal behavior form a separate security boundary."
-    },
-    {
-      "id": "intro-outro",
-      "api": "spinlog.intro() and spinlog.outro()",
-      "reason": "Flow decoration is not required by the core color and spinner primitive."
     },
     {
       "id": "structured-logs",
