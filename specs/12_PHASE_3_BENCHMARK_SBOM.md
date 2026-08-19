@@ -40,7 +40,7 @@ Build SBOMs, benchmark results, candidate manifests, and baseline candidates liv
 
 `npm run reproducibility:check` performs a fast double build, SBOM generation, and pack comparison. Candidate verification repeats that proof in two clean temporary workspaces with independent `npm ci --ignore-scripts` installations at different absolute paths.
 
-Approved ESM JavaScript, declarations, source maps, both SBOMs, and the tarball must be byte-identical. `npm run candidate:manifest` then records the version, Git commit, Node/npm versions, file sizes, and SHA-256/SHA-512 digests for the candidate tarball and SBOMs.
+Corresponding artifacts from the independent builds must be byte-identical within each category: ESM JavaScript, declarations, source maps, the runtime SBOM, the build SBOM, and the tarball. Unlike categories are not compared with one another. `npm run candidate:manifest` then records the version, Git commit, Node/npm versions, file sizes, and SHA-256/SHA-512 digests for the candidate tarball and SBOMs.
 
 ```bash
 npm run reproducibility:check

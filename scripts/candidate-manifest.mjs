@@ -6,16 +6,26 @@ import { pathToFileURL } from 'node:url'
 import { digestFile, writeCanonicalJson } from './artifact-evidence.mjs'
 
 const ARTIFACT_DIRECTORY = 'artifacts/phase3'
+const GITHUB_COMMIT = /^[0-9a-f]{40}$/u
+const TRUSTED_GIT_EXECUTABLE = '/usr/bin/git'
 
-function gitCommit() {
-  return execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', windowsHide: true }).trim()
+export function requireGitHubCommit(environment = process.env) {
+  const commit = environment.GITHUB_SHA
+  if (environment.GITHUB_ACTIONS !== 'true' || !GITHUB_COMMIT.test(commit ?? '')) {
+    throw new Error('candidate evidence requires a GitHub Actions commit identity')
+  }
+  return commit
 }
 
 function requireCleanTrackedFiles() {
-  const changes = execFileSync('git', ['status', '--porcelain', '--untracked-files=no'], {
-    encoding: 'utf8',
-    windowsHide: true,
-  }).trim()
+  if (process.platform !== 'linux' || !existsSync(TRUSTED_GIT_EXECUTABLE)) {
+    throw new Error('candidate evidence requires the trusted Linux CI Git executable')
+  }
+  const changes = execFileSync(
+    TRUSTED_GIT_EXECUTABLE,
+    ['-c', 'core.fsmonitor=false', 'status', '--porcelain', '--untracked-files=no'],
+    { encoding: 'utf8', windowsHide: true },
+  ).trim()
   if (changes) throw new Error('candidate evidence requires a clean tracked Git checkout')
 }
 
@@ -48,7 +58,7 @@ export function writeCandidateManifest() {
     files: Object.fromEntries(
       Object.entries(files).map(([name, path]) => [name, { path, ...digestFile(path) }]),
     ),
-    gitCommit: gitCommit(),
+    gitCommit: requireGitHubCommit(),
     node: process.version,
     npm,
     schemaVersion: 1,

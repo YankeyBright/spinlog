@@ -7,7 +7,7 @@ This specification is the single source of truth for phase numbering across the 
 | 0 | Product and Spec Lock | Freeze the v1 boundary, deferred features, package identity, stream policy, and invariants. | `npm run check:phase0` |
 | 1 | Package Scaffolding | Establish the secure package shell, build and test tooling, size and package controls, and release preparation. | `npm run check:phase1` and `npm run check:phase1:release` |
 | 2 | Core Implementation and Testing | Implement the frozen v1 runtime and its behavior-driven tests together. | `npm run check:phase2` |
-| 3 | Benchmarking and SBOM Hardening | Prove size and performance and harden runtime inventory evidence. | `npm run check:phase3` |
+| 3 | Benchmarking and SBOM Hardening | Prove size and performance and harden runtime inventory evidence. | `npm run check:phase3` and `npm run verify:candidate` |
 | 4 | Documentation and Migration | Publish verified usage, audit, and migration guidance after runtime behavior exists. | Defined in the Phase 4 specification |
 | 5 | Trusted Release | Publish through OIDC and verify provenance, signatures, and release assets. | Defined in the Phase 5 specification |
 

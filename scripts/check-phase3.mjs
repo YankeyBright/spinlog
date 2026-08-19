@@ -29,7 +29,7 @@ const result = readObject('artifacts/phase3/benchmark.json', 'benchmark smoke ev
 if (result) failures.push(...validateBenchmarkResult(result, 'smoke'))
 
 if (failures.length > 0) {
-  for (const failure of [...new Set(failures)]) console.error(`phase3: ${failure}`)
+  for (const failure of new Set(failures)) console.error(`phase3: ${failure}`)
   process.exitCode = 1
 } else {
   console.log('phase3=pass')

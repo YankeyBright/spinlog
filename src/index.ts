@@ -75,8 +75,6 @@ import { createSpinner } from './spinner.js'
 
 // ── Type Definitions ────────────────────────────────────────────────────────
 
-type Style = (text: string) => string
-
 /** Built-in spinner animation names. */
 export type SpinnerName = 'dots' | 'line'
 
@@ -144,52 +142,52 @@ export interface Spinlog {
 // Consumers use these as:  import { bold, red } from 'spinlog'
 
 // Text decoration styles
-export const reset: Style = ansiReset
-export const bold: Style = ansiBold
-export const dim: Style = ansiDim
-export const italic: Style = ansiItalic
-export const underline: Style = ansiUnderline
-export const strikethrough: Style = ansiStrikethrough
+export const reset: (text: string) => string = ansiReset
+export const bold: (text: string) => string = ansiBold
+export const dim: (text: string) => string = ansiDim
+export const italic: (text: string) => string = ansiItalic
+export const underline: (text: string) => string = ansiUnderline
+export const strikethrough: (text: string) => string = ansiStrikethrough
 
 // Foreground colors (standard 8)
-export const black: Style = ansiBlack
-export const red: Style = ansiRed
-export const green: Style = ansiGreen
-export const yellow: Style = ansiYellow
-export const blue: Style = ansiBlue
-export const magenta: Style = ansiMagenta
-export const cyan: Style = ansiCyan
-export const white: Style = ansiWhite
+export const black: (text: string) => string = ansiBlack
+export const red: (text: string) => string = ansiRed
+export const green: (text: string) => string = ansiGreen
+export const yellow: (text: string) => string = ansiYellow
+export const blue: (text: string) => string = ansiBlue
+export const magenta: (text: string) => string = ansiMagenta
+export const cyan: (text: string) => string = ansiCyan
+export const white: (text: string) => string = ansiWhite
 
 // Foreground colors (bright variants)
-export const blackBright: Style = ansiBlackBright
-export const redBright: Style = ansiRedBright
-export const greenBright: Style = ansiGreenBright
-export const yellowBright: Style = ansiYellowBright
-export const blueBright: Style = ansiBlueBright
-export const magentaBright: Style = ansiMagentaBright
-export const cyanBright: Style = ansiCyanBright
-export const whiteBright: Style = ansiWhiteBright
+export const blackBright: (text: string) => string = ansiBlackBright
+export const redBright: (text: string) => string = ansiRedBright
+export const greenBright: (text: string) => string = ansiGreenBright
+export const yellowBright: (text: string) => string = ansiYellowBright
+export const blueBright: (text: string) => string = ansiBlueBright
+export const magentaBright: (text: string) => string = ansiMagentaBright
+export const cyanBright: (text: string) => string = ansiCyanBright
+export const whiteBright: (text: string) => string = ansiWhiteBright
 
 // Background colors (standard 8)
-export const bgBlack: Style = ansiBgBlack
-export const bgRed: Style = ansiBgRed
-export const bgGreen: Style = ansiBgGreen
-export const bgYellow: Style = ansiBgYellow
-export const bgBlue: Style = ansiBgBlue
-export const bgMagenta: Style = ansiBgMagenta
-export const bgCyan: Style = ansiBgCyan
-export const bgWhite: Style = ansiBgWhite
+export const bgBlack: (text: string) => string = ansiBgBlack
+export const bgRed: (text: string) => string = ansiBgRed
+export const bgGreen: (text: string) => string = ansiBgGreen
+export const bgYellow: (text: string) => string = ansiBgYellow
+export const bgBlue: (text: string) => string = ansiBgBlue
+export const bgMagenta: (text: string) => string = ansiBgMagenta
+export const bgCyan: (text: string) => string = ansiBgCyan
+export const bgWhite: (text: string) => string = ansiBgWhite
 
 // Background colors (bright variants)
-export const bgBlackBright: Style = ansiBgBlackBright
-export const bgRedBright: Style = ansiBgRedBright
-export const bgGreenBright: Style = ansiBgGreenBright
-export const bgYellowBright: Style = ansiBgYellowBright
-export const bgBlueBright: Style = ansiBgBlueBright
-export const bgMagentaBright: Style = ansiBgMagentaBright
-export const bgCyanBright: Style = ansiBgCyanBright
-export const bgWhiteBright: Style = ansiBgWhiteBright
+export const bgBlackBright: (text: string) => string = ansiBgBlackBright
+export const bgRedBright: (text: string) => string = ansiBgRedBright
+export const bgGreenBright: (text: string) => string = ansiBgGreenBright
+export const bgYellowBright: (text: string) => string = ansiBgYellowBright
+export const bgBlueBright: (text: string) => string = ansiBgBlueBright
+export const bgMagentaBright: (text: string) => string = ansiBgMagentaBright
+export const bgCyanBright: (text: string) => string = ansiBgCyanBright
+export const bgWhiteBright: (text: string) => string = ansiBgWhiteBright
 
 // ── Spinner Factory ─────────────────────────────────────────────────────────
 

@@ -4,94 +4,92 @@
 
 ```ts
 
-// Warning: (ae-forgotten-export) The symbol "Style" needs to be exported by the entry point v1-public-api.d.ts
-//
 // @public (undocumented)
-export const bgBlack: Style;
+export const bgBlack: (text: string) => string;
 
 // @public (undocumented)
-export const bgBlackBright: Style;
+export const bgBlackBright: (text: string) => string;
 
 // @public (undocumented)
-export const bgBlue: Style;
+export const bgBlue: (text: string) => string;
 
 // @public (undocumented)
-export const bgBlueBright: Style;
+export const bgBlueBright: (text: string) => string;
 
 // @public (undocumented)
-export const bgCyan: Style;
+export const bgCyan: (text: string) => string;
 
 // @public (undocumented)
-export const bgCyanBright: Style;
+export const bgCyanBright: (text: string) => string;
 
 // @public (undocumented)
-export const bgGreen: Style;
+export const bgGreen: (text: string) => string;
 
 // @public (undocumented)
-export const bgGreenBright: Style;
+export const bgGreenBright: (text: string) => string;
 
 // @public (undocumented)
-export const bgMagenta: Style;
+export const bgMagenta: (text: string) => string;
 
 // @public (undocumented)
-export const bgMagentaBright: Style;
+export const bgMagentaBright: (text: string) => string;
 
 // @public (undocumented)
-export const bgRed: Style;
+export const bgRed: (text: string) => string;
 
 // @public (undocumented)
-export const bgRedBright: Style;
+export const bgRedBright: (text: string) => string;
 
 // @public (undocumented)
-export const bgWhite: Style;
+export const bgWhite: (text: string) => string;
 
 // @public (undocumented)
-export const bgWhiteBright: Style;
+export const bgWhiteBright: (text: string) => string;
 
 // @public (undocumented)
-export const bgYellow: Style;
+export const bgYellow: (text: string) => string;
 
 // @public (undocumented)
-export const bgYellowBright: Style;
+export const bgYellowBright: (text: string) => string;
 
 // @public (undocumented)
-export const black: Style;
+export const black: (text: string) => string;
 
 // @public (undocumented)
-export const blackBright: Style;
+export const blackBright: (text: string) => string;
 
 // @public (undocumented)
-export const blue: Style;
+export const blue: (text: string) => string;
 
 // @public (undocumented)
-export const blueBright: Style;
+export const blueBright: (text: string) => string;
 
 // @public (undocumented)
-export const bold: Style;
+export const bold: (text: string) => string;
 
 // @public (undocumented)
-export const cyan: Style;
+export const cyan: (text: string) => string;
 
 // @public (undocumented)
-export const cyanBright: Style;
+export const cyanBright: (text: string) => string;
 
 // @public (undocumented)
-export const dim: Style;
+export const dim: (text: string) => string;
 
 // @public (undocumented)
-export const green: Style;
+export const green: (text: string) => string;
 
 // @public (undocumented)
-export const greenBright: Style;
+export const greenBright: (text: string) => string;
 
 // @public (undocumented)
-export const italic: Style;
+export const italic: (text: string) => string;
 
 // @public (undocumented)
-export const magenta: Style;
+export const magenta: (text: string) => string;
 
 // @public (undocumented)
-export const magentaBright: Style;
+export const magentaBright: (text: string) => string;
 
 // @public
 export interface PromiseOptions extends SpinnerOptions {
@@ -100,13 +98,13 @@ export interface PromiseOptions extends SpinnerOptions {
 }
 
 // @public (undocumented)
-export const red: Style;
+export const red: (text: string) => string;
 
 // @public (undocumented)
-export const redBright: Style;
+export const redBright: (text: string) => string;
 
 // @public (undocumented)
-export const reset: Style;
+export const reset: (text: string) => string;
 
 // @public
 export interface Spinlog {
@@ -175,25 +173,22 @@ export interface SpinnerOptions {
 }
 
 // @public (undocumented)
-export const strikethrough: Style;
+export const strikethrough: (text: string) => string;
 
 // @public (undocumented)
-type Style = (text: string) => string
+export const underline: (text: string) => string;
 
 // @public (undocumented)
-export const underline: Style;
+export const white: (text: string) => string;
 
 // @public (undocumented)
-export const white: Style;
+export const whiteBright: (text: string) => string;
 
 // @public (undocumented)
-export const whiteBright: Style;
+export const yellow: (text: string) => string;
 
 // @public (undocumented)
-export const yellow: Style;
-
-// @public (undocumented)
-export const yellowBright: Style;
+export const yellowBright: (text: string) => string;
 
 // (No @packageDocumentation comment for this package)
 

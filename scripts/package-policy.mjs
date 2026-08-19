@@ -1,5 +1,7 @@
 import { isDeepStrictEqual } from 'node:util'
 
+import { sortCanonicalText } from './canonical-order.mjs'
+
 export const APPROVED_SCRIPTS = Object.freeze({
   'api:check': 'node scripts/check-api-contract.mjs',
   'api:update': 'node scripts/check-api-contract.mjs --update',
@@ -58,12 +60,23 @@ const FORBIDDEN_LIFECYCLE =
 export function validatePackagePolicy(packageJson, rootEntries = []) {
   const failures = []
   const scripts = packageJson?.scripts ?? {}
-  const entry = packageJson?.exports?.['.']
-  const styles = packageJson?.exports?.['./styles']
 
+  validateRuntimeDependencies(packageJson, failures)
+  validatePackageIdentity(packageJson, failures)
+  validateExports(packageJson?.exports, failures)
+  validateScripts(scripts, failures)
+  validateNativeMetadata(packageJson, rootEntries, failures)
+  validateDevelopmentPins(packageJson?.devDependencies, failures)
+  return [...new Set(failures)]
+}
+
+function validateRuntimeDependencies(packageJson, failures) {
   for (const field of ['dependencies', 'optionalDependencies', 'peerDependencies']) {
     if (Object.keys(packageJson?.[field] ?? {}).length > 0) failures.push(`${field} must be empty`)
   }
+}
+
+function validatePackageIdentity(packageJson, failures) {
   if (packageJson?.type !== 'module') failures.push('type must be module')
   if (packageJson?.sideEffects !== false) failures.push('sideEffects must be false')
   if (packageJson?.engines?.node !== '^22.13.0 || ^24.0.0') {
@@ -78,6 +91,11 @@ export function validatePackagePolicy(packageJson, rootEntries = []) {
   if (!isDeepStrictEqual(packageJson?.files, APPROVED_FILES)) {
     failures.push('files must contain the approved publish allowlist')
   }
+}
+
+function validateExports(exports, failures) {
+  const entry = exports?.['.']
+  const styles = exports?.['./styles']
   if (
     entry?.types !== './dist/index.d.ts' ||
     entry?.import !== './dist/index.js' ||
@@ -85,10 +103,13 @@ export function validatePackagePolicy(packageJson, rootEntries = []) {
     styles?.types !== './dist/styles.d.ts' ||
     styles?.import !== './dist/styles.js' ||
     'require' in (styles ?? {}) ||
-    !isDeepStrictEqual(Object.keys(packageJson?.exports ?? {}).sort(), ['.', './styles'])
+    !isDeepStrictEqual(sortCanonicalText(Object.keys(exports ?? {})), ['.', './styles'])
   ) {
     failures.push('exports must expose exactly the two ESM entrypoints and declarations')
   }
+}
+
+function validateScripts(scripts, failures) {
   if (!isDeepStrictEqual(scripts, APPROVED_SCRIPTS)) {
     failures.push('scripts must exactly match the approved command map')
   }
@@ -98,15 +119,19 @@ export function validatePackagePolicy(packageJson, rootEntries = []) {
       failures.push(`arbitrary npm hook is forbidden: ${name}`)
     }
   }
+}
+
+function validateNativeMetadata(packageJson, rootEntries, failures) {
   for (const name of ['gypfile', 'binary', 'os', 'cpu', 'libc']) {
     if (name in (packageJson ?? {})) failures.push(`native-install metadata is forbidden: ${name}`)
   }
   if (rootEntries.includes('binding.gyp')) failures.push('binding.gyp is forbidden')
-  for (const [name, version] of Object.entries(packageJson?.devDependencies ?? {})) {
+}
+
+function validateDevelopmentPins(devDependencies, failures) {
+  for (const [name, version] of Object.entries(devDependencies ?? {})) {
     if (!/^\d+\.\d+\.\d+$/.test(version)) {
       failures.push(`dev dependency must be exact-pinned: ${name}`)
     }
   }
-
-  return [...new Set(failures)]
 }

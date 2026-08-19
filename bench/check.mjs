@@ -10,8 +10,7 @@ const failures = []
 const warnings = []
 const scenarios = Array.isArray(result.scenarios) ? result.scenarios : []
 
-failures.push(...validateBenchmarkResult(result, 'full'))
-failures.push(...validateBaseline(baseline))
+failures.push(...validateBenchmarkResult(result, 'full'), ...validateBaseline(baseline))
 if (result.platform !== 'linux' || !String(result.node ?? '').startsWith('v24.')) {
   failures.push('candidate benchmark must run on Node 24 Linux')
 }

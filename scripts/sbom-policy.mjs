@@ -1,5 +1,7 @@
 import { isDeepStrictEqual } from 'node:util'
 
+import { compareCanonicalText } from './canonical-order.mjs'
+
 const REPRODUCIBLE_PROPERTY = Object.freeze({ name: 'cdx:reproducible', value: 'true' })
 
 function canonicalize(value) {
@@ -7,7 +9,7 @@ function canonicalize(value) {
   if (value !== null && typeof value === 'object') {
     return Object.fromEntries(
       Object.entries(value)
-        .sort(([left], [right]) => left.localeCompare(right))
+        .sort(([left], [right]) => compareCanonicalText(left, right))
         .map(([key, entry]) => [key, canonicalize(entry)]),
     )
   }
@@ -43,7 +45,7 @@ function normalizeMetadata(bom, packageJson) {
     ? bom.metadata.properties.filter(({ name }) => name !== REPRODUCIBLE_PROPERTY.name)
     : []
   bom.metadata.properties = [...properties, REPRODUCIBLE_PROPERTY].sort((left, right) =>
-    left.name.localeCompare(right.name),
+    compareCanonicalText(left.name, right.name),
   )
   bom.metadata.tools = [{ name: 'cli', vendor: 'npm' }]
   bom.metadata.component = componentIdentity(packageJson)
@@ -53,10 +55,10 @@ function normalizeDependencies(dependencies, rootReference) {
   if (!Array.isArray(dependencies)) return []
   return dependencies
     .map(({ dependsOn = [], ref }) => ({
-      dependsOn: [...dependsOn].sort(),
+      dependsOn: [...dependsOn].sort(compareCanonicalText),
       ref: ref === rootReference ? rootReference : ref,
     }))
-    .sort((left, right) => left.ref.localeCompare(right.ref))
+    .sort((left, right) => compareCanonicalText(left.ref, right.ref))
 }
 
 function validateIdentity(bom, packageJson) {
@@ -112,10 +114,10 @@ export function normalizeSbom(input, packageJson) {
         .map(({ dependsOn = [], ref }) => ({
           dependsOn: [...dependsOn]
             .map((dependency) => (dependency === sourceReference ? reference : dependency))
-            .sort(),
+            .sort(compareCanonicalText),
           ref: ref === sourceReference ? reference : ref,
         }))
-        .sort((left, right) => String(left.ref).localeCompare(String(right.ref)))
+        .sort((left, right) => compareCanonicalText(left.ref, right.ref))
     : []
   return canonicalize(bom)
 }
@@ -127,7 +129,7 @@ export function normalizeBuildSbom(input, packageJson) {
   normalizeMetadata(bom, packageJson)
   bom.components = Array.isArray(bom.components)
     ? [...bom.components].sort((left, right) =>
-        String(left['bom-ref']).localeCompare(String(right['bom-ref'])),
+        compareCanonicalText(left['bom-ref'], right['bom-ref']),
       )
     : []
   bom.dependencies = normalizeDependencies(bom.dependencies, reference)
@@ -181,15 +183,15 @@ export function validateBuildSbom(bom, packageJson) {
   const reference = `${packageJson.name}@${packageJson.version}`
   const components = Array.isArray(bom.components) ? bom.components : []
   const dependencies = Array.isArray(bom.dependencies) ? bom.dependencies : []
-  const root = dependencies.find((entry) => entry?.ref === reference)
+  const hasRoot = dependencies.some((entry) => entry?.ref === reference)
 
   if (components.length === 0) failures.push('build SBOM must include development components')
-  if (!root) failures.push('build SBOM must include the root dependency graph')
+  if (!hasRoot) failures.push('build SBOM must include the root dependency graph')
   if (
     JSON.stringify(components) !==
     JSON.stringify(
       [...components].sort((left, right) =>
-        String(left?.['bom-ref']).localeCompare(String(right?.['bom-ref'])),
+        compareCanonicalText(left?.['bom-ref'], right?.['bom-ref']),
       ),
     )
   ) {

@@ -263,11 +263,23 @@ describe('runtime source policy', () => {
       'stdout write',
       { path: 'spinner.ts', text: "import { stdout } from 'node:process'\nstdout.write('unsafe')" },
     ],
+    ['bare Node built-in import', { path: 'spinner.ts', text: "import 'node:fs'" }],
+    ['bare process import', { path: 'spinner.ts', text: "import 'node:process'" }],
   ])('rejects %s before accepting a changed architecture', (_name, hostile) => {
     const mutated = sources.map((source) => (source.path === hostile.path ? hostile : source))
     if (!mutated.some((source) => source.path === hostile.path)) mutated.push(hostile)
 
     expect(validateRuntimePolicy(mutated)).not.toEqual([])
+  })
+
+  it('accepts the approved process import with a trailing semicolon', () => {
+    const semicolonTerminated = sources.map((source) =>
+      source.path === 'spinner.ts'
+        ? { ...source, text: "import { stderr } from 'node:process';" }
+        : source,
+    )
+
+    expect(validateRuntimePolicy(semicolonTerminated)).toEqual([])
   })
 
   it('rejects a symlinked runtime module', () => {
@@ -310,6 +322,11 @@ describe('workflow policy', () => {
     [
       'OIDC permission',
       (source: string) => source.replace('contents: read', 'contents: read\n  id-token: write'),
+    ],
+    [
+      'credential reference in a value',
+      (source: string) =>
+        source.replace('env:\n', `env:\n  UNRELATED_VALUE: \${{ secrets.NPM_TOKEN }}\n`),
     ],
     [
       'publication command',

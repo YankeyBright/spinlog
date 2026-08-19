@@ -19,7 +19,7 @@ const HIDE_CURSOR = '\x1b[?25l'
 const SHOW_CURSOR = '\x1b[?25h'
 const CLEAR_LINE = '\x1b[2K\r'
 const DOTS_FRAMES = '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
-const LINE_FRAMES = '-\\|/'
+const LINE_FRAMES = String.raw`-\|/`
 const SPINNER_COLORS =
   'black red green yellow blue magenta cyan white blackBright redBright greenBright yellowBright blueBright magentaBright cyanBright whiteBright'.split(
     ' ',
@@ -146,9 +146,8 @@ export function createSpinner(text = '', options: SpinnerOptions = {}): Spinner 
       if (!wasSpinning) return this
 
       clearTimer()
-      if (activeCapabilities?.[1] === true && !tryWrite(CLEAR_LINE)) {
-        tryWrite(SHOW_CURSOR)
-      } else if (activeCapabilities?.[1] === true) {
+      if (activeCapabilities?.[1] === true) {
+        tryWrite(CLEAR_LINE)
         tryWrite(SHOW_CURSOR)
       }
       return this

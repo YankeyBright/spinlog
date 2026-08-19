@@ -64,6 +64,33 @@ describe('benchmark statistics', () => {
     )
   })
 
+  it('reports missing scenario statistics without throwing', () => {
+    const invalid = benchmarkResult(1)
+    delete (invalid.scenarios[0] as { statistics?: unknown }).statistics
+
+    expect(validateBenchmarkResult(invalid, 'full')).toContain(
+      `benchmark scenario statistics are invalid or unstable: ${invalid.scenarios[0]?.name}`,
+    )
+  })
+
+  it('rejects summary statistics that do not match their samples', () => {
+    const invalid = benchmarkResult(1)
+    invalid.scenarios[0].statistics.median += 1
+
+    expect(validateBenchmarkResult(invalid, 'full')).toContain(
+      `benchmark scenario statistics are invalid or unstable: ${invalid.scenarios[0].name}`,
+    )
+  })
+
+  it('reports malformed scenario entries as validation failures', () => {
+    const invalid = benchmarkResult(1)
+    invalid.scenarios[0] = null as unknown as (typeof invalid.scenarios)[number]
+
+    expect(validateBenchmarkResult(invalid, 'full')).toContain(
+      'benchmark must contain the six ordered Phase 3 scenarios exactly once',
+    )
+  })
+
   it('aggregates five uniquely identified CI artifacts into a reviewable baseline', () => {
     const baseline = aggregateBaseline(
       Array.from({ length: 5 }, (_, index) => {

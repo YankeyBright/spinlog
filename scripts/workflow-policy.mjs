@@ -1,5 +1,7 @@
 import { parseDocument } from 'yaml'
 
+import { sortCanonicalText } from './canonical-order.mjs'
+
 const PINNED_ACTION = /^[\w.-]+\/[\w.-]+@[a-f0-9]{40}$/
 const ALLOWED_ACTIONS = new Set([
   'actions/checkout',
@@ -71,8 +73,13 @@ function validateReadOnly(workflow, name, failures) {
   }
   const restricted = findKeys(workflow, new Set(['id-token', 'environment', 'registry-url']))
   if (restricted.length > 0) failures.push(`${name} contains restricted release configuration`)
-  const credentials = findKeys(workflow, new Set(['NPM_TOKEN', 'NODE_AUTH_TOKEN', 'GITHUB_TOKEN']))
-  if (credentials.length > 0) failures.push(`${name} contains publication credentials`)
+  const credentials = new Set(['NPM_TOKEN', 'NODE_AUTH_TOKEN', 'GITHUB_TOKEN'])
+  if (
+    findKeys(workflow, credentials).length > 0 ||
+    /\b(?:NPM_TOKEN|NODE_AUTH_TOKEN|GITHUB_TOKEN)\b/.test(JSON.stringify(workflow))
+  ) {
+    failures.push(`${name} contains publication credentials`)
+  }
 }
 
 function validateCi(workflow, failures) {
@@ -158,7 +165,7 @@ export function parseWorkflow(source, name) {
 
 export function validateWorkflowPolicy(sources) {
   const failures = []
-  if (!equals(Object.keys(sources).sort(), WORKFLOW_NAMES)) {
+  if (!equals(sortCanonicalText(Object.keys(sources)), WORKFLOW_NAMES)) {
     failures.push('pre-Phase-5 workflows must be exactly ci.yml and release-readiness.yml')
     return failures
   }
