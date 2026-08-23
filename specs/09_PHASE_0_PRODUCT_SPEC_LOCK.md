@@ -16,20 +16,20 @@ Freeze the exact v1 product surface and behavior that every later phase must pre
 
 ## Frozen MVP Summary
 
-- v1 includes ANSI-16 named style helpers, one spinner with `start`, `stop`, `succeed`, `fail`, `warn`, and `info`, live mutation of `text`, `color`, `prefix`, and `suffix`, both frozen `spinlog.promise()` overloads, and stateless `spinlog.intro()`/`spinlog.outro()` flow messages.
+- v1 includes ANSI-16 named style helpers, one interactive terminal lease, one spinner with `start`, `stop`, `log`, `succeed`, `fail`, `warn`, `info`, and `Symbol.dispose`, live mutation of `text`, `color`, `prefix`, and `suffix`, static modes, terminal-mode overrides, both frozen `spinlog.promise()` overloads, and coordinated `spinlog.intro()`/`spinlog.outro()` flow messages.
 - The package is ESM-only, supports Node 22, Node 24, and Node 26, and has zero runtime, optional, and peer dependencies.
 - Style helpers are side-effect-free and stream-free. Spinner frames, statuses, intro lines, and outro lines write only to `stderr`; v1 never writes to `stdout`.
 - User text is sanitized only at the rendering boundary, active write failure moves the current cycle to `stopped`, and terminal state never depends on cosmetic I/O success.
-- Color precedence is frozen highest-to-lowest as `NO_COLOR`, `NODE_DISABLE_COLORS`, `FORCE_COLOR`, CI, dumb terminal, test mode, and stderr TTY capability.
+- Named capabilities are frozen as SGR, cursor control, color, emphasis, animation, and Unicode. Automatic animation requires a conservative terminal profile after highest-to-lowest color precedence: `NO_COLOR`, `NODE_DISABLE_COLORS`, `FORCE_COLOR`, CI, dumb terminal, test mode, stderr TTY capability, and profile recognition. Explicit color-disable variables affect colors only on known capable interactive terminals; `terminal: 'interactive'` is an informed TTY-only override that never enables color itself.
 - The library installs no process signal or exit listener and never terminates the host process.
-- `dist/index.js` may not exceed 2,560 bytes after gzip level 9.
+- `dist/index.js` may not exceed 4,096 bytes after gzip level 9.
 - Every feature outside this boundary is either listed with exact rationale in `specs/16_POST_MVP_FEATURES.md` or declared a permanent non-goal in the behavior contract.
 
 ## Size Budget Decision
 
-Earlier pre-runtime budgets were retired before publication. After intro/outro, shared terminal-text validation, cross-Node nested-style normalization, a dedicated style-only entrypoint, direct esbuild output, and linked production source maps were finalized, the root artifact measured 2,552 bytes with Node gzip level 9. The 2,560-byte ceiling preserves every frozen API, terminal-safety, validation, stream, and host-ownership guarantee while retaining 8 bytes of explicit headroom. This is a versioned contract revision, not a checker bypass: the machine contract, independent size controls, mutation tests, and all normative documentation enforce the same ceiling.
+The original micro-budget was retired before publication. Coordinated flow rendering, conservative width safety, static secondary spinners, and disposal require a realistic 4,096-byte ceiling. This is a versioned contract revision, not a checker bypass: the machine contract, independent size controls, mutation tests, and all normative documentation enforce the same ceiling.
 
-The esbuild single-style consumer proof measures 550 gzip bytes after cross-Node nesting normalization. Schema v6 freezes a separate 600-byte tree-shaken style ceiling, retaining 50 bytes of headroom without weakening style behavior.
+The esbuild single-style consumer proof remains capped at 600 gzip bytes. Schema v8 preserves this separate tree-shaken style ceiling without weakening style behavior.
 
 ## Explicit Non-Goals
 

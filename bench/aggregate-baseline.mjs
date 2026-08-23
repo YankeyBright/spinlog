@@ -15,14 +15,52 @@ function sha256(contents) {
   return createHash('sha256').update(contents).digest('hex')
 }
 
+function parseRecords(inputs) {
+  return inputs.map(({ contents, path }) => {
+    try {
+      return { digest: sha256(contents), path, result: JSON.parse(contents) }
+    } catch {
+      throw new Error(`baseline input must contain valid JSON: ${path}`)
+    }
+  })
+}
+
+function validateIdentity(records) {
+  const [first] = records
+  const identity = first.result?.provenance
+  const slots = records.map(({ result }) => Number(result?.provenance?.slot))
+  const hasOneIdentity = records.every(
+    ({ result }) =>
+      result?.node === first.result?.node &&
+      result?.provenance?.commit === identity?.commit &&
+      result?.provenance?.githubRunId === identity?.githubRunId &&
+      result?.provenance?.githubRunAttempt === identity?.githubRunAttempt,
+  )
+
+  if (
+    !/^[0-9a-f]{40}$/u.test(identity?.commit ?? '') ||
+    !/^\d+$/u.test(identity?.githubRunId ?? '') ||
+    !/^\d+$/u.test(identity?.githubRunAttempt ?? '') ||
+    !hasOneIdentity ||
+    JSON.stringify([...slots].sort((left, right) => left - right)) !==
+      JSON.stringify([1, 2, 3, 4, 5])
+  ) {
+    throw new Error(
+      'baseline inputs must come from five matrix slots in one commit and workflow attempt',
+    )
+  }
+  if (new Set(records.map(({ digest }) => digest)).size !== 5) {
+    throw new Error('baseline inputs must be five unique artifacts')
+  }
+
+  return { identity, slots }
+}
+
 export function aggregateBaseline(inputs) {
   if (inputs.length !== 5) throw new Error('provide exactly five benchmark inputs')
 
-  const records = inputs.map(({ contents, path }) => ({
-    digest: sha256(contents),
-    path,
-    result: JSON.parse(contents),
-  }))
+  const records = parseRecords(inputs)
+  const { identity } = validateIdentity(records)
   const failures = records.flatMap(({ path, result }) =>
     validateBenchmarkResult(result, 'full').map((failure) => `${path}: ${failure}`),
   )
@@ -34,29 +72,6 @@ export function aggregateBaseline(inputs) {
   }
 
   const [first] = records
-  const identity = first.result.provenance
-  const slots = records.map(({ result }) => Number(result.provenance?.slot))
-  if (
-    !/^[0-9a-f]{40}$/u.test(identity?.commit ?? '') ||
-    !/^\d+$/u.test(identity?.githubRunId ?? '') ||
-    !/^\d+$/u.test(identity?.githubRunAttempt ?? '') ||
-    records.some(
-      ({ result }) =>
-        result.node !== first.result.node ||
-        result.provenance?.commit !== identity.commit ||
-        result.provenance?.githubRunId !== identity.githubRunId ||
-        result.provenance?.githubRunAttempt !== identity.githubRunAttempt,
-    ) ||
-    JSON.stringify([...slots].sort((left, right) => left - right)) !==
-      JSON.stringify([1, 2, 3, 4, 5])
-  ) {
-    throw new Error(
-      'baseline inputs must come from five matrix slots in one commit and workflow attempt',
-    )
-  }
-  if (new Set(records.map(({ digest }) => digest)).size !== 5) {
-    throw new Error('baseline inputs must be five unique artifacts')
-  }
 
   const scenarios = Object.fromEntries(
     BENCHMARK_SCENARIOS.map((name) => {

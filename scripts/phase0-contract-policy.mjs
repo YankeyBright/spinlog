@@ -135,6 +135,39 @@ const EXPECTED_RENDERING = Object.freeze({
     stopSequence: [],
     terminalSequence: ['render-status', 'newline'],
   },
+  staticModes: {
+    default: 'symbol',
+    options: ['symbol', 'text', 'silent'],
+    appliesFor: ['non-interactive', 'lease-unavailable', 'terminal-static', 'width-demotion'],
+    symbol: {
+      startSequence: ['render-frame', 'newline'],
+      terminalSequence: ['render-status', 'newline'],
+    },
+    text: {
+      startSequence: ['render-text', 'newline'],
+      terminalSequence: ['render-text', 'newline'],
+      color: 'none',
+      status: 'none',
+    },
+    silent: {
+      startSequence: [],
+      terminalSequence: [],
+      cursorRestoreAfterDemotion: true,
+    },
+  },
+  log: {
+    stream: 'stderr',
+    states: 'all',
+    return: 'same-instance',
+    validation: 'string-before-output',
+    sanitization: 'render-boundary',
+    output: 'one-permanent-newline-terminated-line',
+    activeFrameCoordination: 'clear-write-redraw',
+    changesState: false,
+    changesTimer: false,
+    backpressure: 'ignore',
+    synchronousWriteFailure: 'suppress',
+  },
   flowMessages: {
     stream: 'stderr',
     writesPerCall: 1,
@@ -148,15 +181,39 @@ const EXPECTED_RENDERING = Object.freeze({
     stateless: true,
     paired: false,
     touchesSpinnerState: false,
+    activeFrameCoordination: 'clear-write-redraw',
     createsTimer: false,
     synchronousWriteFailure: 'suppress',
     backpressure: 'ignore',
     asynchronousErrors: 'host-owned',
   },
+  interactiveLease: {
+    scope: 'process',
+    activeSpinnerLimit: 1,
+    secondarySpinner: 'static',
+    release: ['stop', 'terminal', 'dispose', 'write-failure'],
+  },
+  widthSafety: {
+    source: 'stderr.columns',
+    minimumColumns: 3,
+    asciiCellWidth: 1,
+    nonAsciiCellWidth: 2,
+    maximumWidth: 'less-than-columns-minus-one',
+    unavailable: 'static',
+    overflow: 'static',
+    resize: 'demote-to-static',
+    mutation: 'demote-to-static',
+  },
+  renderCache: {
+    sanitization: 'lazy-render-boundary',
+    fields: ['text', 'prefix', 'suffix'],
+    colorMutation: 'reuse-text-snapshot',
+    width: 'cached-conservative',
+  },
 })
 
 const EXPECTED_TEXT_SAFETY = Object.freeze({
-  fields: ['text', 'prefix', 'suffix', 'terminalText', 'flowMessage'],
+  fields: ['text', 'prefix', 'suffix', 'terminalText', 'flowMessage', 'logMessage'],
   boundary: 'render-only',
   preserveAssignedValues: true,
   stripVTControlCharacters: true,
@@ -174,6 +231,7 @@ const EXPECTED_TEXT_SAFETY = Object.freeze({
 })
 
 const EXPECTED_ENVIRONMENT = Object.freeze({
+  capabilityShape: ['sgr', 'cursor', 'color', 'emphasis', 'animation', 'unicode'],
   colorPrecedenceDirection: 'highest-to-lowest',
   colorPrecedence: [
     'NO_COLOR',
@@ -183,24 +241,51 @@ const EXPECTED_ENVIRONMENT = Object.freeze({
     'TERM=dumb',
     'NODE_ENV=test',
     'stderr.isTTY',
+    'known-terminal-profile',
   ],
-  noColor: 'non-empty-disables',
+  noColor: 'non-empty-disables-colors-only',
   noColorOverridesForceColor: true,
-  nodeDisableColors: 'non-empty-disables',
+  nodeDisableColors: 'non-empty-disables-colors-only',
   nodeDisableColorsOverridesForceColor: true,
   forceColorFalseValues: ['0', 'false'],
   forceColorOtherDefinedValues: 'enable',
   forceColorEnablesAnimation: false,
+  forceColorEnablesEmphasis: true,
+  interactiveEmphasisWhenColorDisabled: true,
+  nonInteractiveEmphasis: 'disabled',
   ci: 'non-empty-disables',
   termDumb: 'exact-disables',
   nodeEnvTest: 'exact-disables',
   unicodeWindowsHeuristic: 'WT_SESSION-required',
+  cursorTerminalPrefixes: [
+    'xterm',
+    'screen',
+    'tmux',
+    'rxvt',
+    'linux',
+    'cygwin',
+    'st',
+    'alacritty',
+    'kitty',
+    'wezterm',
+    'foot',
+    'konsole',
+    'vte',
+    'eterm',
+    'putty',
+  ],
+  terminalProfileMatch: 'ascii-lowercase-exact-or-dash-suffix',
+  unknownTerminalProfile: 'auto-static-and-no-default-sgr',
+  limitedTerminalProfiles: ['vt100', 'vt220'],
+  terminalModes: ['auto', 'static', 'interactive'],
+  staticTerminalMode: 'disables-animation',
+  interactiveTerminalMode: 'tty-and-not-dumb-overrides-profile-ci-test-only',
 })
 
 const EXPECTED_INPUT_VALIDATION = Object.freeze({
   factoryText: 'string',
   options: 'non-null-non-array-object',
-  textFields: ['text', 'prefix', 'suffix', 'terminalText', 'flowMessage'],
+  textFields: ['text', 'prefix', 'suffix', 'terminalText', 'flowMessage', 'logMessage'],
   spinnerNames: ['dots', 'line'],
   colors: 'publicApi.SpinnerColor',
   mutableFields: ['text', 'color', 'prefix', 'suffix'],
@@ -209,6 +294,11 @@ const EXPECTED_INPUT_VALIDATION = Object.freeze({
   invalidMutation: 'throw-TypeError-and-preserve-value',
   invalidTerminalOverride: 'throw-TypeError-before-idempotency-state-mutation-timer-or-output',
   invalidFlowMessage: 'throw-TypeError-before-capability-or-output',
+  staticModes: ['symbol', 'text', 'silent'],
+  terminalModes: ['auto', 'static', 'interactive'],
+  invalidStaticMode: 'throw-TypeError-before-output',
+  invalidTerminalMode: 'throw-TypeError-before-output',
+  invalidLogMessage: 'throw-TypeError-before-output',
   invalidPromiseOptions: 'reject-TypeError-before-start-or-input',
   invalidStyleInput: 'throw-TypeError-before-capability-detection',
 })
@@ -306,7 +396,8 @@ const EXPECTED_DEFERRED = Object.freeze([
   {
     id: 'concurrent-spinners',
     api: 'multiple active spinners',
-    reason: 'Shared-line coordination belongs with the deferred task-group renderer.',
+    reason:
+      'Only one interactive spinner owns the terminal lease; multi-row task coordination remains separate.',
   },
   {
     id: 'advanced-colors',
@@ -376,7 +467,9 @@ export function renderPublicApiDeclaration(contract) {
     .map((name) => `export declare const ${name}: ${styleSignature}`)
     .join('\n')
 
-  return `/** Built-in spinner animation names. */
+  return `/// <reference lib="esnext.disposable" />
+
+/** Built-in spinner animation names. */
 export type SpinnerName = 'dots' | 'line'
 
 /** ANSI-16 foreground colors available to spinner frames. */
@@ -389,6 +482,8 @@ export interface SpinnerOptions {
   prefix?: string
   suffix?: string
   spinner?: SpinnerName
+  static?: 'symbol' | 'text' | 'silent'
+  terminal?: 'auto' | 'static' | 'interactive'
 }
 
 /** Options used by the \`Spinlog.promise\` overloads. */
@@ -406,6 +501,10 @@ export interface Spinner {
   start(): this
   /** Stops an active cycle and restores owned terminal state. */
   stop(): this
+  /** Writes a permanent sanitized stderr line without changing spinner lifecycle state. */
+  log(message: string): this
+  /** Releases terminal state when a \`using\` declaration leaves scope. */
+  [Symbol.dispose](): void
   /** Persists the first successful terminal result for the current cycle. */
   succeed(text?: string): this
   /** Persists the first failed terminal result for the current cycle. */
@@ -594,10 +693,17 @@ function validateDocuments(documents, contract, failures) {
       'specs/v1-behavior.json',
       '`^22.13.0 || ^24.0.0 || ^26.0.0`',
     ],
-    'specs/05_TERMINAL_SPEC.md': ['never writes to `stdout`', 'installs no process signal'],
+    'specs/05_TERMINAL_SPEC.md': [
+      'never writes to `stdout`',
+      'installs no process signal',
+      'SGR, cursor control, color, emphasis, animation, and Unicode are separate named capability decisions.',
+      'explicit `reset`, `bold`, `dim`, `italic`, `underline`, and `strikethrough` remain available when color is disabled',
+      'An immutable sanitized snapshot and conservative cell width are created lazily',
+      "Only spinlog's own flow messages and spinner.log() writes coordinate with an active frame",
+    ],
     'specs/09_PHASE_0_PRODUCT_SPEC_LOCK.md': [
       'Node 22, Node 24, and Node 26',
-      '2,560 bytes',
+      '4,096 bytes',
       'only to `stderr`',
     ],
   })) {
@@ -655,8 +761,8 @@ export function validatePhase0Contract({
     'contract',
     failures,
   )
-  require(contract.schemaVersion === 6 &&
-    contract.phase === 0, 'contract version and phase must be 6 and 0', failures)
+  require(contract.schemaVersion === 9 &&
+    contract.phase === 0, 'contract version and phase must be 9 and 0', failures)
   requireExact(
     contract.identity,
     {
@@ -687,7 +793,7 @@ export function validatePhase0Contract({
       artifact: 'dist/index.js',
       compression: 'gzip',
       level: 9,
-      maximumBytes: 2560,
+      maximumBytes: 4096,
       singleStyleMaximumBytes: 600,
     },
     'size',
@@ -701,6 +807,8 @@ export function validatePhase0Contract({
       stylesSubpath: 'spinlog/styles',
       defaultExport: 'spinlog',
       callableMethods: ['promise', 'intro', 'outro'],
+      spinnerMethods: ['start', 'stop', 'log', 'Symbol.dispose', 'succeed', 'fail', 'warn', 'info'],
+      spinnerDisposal: 'Symbol.dispose',
       typeExports: TYPE_EXPORTS,
       styleExports: STYLE_EXPORTS,
     },
@@ -709,7 +817,16 @@ export function validatePhase0Contract({
   )
   requireExact(
     contract.defaults,
-    { text: '', color: 'cyan', prefix: '', suffix: '', spinner: 'dots', intervalMs: 80 },
+    {
+      text: '',
+      color: 'cyan',
+      prefix: '',
+      suffix: '',
+      spinner: 'dots',
+      static: 'symbol',
+      terminal: 'auto',
+      intervalMs: 80,
+    },
     'defaults',
     failures,
   )
@@ -729,6 +846,13 @@ export function validatePhase0Contract({
       nestedStylesRestoreParent: true,
       resetBehavior: 'hard-reset-boundary',
       resetRestoresParent: false,
+      metadata: {
+        singleSourceOfTruth: true,
+        colorClassification: ['foreground', 'background'],
+        emphasisClassification: ['reset', 'modifiers'],
+        spinnerColorValidation: 'foreground-only',
+        nestedRestore: 'metadata-driven',
+      },
       capabilityStream: 'stderr',
       escapePrefix: '\u001b[',
       escapeSuffix: 'm',
@@ -746,6 +870,7 @@ export function validatePhase0Contract({
       globalStreamErrorListeners: false,
       applicationOwnsShutdown: true,
       explicitMethodsRestoreCursor: true,
+      disposalRestoresCursor: true,
     },
     'processOwnership',
     failures,
@@ -788,9 +913,9 @@ export function validatePhase0Contract({
   require(contract.size?.artifact === 'dist/index.js' &&
     contract.size?.compression === 'gzip' &&
     contract.size?.level === 9 &&
-    contract.size?.maximumBytes === 2560 &&
+    contract.size?.maximumBytes === 4096 &&
     contract.size?.singleStyleMaximumBytes ===
-      600, 'size contract must enforce 2,560 root bytes and 600 single-style bytes using gzip level 9', failures)
+      600, 'size contract must enforce 4,096 root bytes and 600 single-style bytes using gzip level 9', failures)
   require(sameValues(
     contract.publicApi?.typeExports ?? [],
     TYPE_EXPORTS,
@@ -805,6 +930,8 @@ export function validatePhase0Contract({
     prefix: '',
     suffix: '',
     spinner: 'dots',
+    static: 'symbol',
+    terminal: 'auto',
     intervalMs: 80,
   }), 'spinner defaults must match the frozen values', failures)
   require(contract.rendering?.stream === 'stderr' &&

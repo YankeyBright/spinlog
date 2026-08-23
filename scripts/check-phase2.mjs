@@ -36,6 +36,59 @@ function readObject(path) {
 const contract = readObject('specs/v1-behavior.json')
 const packageJson = readObject('package.json')
 const coverage = readObject('coverage/coverage-final.json')
+require(contract.schemaVersion === 9, 'Phase 2 requires behavior schema version 9')
+require(JSON.stringify(contract.environment?.capabilityShape) ===
+  JSON.stringify([
+    'sgr',
+    'cursor',
+    'color',
+    'emphasis',
+    'animation',
+    'unicode',
+  ]), 'Phase 2 requires named terminal capabilities')
+require(contract.environment?.noColor === 'non-empty-disables-colors-only' &&
+  contract.environment?.nodeDisableColors === 'non-empty-disables-colors-only' &&
+  contract.environment?.interactiveEmphasisWhenColorDisabled ===
+    true, 'Phase 2 requires the color-only disable and interactive emphasis policy')
+require(contract.rendering?.renderCache?.sanitization === 'lazy-render-boundary' &&
+  contract.rendering?.renderCache?.colorMutation === 'reuse-text-snapshot' &&
+  contract.rendering?.renderCache?.width ===
+    'cached-conservative', 'Phase 2 requires the frozen render-cache policy')
+require(contract.styles?.metadata?.singleSourceOfTruth === true &&
+  contract.styles?.metadata?.spinnerColorValidation === 'foreground-only' &&
+  contract.styles?.metadata?.nestedRestore ===
+    'metadata-driven', 'Phase 2 requires metadata-driven ANSI behavior')
+require(JSON.stringify(contract.defaults) ===
+  JSON.stringify({
+    text: '',
+    color: 'cyan',
+    prefix: '',
+    suffix: '',
+    spinner: 'dots',
+    static: 'symbol',
+    terminal: 'auto',
+    intervalMs: 80,
+  }), 'Phase 2 requires the frozen static and terminal defaults')
+require(JSON.stringify(contract.publicApi?.spinnerMethods) ===
+  JSON.stringify([
+    'start',
+    'stop',
+    'log',
+    'Symbol.dispose',
+    'succeed',
+    'fail',
+    'warn',
+    'info',
+  ]), 'Phase 2 requires the exact spinner method surface, including log()')
+require(contract.rendering?.staticModes?.default === 'symbol' &&
+  JSON.stringify(contract.rendering?.staticModes?.options) ===
+    JSON.stringify(['symbol', 'text', 'silent']) &&
+  contract.rendering?.log?.activeFrameCoordination ===
+    'clear-write-redraw', 'Phase 2 requires the frozen static-mode and coordinated-log policy')
+require(JSON.stringify(contract.environment?.terminalModes) ===
+  JSON.stringify(['auto', 'static', 'interactive']) &&
+  contract.environment?.unknownTerminalProfile ===
+    'auto-static-and-no-default-sgr', 'Phase 2 requires the conservative terminal-profile policy')
 let runtimeFiles = []
 try {
   const inspected = inspectRuntimeDirectory('src')
@@ -54,6 +107,12 @@ for (const path of [
 ]) {
   require(existsSync(path), `API Extractor contract evidence must exist: ${path}`)
 }
+require(readText('specs/v1-public-api.d.ts').startsWith(
+  '/// <reference lib="esnext.disposable" />\n\n',
+), 'frozen declarations must reference esnext.disposable for Symbol.dispose')
+require(readText('dist/index.d.ts').startsWith(
+  '/// <reference lib="esnext.disposable" />\n\n',
+), 'emitted declarations must reference esnext.disposable for Symbol.dispose')
 require(packageJson.devDependencies?.['@microsoft/api-extractor'] ===
   '7.58.12', 'API Extractor must be an exact development-only pin')
 require(packageJson.devDependencies?.yaml ===
@@ -120,6 +179,9 @@ try {
     require(typeof runtime.default?.[method] ===
       'function', `default export must expose ${method}()`)
   }
+  const spinner = runtime.default()
+  require(typeof spinner.log === 'function', 'spinner instances must expose log()')
+  require(spinner.log('phase2') === spinner, 'spinner.log() must return its instance')
   require(JSON.stringify(sortCanonicalText(Object.keys(stylesRuntime))) ===
     JSON.stringify(
       expectedStyleExports,

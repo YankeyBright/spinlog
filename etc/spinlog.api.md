@@ -4,6 +4,8 @@
 
 ```ts
 
+/// <reference lib="esnext.disposable" />
+
 // @public (undocumented)
 export const bgBlack: (text: string) => string;
 
@@ -126,10 +128,12 @@ export default spinlog;
 
 // @public
 export interface Spinner {
+    [Symbol.dispose](): void
     // (undocumented)
     color: SpinnerColor
     fail(text?: string): this
     info(text?: string): this
+    log(message: string): this
     // (undocumented)
     prefix: string
     start(): this
@@ -173,7 +177,11 @@ export interface SpinnerOptions {
     // (undocumented)
     spinner?: SpinnerName
     // (undocumented)
+    static?: 'symbol' | 'text' | 'silent'
+    // (undocumented)
     suffix?: string
+    // (undocumented)
+    terminal?: 'auto' | 'static' | 'interactive'
 }
 
 // @public (undocumented)

@@ -7,20 +7,16 @@
 | Defined ownership and response | Protected repository settings plus `SECURITY.md`. |
 | Controlled reuse | Empty consumer dependency maps and a runtime-only SBOM. |
 | Reproducible verification | Exact direct pins, lockfile installation, typecheck, tests, artifact checks, and dependency audit. |
-| Protected publication | Public-repository OIDC, immutable action commits, protected release environment, tag validation, and no long-lived publish token. |
+| Publication hold | Immutable action commits plus a read-only revalidation workflow that cannot publish, attest, authenticate, or create releases. |
 | Vulnerability response | Private GitHub advisory channel and documented acknowledgement target. |
 
 This mapping is engineering evidence, not certification against NIST SSDF, SLSA, an executive order, or another compliance regime.
 
-## Trusted Publishing
+## Publication Hold
 
-- Before Phase 5, `.github/workflows/release-readiness.yml` is verification-only and has no tag trigger, write permission, OIDC permission, publish command, or release command.
-- Phase 5 creates `.github/workflows/release.yml`; publish only from that workflow in `YankeyBright/spinlog`.
-- Require `id-token: write`, Node 24, npm at or above 11.5.1, and the protected `release` environment.
-- Configure npm with the exact owner, repository, workflow filename, environment, and allowed publish action.
-- Use `npm publish --provenance --access public` and no `NPM_TOKEN` or `NODE_AUTH_TOKEN`.
-- Keep the repository and package public because private-repository provenance is unsupported.
-- Verify tag/version equality, dependency audit, package gates, and provenance before declaring a release complete.
+- `.github/workflows/release-readiness.yml` runs only by manual dispatch and has exactly `contents: read` permission.
+- It may install with `npm ci --ignore-scripts` and revalidate Phases 0 through 4, but it cannot run on tags, request OIDC, attest, access npm credentials, publish, or create a GitHub release.
+- The obsolete preview receipt cannot authorize the changed runtime. A new reviewed release contract must define the future trusted-publishing workflow, protected environment, exact HTTPS registry, provenance, and post-publication verification.
 
 OIDC provenance supplies cryptographic build-origin evidence. It does not prove source correctness or independently confer a SLSA level.
 
@@ -30,11 +26,11 @@ OIDC provenance supplies cryptographic build-origin evidence. It does not prove 
 
 Phase 3 also emits a separate build-tool CycloneDX inventory and candidate manifest outside the npm payload. Those artifacts prove development dependency composition and digest identity without misrepresenting build tools as consumer runtime dependencies.
 
-The SBOM represents the consumer runtime package, not the development workstation or GitHub-hosted build environment. Attach it to both the npm package and GitHub Release.
+The SBOM represents the consumer runtime package, not the development workstation or GitHub-hosted build environment. Include it in the npm package; attach release evidence only after a new publication policy is approved.
 
 ## Evidence Discipline
 
-- Do not publish API, compatibility, size, signature, or provenance claims before the corresponding artifact exists.
+- Do not claim API, compatibility, size, signature, provenance, or vulnerability guarantees beyond the corresponding verified artifact and current scan result.
 - Record exact proof commands and outcomes in implementation notes.
 - Recheck public repository identity and npm trusted-publisher settings before first publication.
-- Run `npm audit signatures` and inspect npm attestations after publication.
+- Run `npm audit signatures` and inspect npm attestations only after a future approved publication.

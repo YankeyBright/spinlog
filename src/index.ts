@@ -1,3 +1,5 @@
+/// <reference lib="esnext.disposable" />
+
 import { intro, outro } from './messages.js'
 import { createSpinner, requireOptions } from './spinner.js'
 import * as styles from './styles.js'
@@ -30,6 +32,8 @@ export interface SpinnerOptions {
   prefix?: string
   suffix?: string
   spinner?: SpinnerName
+  static?: 'symbol' | 'text' | 'silent'
+  terminal?: 'auto' | 'static' | 'interactive'
 }
 
 /** Options used by the `Spinlog.promise` overloads. */
@@ -47,6 +51,10 @@ export interface Spinner {
   start(): this
   /** Stops an active cycle and restores owned terminal state. */
   stop(): this
+  /** Writes a permanent sanitized stderr line without changing spinner lifecycle state. */
+  log(message: string): this
+  /** Releases terminal state when a `using` declaration leaves scope. */
+  [Symbol.dispose](): void
   /** Persists the first successful terminal result for the current cycle. */
   succeed(text?: string): this
   /** Persists the first failed terminal result for the current cycle. */

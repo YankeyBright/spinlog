@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'v
 
 import { sortCanonicalText } from '../scripts/canonical-order.mjs'
 import spinlog, * as moduleExports from '../src/index.js'
+import type { Spinner } from '../src/index.js'
 
 const STYLE_EXPORTS = [
   'reset',
@@ -67,11 +68,16 @@ describe('public runtime surface', () => {
       'suffix',
       'start',
       'stop',
+      'log',
       'succeed',
       'fail',
       'warn',
       'info',
     ])
+    expect(typeof spinlog()[Symbol.dispose]).toBe('function')
+    expectTypeOf(spinlog()[Symbol.dispose]).returns.toBeVoid()
+    expectTypeOf(spinlog().log).parameter(0).toEqualTypeOf<string>()
+    expectTypeOf(spinlog().log).returns.toEqualTypeOf<Spinner>()
   })
 })
 
@@ -79,6 +85,7 @@ describe('intro and outro flow messages', () => {
   let write: ReturnType<typeof vi.spyOn>
   let stdoutWrite: ReturnType<typeof vi.spyOn>
   let ttyDescriptor: PropertyDescriptor | undefined
+  let columnsDescriptor: PropertyDescriptor | undefined
 
   beforeEach(() => {
     vi.useFakeTimers()
@@ -86,8 +93,11 @@ describe('intro and outro flow messages', () => {
     vi.stubEnv('CI', '1')
     vi.stubEnv('FORCE_COLOR', '0')
     vi.stubEnv('WT_SESSION', 'test-session')
+    vi.stubEnv('TERM', 'xterm-256color')
     ttyDescriptor = Object.getOwnPropertyDescriptor(stderr, 'isTTY')
+    columnsDescriptor = Object.getOwnPropertyDescriptor(stderr, 'columns')
     Object.defineProperty(stderr, 'isTTY', { configurable: true, value: true })
+    Object.defineProperty(stderr, 'columns', { configurable: true, value: 80 })
     write = vi.spyOn(stderr, 'write').mockImplementation(() => true)
     stdoutWrite = vi.spyOn(stdout, 'write').mockImplementation(() => true)
   })
@@ -98,6 +108,8 @@ describe('intro and outro flow messages', () => {
     vi.unstubAllEnvs()
     if (ttyDescriptor) Object.defineProperty(stderr, 'isTTY', ttyDescriptor)
     else delete (stderr as { isTTY?: boolean }).isTTY
+    if (columnsDescriptor) Object.defineProperty(stderr, 'columns', columnsDescriptor)
+    else delete (stderr as { columns?: number }).columns
   })
 
   it('writes Unicode, empty, and repeated messages exactly once per call', () => {
@@ -176,7 +188,7 @@ describe('intro and outro flow messages', () => {
     expect(write).toHaveBeenCalledTimes(2)
   })
 
-  it('does not alter an active spinner or own process listeners', () => {
+  it('coordinates flow messages around an active spinner without process ownership', () => {
     vi.stubEnv('CI', '')
     const beforeSignals = {
       sigint: process.listenerCount('SIGINT'),
@@ -189,6 +201,11 @@ describe('intro and outro flow messages', () => {
     spinlog.outro('Done')
 
     expect(vi.getTimerCount()).toBe(1)
+    expect(write.mock.calls.map(([value]) => String(value))).toEqual([
+      '\x1b[?25l- work',
+      '\x1b[2K\r┌  Build\n- work',
+      '\x1b[2K\r└  Done\n- work',
+    ])
     expect(process.listenerCount('SIGINT')).toBe(beforeSignals.sigint)
     expect(process.listenerCount('SIGTERM')).toBe(beforeSignals.sigterm)
     spinner.succeed()

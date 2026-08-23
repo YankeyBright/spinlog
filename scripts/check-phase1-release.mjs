@@ -19,8 +19,6 @@ const workflows = Object.fromEntries(
 
 if (Number(process.versions.node.split('.')[0]) < 22)
   failures.push('Phase 1 release checks require Node >=22')
-if (existsSync(`${workflowDirectory}/release.yml`))
-  failures.push('release.yml must not exist before Phase 5')
 if (packageJson.scripts?.sbom !== 'node scripts/generate-sbom.mjs') {
   failures.push('sbom script must use the checked-in npm SBOM adapter')
 }

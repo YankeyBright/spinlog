@@ -7,34 +7,39 @@ Implement and prove the frozen v1 contract. Runtime behavior and deterministic t
 ## Runtime Modules
 
 1. `src/ansi.ts`
-   - Apply capability-approved color to spinner frames and statuses.
-2. `src/env.ts`
-   - Implement the frozen color and animation precedence independently.
-   - Detect TTY, CI, dumb terminal, test mode, and the Windows Unicode heuristic.
-3. `src/spinner.ts`
+   - Own the canonical SGR registry, validation, and generic nesting normalization.
+2. `src/ansi-metadata.ts` and `src/ansi-apply.ts`
+   - Keep one canonical source of SGR metadata while preserving style-subpath tree shaking.
+3. `src/env.ts`
+   - Implement frozen named SGR, cursor, color, emphasis, animation, and Unicode capabilities independently.
+   - Detect TTY, CI, dumb terminal, test mode, conservative terminal profiles, and the Windows Unicode heuristic.
+4. `src/spinner.ts`
    - Implement every state and transition from `specs/v1-behavior.json`.
-   - Own only instance timers, cursor state, mutation fields, and stderr rendering.
+   - Own only instance timers, cursor state, mutation fields, static modes, terminal overrides, lazy render snapshots, and stderr rendering.
    - Contain synchronous write failure without owning host signals or stream errors.
-4. `src/text.ts`
+5. `src/text.ts`
    - Share strict string validation and render-boundary terminal sanitization.
-5. `src/messages.ts`
-   - Implement independent intro/outro flow lines with one contained stderr write.
-6. `src/index.ts`
+6. `src/renderer.ts`
+   - Coordinate permanent stderr lines around the active frame and contain rendering failures.
+7. `src/messages.ts`
+   - Implement coordinated intro/outro flow lines with one contained stderr write.
+8. `src/index.ts`
    - Export the callable default factory, exact types, exact styles, two promise overloads, and intro/outro properties.
    - Export nothing listed as deferred or permanently excluded.
-7. `src/styles.ts`
+9. `src/styles.ts`
    - Export the exact 38 side-effect-free style helpers.
    - Reject invalid JavaScript input consistently and preserve nested SGR behavior.
    - Provide the independently tree-shakeable `spinlog/styles` entrypoint.
 
 ## Required Behavior Tests
 
-- ANSI tests prove every style sequence, disabled output, and nested restoration.
-- Environment tests prove `NO_COLOR` and `NODE_DISABLE_COLORS` override `FORCE_COLOR`, plus CI, dumb-terminal, test, TTY, animation, and Unicode decisions.
-- Spinner tests use fake timers and controlled stderr writes to prove immediate render, 80ms cadence, all legal transitions, validation-before-idempotency, mutation, static degradation, cleanup, and write-failure containment.
+- ANSI tests prove every style sequence, color-only disable behavior, metadata-driven nesting restoration, and reset boundaries.
+- Environment tests prove `NO_COLOR` and `NODE_DISABLE_COLORS` override `FORCE_COLOR` for colors while preserving known-profile interactive emphasis, plus CI, dumb-terminal, test, TTY, automatic profile selection, explicit terminal overrides, and Unicode decisions.
+- Spinner tests use fake timers and controlled stderr writes to prove immediate render, 80ms cadence, all legal transitions, validation-before-idempotency, lazy snapshot invalidation, static modes, static degradation, coordinated instance logs, cleanup, and write-failure containment.
 - Process-ownership tests prove no signal or exit listeners are installed and no host termination API is invoked.
 - Promise tests prove both overloads, thenable assimilation, callback ordering, synchronous throws, exact value/reason preservation, and cosmetic-failure isolation.
-- Flow-message tests prove Unicode and ASCII markers, marker-only lines, marker-only color, validation order, sanitization, one-write stderr output, failure containment, timer/listener absence, and active-spinner independence.
+- Flow-message tests prove Unicode and ASCII markers, marker-only lines, marker-only color, validation order, sanitization, one-write stderr output, failure containment, timer/listener absence, and active-frame coordination.
+- Terminal-emulation tests replay ANSI transcripts at narrow widths and prove that coordinated messages leave the final screen intact.
 - Contract tests compare emitted declarations and runtime exports against Phase 0.
 - API Extractor validates the frozen root and styles declarations and their emitted counterparts against tracked semantic reports. Documentation-only edits do not change report parity; export, overload, property, or return-type drift does.
 - Packed-consumer tests install the actual tarball and validate package-name imports, module-resolution profiles, stderr output, and timer ownership.
@@ -44,7 +49,7 @@ Tests make no network calls. Every source file maintains 100% statements, branch
 
 ## Explicit Exclusions
 
-All entries in `specs/16_POST_MVP_FEATURES.md`, CommonJS, and browser-first support remain unavailable.
+All entries in `specs/16_POST_MVP_FEATURES.md`, including multi-row concurrent animation, plus CommonJS and browser-first support remain unavailable.
 
 ## Definition Of Done
 

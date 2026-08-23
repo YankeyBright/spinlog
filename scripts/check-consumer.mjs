@@ -79,7 +79,7 @@ try {
 
   writeFileSync(
     join(consumer, 'unref.mjs'),
-    `import spinlog from 'spinlog'\nObject.defineProperty(process.stderr, 'isTTY', { configurable: true, value: true })\nspinlog('active', { spinner: 'line' }).start()\n`,
+    `import spinlog from 'spinlog'\nObject.defineProperty(process.stderr, 'isTTY', { configurable: true, value: true })\nObject.defineProperty(process.stderr, 'columns', { configurable: true, value: 80 })\nspinlog('active', { spinner: 'line' }).start()\n`,
   )
   const unref = spawnSync(process.execPath, ['unref.mjs'], {
     cwd: consumer,

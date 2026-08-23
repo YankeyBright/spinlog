@@ -354,12 +354,14 @@ describe('runtime source policy', () => {
 })
 
 describe('workflow policy', () => {
-  const workflows = {
-    'ci.yml': readFileSync('.github/workflows/ci.yml', 'utf8'),
-    'release-readiness.yml': readFileSync('.github/workflows/release-readiness.yml', 'utf8'),
-  }
+  const workflows = Object.fromEntries(
+    ['ci.yml', 'codeql.yml', 'release-readiness.yml'].map((name) => [
+      name,
+      readFileSync(`.github/workflows/${name}`, 'utf8'),
+    ]),
+  )
 
-  it('accepts the read-only pre-Phase-5 workflows', () => {
+  it('accepts the frozen Phase 5 workflow set', () => {
     expect(validateWorkflowPolicy(workflows)).toEqual([])
   })
 

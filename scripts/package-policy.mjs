@@ -24,9 +24,13 @@ export const APPROVED_SCRIPTS = Object.freeze({
   'check:foundation':
     'npm run check:phase0 && npm run check:phase1 && npm run check:phase1:release && npm run check:phase2',
   'check:phase3':
-    'npm run policy:check && npm run build && npm run benchmark:smoke && npm run sbom && npm run sbom:check && npm run sbom:build && npm run sbom:build:check && npm run size && npm run size:limit && npm run package:lint && npm run pack:check && npm run reproducibility:check && node scripts/check-phase3.mjs',
+    'npm run policy:check && npm run build && npm run benchmark:smoke && npm run sbom && npm run sbom:check && npm run sbom:build && npm run sbom:build:check && npm run size && npm run size:limit && npm run package:lint && npm run pack:check && npm run reproducibility:check && npm run check:baseline-scope && node scripts/check-phase3.mjs',
   'check:phase4':
     'npm run build && npm run sbom && npm run sbom:check && npm run docs:check && npm run test:examples && npm run pack:check && node scripts/check-phase4.mjs',
+  'check:phase5':
+    'npm run check:phase-map && npm run policy:check && npm run sbom:check && npm run pack:check && npm run https:check && node scripts/check-phase5.mjs',
+  'check:baseline-scope': 'node scripts/check-baseline-scope.mjs',
+  'check:release-ancestry': 'node scripts/check-release-ancestry.mjs',
   'check:phases': 'node scripts/check-phases.mjs',
   'check:tree-shaking': 'node scripts/check-tree-shaking.mjs',
   'candidate:manifest': 'node scripts/candidate-manifest.mjs',
@@ -59,6 +63,12 @@ export const APPROVED_SCRIPTS = Object.freeze({
     'npm run policy:check && npm run typecheck && npm run typecheck:contracts && npm run format:check && npm run lint && npm run test:coverage && npm run build && npm run typecheck:public && npm run api:check && npm run runtime:check && node scripts/check-phase2.mjs && npm run package:lint && npm run check:tree-shaking && npm run test:consumer && npm run size && npm run size:limit && npm run pack:check',
   'verify:release': 'npm run verify && npm run sbom && npm run sbom:check',
   'verify:candidate': 'node scripts/verify-candidate.mjs',
+  'verify:preview': 'node scripts/verify-preview.mjs',
+  'verify:published': 'node scripts/verify-published-preview.mjs',
+  'verify:published:integrity': 'node scripts/verify-published-integrity.mjs',
+  'verify:published:signatures': 'node scripts/verify-published-signatures.mjs',
+  'https:check': 'node scripts/check-https-policy.mjs',
+  'test:stability': 'node scripts/test-stability.mjs',
 })
 
 const APPROVED_FILES = Object.freeze(['dist', 'README.md', 'LICENSE', 'SECURITY.md', 'sbom.json'])
@@ -95,6 +105,16 @@ function validatePackageIdentity(packageJson, failures) {
   }
   if (packageJson?.repository?.url !== 'git+https://github.com/YankeyBright/spinlog.git') {
     failures.push('repository.url must match the trusted publishing repository')
+  }
+  if (
+    !isDeepStrictEqual(packageJson?.publishConfig, {
+      access: 'public',
+      provenance: true,
+      registry: 'https://registry.npmjs.org/',
+      tag: 'next',
+    })
+  ) {
+    failures.push('publishConfig must pin public HTTPS preview publishing with provenance')
   }
   if (!isDeepStrictEqual(packageJson?.files, APPROVED_FILES)) {
     failures.push('files must contain the approved publish allowlist')

@@ -5,22 +5,28 @@ import { parse } from '@babel/parser'
 import { compareCanonicalText, sortCanonicalText } from './canonical-order.mjs'
 
 export const APPROVED_RUNTIME_FILES = Object.freeze([
+  'ansi-apply.ts',
+  'ansi-metadata.ts',
   'ansi.ts',
   'env.ts',
   'index.ts',
   'messages.ts',
+  'renderer.ts',
   'spinner.ts',
   'styles.ts',
   'text.ts',
 ])
 
 const APPROVED_IMPORTS = Object.freeze({
-  'ansi.ts': ['node:util'],
+  'ansi-apply.ts': [],
+  'ansi-metadata.ts': [],
+  'ansi.ts': [],
   'env.ts': [],
   'index.ts': [],
   'messages.ts': [],
+  'renderer.ts': [],
   'spinner.ts': [],
-  'styles.ts': ['node:util'],
+  'styles.ts': [],
   'text.ts': ['node:process', 'node:util'],
 })
 const PROCESS_LISTENERS = new Set([

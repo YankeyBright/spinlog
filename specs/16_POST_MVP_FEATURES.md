@@ -10,7 +10,7 @@ These capabilities may be specified only after the Phase 2 core is stable and te
 - **structured: true**: Machine output requires a separately versioned stdout schema.
 - **custom frames and intervals**: Arbitrary animation data expands validation, timing, and size requirements.
 - **custom writable streams**: The v1 stderr-only contract intentionally avoids stream ownership and error-listener complexity.
-- **multiple active spinners**: Shared-line coordination belongs with the deferred task-group renderer.
+- **multiple active spinners**: Only one interactive spinner owns the terminal lease; multi-row task coordination remains separate.
 - **style chaining, 256-color, and truecolor**: The exact ANSI-16 named-export surface preserves tree-shaking and the fixed size budget.
 
 Every candidate requires its own API, stream, failure, size, security, and behavior-test contract before entering a release phase. None is available in v1. Intro and outro flow messages are part of the frozen v1 contract and are intentionally absent from this list.

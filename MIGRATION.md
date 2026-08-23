@@ -30,7 +30,7 @@ spinner.succeed()
 ```
 <!-- example:migration-ora:end -->
 
-There is no v1 equivalent for custom streams, custom frame sets, custom intervals, simultaneous spinners, or CommonJS loading.
+There is no v1 equivalent for custom streams, custom frame sets, custom intervals, multi-row concurrent animation, or CommonJS loading. Spinlog permits one interactive spinner and renders later simultaneous spinners with their configured static behavior. Use `spinner.log(message)` for a permanent line that coordinates with Spinlog's active frame.
 
 ## From Clack
 
@@ -45,8 +45,8 @@ spinlog.outro('Done')
 ```
 <!-- example:migration-clack:end -->
 
-Intro and outro calls are stateless and do not coordinate active spinners. Settle an active spinner before writing a flow message. There is no v1 equivalent for prompts, task groups, progress bars, cancellation orchestration, or custom output streams.
+Intro and outro calls are stateless and coordinate with an active Spinlog frame. They do not coordinate writes made directly by other libraries or by `console.error`. There is no v1 equivalent for prompts, task groups, progress bars, cancellation orchestration, or custom output streams.
 
 ## Stream And Process Differences
 
-spinlog writes cosmetic runtime output only to `stderr`. Style helpers return strings and never write. The package does not install signal handlers, terminate the process, or own asynchronous stream errors. Applications remain responsible for shutdown policy and should call `stop()` on active spinners during graceful shutdown.
+spinlog writes cosmetic runtime output only to `stderr`. Style helpers return strings and never write. The package does not install signal handlers, terminate the process, or own asynchronous stream errors. Applications remain responsible for shutdown policy and should call `stop()` on active spinners during graceful shutdown. For deterministic non-interactive output, use `static: 'symbol'`, `'text'`, or `'silent'`; use `terminal: 'static'` to force that path, or the informed `terminal: 'interactive'` override only for a TTY that supports cursor control.

@@ -20,9 +20,9 @@ The callable default export also has exactly three properties: `promise`, `intro
 
 ## Factory And Defaults
 
-`spinlog(text?, options?)` returns `Spinner`. Options are limited to `color`, `prefix`, `suffix`, and `spinner`. Defaults are empty text/prefix/suffix, cyan, dots, and an 80ms interval. Spinner names are exactly `dots` and `line`; spinner colors are the 16 foreground names.
+`spinlog(text?, options?)` returns `Spinner`. Options are limited to `color`, `prefix`, `suffix`, `spinner`, `static`, and `terminal`. Defaults are empty text/prefix/suffix, cyan, dots, `static: 'symbol'`, `terminal: 'auto'`, and an 80ms interval. Spinner names are exactly `dots` and `line`; spinner colors are the 16 foreground names. Static values are exactly `'symbol'`, `'text'`, and `'silent'`; terminal values are exactly `'auto'`, `'static'`, and `'interactive'`.
 
-The mutable instance properties are exactly `text`, `color`, `prefix`, and `suffix`. Lifecycle methods return the same instance for chaining and accept no undocumented parameters.
+The mutable instance properties are exactly `text`, `color`, `prefix`, and `suffix`. Lifecycle methods return the same instance for chaining and accept no undocumented parameters. `spinner.log(message)` accepts one string, emits one coordinated permanent sanitized stderr line in every lifecycle state, and returns the same instance without mutating lifecycle, timer, or cursor ownership. `Spinner[Symbol.dispose]()` returns `void` and is the sole cleanup addition; it is equivalent to `stop()` and is intentionally non-enumerable.
 
 At runtime, invalid factory text, option objects, option values, terminal text overrides, and mutable assignments throw `TypeError` before output. Terminal overrides are validated before idempotency, state changes, mutation, timer cleanup, or writes; a failed validation preserves the current text, state, timer ownership, and output history. A failed mutation preserves its previous value. Invalid promise options reject before spinner start, direct thenable observation, or task invocation. Unknown option keys are ignored for forward compatibility.
 
@@ -46,14 +46,14 @@ The spinner starts before a direct input is observed or a callback is invoked. T
 
 ## Flow Messages
 
-`spinlog.intro(message?)` and `spinlog.outro(message?)` emit one sanitized, newline-terminated line to `stderr`. Unicode markers are `┌` and `└`; ASCII fallbacks are `>` and `<`. Two ASCII spaces separate a marker from a non-empty message. Only the marker is styled with `blackBright` when color is enabled.
+`spinlog.intro(message?)` and `spinlog.outro(message?)` emit one sanitized, newline-terminated line to `stderr`. Unicode markers are `┌` and `└`; ASCII fallbacks are `>` and `<`. Two ASCII spaces separate a marker from a non-empty message. Only the marker is styled with `blackBright` when color is enabled. When an interactive spinner owns stderr's current line, each flow write clears and redraws that frame atomically.
 
-Flow calls are synchronous, stateless, repeatable, and independent. They do not inspect or mutate a spinner, create a timer, own a signal, terminate the process, or write to `stdout`. Invalid messages throw `TypeError` before capability detection or output. Synchronous write failures are cosmetic and suppressed.
+Flow calls are synchronous, repeatable, and do not inspect or mutate public spinner state. They do not create a timer, own a signal, terminate the process, or write to `stdout`. Invalid messages throw `TypeError` before capability detection or output. Synchronous write failures are cosmetic and suppressed.
 
 ## Terminal Degradation
 
-Interactive rendering uses stderr and unreferenced timers. Non-interactive execution creates no timer and emits deterministic static start and terminal lines. An active synchronous write failure ends only that rendering cycle in `stopped`; terminal state and promise settlement remain logical outcomes rather than I/O outcomes. Style helpers remain side-effect-free and stream-free while using stderr capability only to decide whether ANSI is appropriate. Non-empty `NO_COLOR` and `NODE_DISABLE_COLORS` values outrank `FORCE_COLOR`; color forcing never enables animation.
+Interactive rendering uses stderr and unreferenced timers. At most one instance receives the interactive line lease; later instances use their configured static behavior. In automatic mode, animation requires a conservative recognized terminal profile and a one-line fit using `stderr.columns`; unavailable or insufficient width, resize, and text mutation demote to static output. `terminal: 'static'` always uses static output, while the informed `terminal: 'interactive'` override permits animation on any TTY except `TERM=dumb`. Non-interactive execution creates no timer. `'symbol'` preserves static frame/status lines, `'text'` emits two unstyled sanitized text lines, and `'silent'` suppresses automatic static output only. An active synchronous write failure ends only that rendering cycle in `stopped`; terminal state and promise settlement remain logical outcomes rather than I/O outcomes. Rendered text is lazily sanitized and width-measured into an immutable snapshot that is invalidated only by text, prefix, or suffix mutation. Style helpers remain side-effect-free and stream-free while using separate SGR, cursor, color, and emphasis decisions. Non-empty `NO_COLOR` and `NODE_DISABLE_COLORS` values outrank `FORCE_COLOR` for colors only; explicit emphasis remains available only on a known capable interactive terminal. Color forcing never enables animation.
 
 ## Explicitly Excluded From v1
 
-The complete deferred list and rationale are in `specs/16_POST_MVP_FEATURES.md`. Phase 2 may not export task groups, progress, prompts, structured logs, custom streams, custom animations, concurrent spinners, or advanced color APIs.
+The complete deferred list and rationale are in `specs/16_POST_MVP_FEATURES.md`. Phase 2 may not export task groups, progress, prompts, structured logs, custom streams, custom animations, multi-row concurrent spinners, or advanced color APIs.

@@ -31,6 +31,18 @@ describe('Phase 0 contract policy', () => {
     )
   })
 
+  it('rejects a declaration without the disposable-library reference', () => {
+    const fixture = loadFixture()
+    fixture.declaration = fixture.declaration.replace(
+      '/// <reference lib="esnext.disposable" />\n\n',
+      '',
+    )
+
+    expect(validatePhase0Contract(fixture)).toContain(
+      'public API declaration must match the generated closed contract',
+    )
+  })
+
   it('rejects styles subpath declaration drift', () => {
     const fixture = loadFixture()
     fixture.stylesDeclaration = fixture.stylesDeclaration.replace(
@@ -47,7 +59,7 @@ describe('Phase 0 contract policy', () => {
     const fixture = loadFixture()
     fixture.contract.schemaVersion = 4
 
-    expect(validatePhase0Contract(fixture)).toContain('contract version and phase must be 6 and 0')
+    expect(validatePhase0Contract(fixture)).toContain('contract version and phase must be 9 and 0')
   })
 
   it('rejects changed promise overload semantics', () => {
@@ -71,6 +83,23 @@ describe('Phase 0 contract policy', () => {
       expect.arrayContaining([
         'public API declaration must match the generated closed contract',
         'rendering must match the frozen contract',
+      ]),
+    )
+  })
+
+  it('rejects static-mode, terminal-mode, and coordinated-log API drift', () => {
+    const fixture = loadFixture()
+    fixture.declaration = fixture.declaration
+      .replace("  static?: 'symbol' | 'text' | 'silent'\n", '')
+      .replace('  log(message: string): this\n', '')
+    fixture.contract.defaults.static = 'silent'
+    fixture.contract.environment.terminalModes = ['auto', 'static']
+
+    expect(validatePhase0Contract(fixture)).toEqual(
+      expect.arrayContaining([
+        'public API declaration must match the generated closed contract',
+        'defaults must match the frozen contract',
+        'environment must match the frozen contract',
       ]),
     )
   })
@@ -236,6 +265,35 @@ describe('Phase 0 contract policy', () => {
     fixture.contract.environment.nodeDisableColorsOverridesForceColor = false
 
     expect(validatePhase0Contract(fixture)).toContain('environment must match the frozen contract')
+  })
+
+  it('rejects capability, render-cache, and ANSI-metadata drift', () => {
+    const fixture = loadFixture()
+    fixture.contract.environment.interactiveEmphasisWhenColorDisabled = false
+    fixture.contract.rendering.renderCache.colorMutation = 'invalidate-all'
+    fixture.contract.styles.metadata.spinnerColorValidation = 'all-colors'
+
+    expect(validatePhase0Contract(fixture)).toEqual(
+      expect.arrayContaining([
+        'environment must match the frozen contract',
+        'rendering must match the frozen contract',
+        'styles must match the frozen contract',
+      ]),
+    )
+  })
+
+  it('rejects weakened terminal profiles and static rendering policy', () => {
+    const fixture = loadFixture()
+    fixture.contract.environment.cursorTerminalPrefixes = ['xterm', 'vt100']
+    fixture.contract.rendering.staticModes.text.status = 'symbol'
+    fixture.contract.rendering.log.changesTimer = true
+
+    expect(validatePhase0Contract(fixture)).toEqual(
+      expect.arrayContaining([
+        'environment must match the frozen contract',
+        'rendering must match the frozen contract',
+      ]),
+    )
   })
 
   it('rejects library-owned signals and forced exits', () => {

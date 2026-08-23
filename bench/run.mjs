@@ -160,6 +160,13 @@ const scenarios = [
       ),
     ),
   ),
+  await stableMeasurement('instance-log-ns', () =>
+    withSilentStderr(() =>
+      withEnvironment({ CI: '1', FORCE_COLOR: '0', NO_COLOR: '1', NODE_ENV: 'production' }, () =>
+        measureSync(() => rootModule.default('benchmark', { static: 'silent' }).log('benchmark')),
+      ),
+    ),
+  ),
 ]
 
 if (JSON.stringify(scenarios.map(({ name }) => name)) !== JSON.stringify(BENCHMARK_SCENARIOS)) {

@@ -1,3 +1,5 @@
+import { stderr } from 'node:process'
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { applyAnsiStyle, normalizeStyleNesting } from '../src/ansi.js'
@@ -86,12 +88,23 @@ const STYLES = {
 }
 
 describe('ANSI styles', () => {
+  let ttyDescriptor: PropertyDescriptor | undefined
+
   beforeEach(() => {
     vi.stubEnv('FORCE_COLOR', '1')
     vi.stubEnv('NO_COLOR', '')
     vi.stubEnv('NODE_DISABLE_COLORS', '')
+    vi.stubEnv('CI', '')
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('TERM', 'xterm-256color')
+    ttyDescriptor = Object.getOwnPropertyDescriptor(stderr, 'isTTY')
+    Object.defineProperty(stderr, 'isTTY', { configurable: true, value: true })
   })
-  afterEach(() => vi.unstubAllEnvs())
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    if (ttyDescriptor) Object.defineProperty(stderr, 'isTTY', ttyDescriptor)
+    else delete (stderr as { isTTY?: boolean }).isTTY
+  })
 
   it('emits every frozen SGR opening and closing sequence', () => {
     for (const [name, [open, close]] of Object.entries(CODES)) {
@@ -100,8 +113,9 @@ describe('ANSI styles', () => {
     }
   })
 
-  it('returns input unchanged when color is disabled', () => {
+  it('returns input unchanged when neither color nor terminal emphasis is supported', () => {
     vi.stubEnv('FORCE_COLOR', '0')
+    Object.defineProperty(stderr, 'isTTY', { configurable: true, value: false })
 
     for (const name of Object.keys(CODES)) {
       expect(STYLES[name as keyof typeof CODES]('plain')).toBe('plain')
@@ -112,7 +126,18 @@ describe('ANSI styles', () => {
     vi.stubEnv('NO_COLOR', '1')
 
     expect(spinlog.red('plain')).toBe('plain')
+    expect(spinlog.bgRed('plain')).toBe('plain')
     expect(styles.red('plain')).toBe('plain')
+    expect(spinlog.bold('plain')).toBe('\x1b[1mplain\x1b[22m')
+    expect(styles.underline('plain')).toBe('\x1b[4mplain\x1b[24m')
+    expect(spinlog.reset('plain')).toBe('\x1b[0mplain\x1b[0m')
+  })
+
+  it('treats NODE_DISABLE_COLORS as color-only while preserving interactive emphasis', () => {
+    vi.stubEnv('NODE_DISABLE_COLORS', '1')
+
+    expect(spinlog.cyan('plain')).toBe('plain')
+    expect(spinlog.italic('plain')).toBe('\x1b[3mplain\x1b[23m')
   })
 
   it.each(['0', '1'])('rejects invalid JavaScript input with FORCE_COLOR=%s', (forceColor) => {
@@ -148,11 +173,13 @@ describe('ANSI styles', () => {
   it('leaves non-SGR and incomplete values unchanged', () => {
     expect(normalizeStyleNesting('plain')).toBe('plain')
     expect(normalizeStyleNesting('\x1b[broken')).toBe('\x1b[broken')
+    expect(normalizeStyleNesting('\x1b[38mvalue\x1b[39m')).toBe('\x1b[38mvalue\x1b[39m')
     expect(normalizeStyleNesting('\x1b[31mvalue')).toBe('\x1b[31mvalue')
   })
 
   it('treats reset as a hard SGR boundary', () => {
     expect(spinlog.red(`a ${spinlog.reset('b')} c`)).toBe('\x1b[31ma \x1b[0mb\x1b[0m c\x1b[39m')
+    expect(normalizeStyleNesting('\x1b[0mplain\x1b[0m')).toBe('\x1b[0mplain\x1b[0m')
   })
 
   it('applies ANSI styling and normalizes nesting directly through applyAnsiStyle', () => {

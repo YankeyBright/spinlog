@@ -7,4 +7,5 @@ const spinner = spinlog('Building', {
 }).start()
 
 spinner.text = 'Bundling'
+spinner.log('Writing manifest')
 spinner.succeed('Built')

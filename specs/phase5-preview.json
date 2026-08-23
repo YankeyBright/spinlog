@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 2,
+  "package": "spinlog",
+  "version": "0.1.0",
+  "repository": "YankeyBright/spinlog",
+  "status": "blocked",
+  "reason": "The unpublished v1.1 terminal revision changed runtime, build, benchmark, and package inputs after the reviewed preview receipt.",
+  "blockedPublication": {
+    "version": "0.1.0",
+    "tag": "v0.1.0",
+    "distTag": "next",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "requiredRevalidation": [
+    "Review the revised Phase 0 contract and Phase 2 runtime behavior.",
+    "Commit a new five-run Linux Node 24 benchmark baseline.",
+    "Regenerate Phase 3 reproducibility, SBOM, consumer, and candidate evidence.",
+    "Complete the Phase 4 documentation review.",
+    "Create a new reviewed preview-release policy before restoring publication workflows."
+  ]
+}

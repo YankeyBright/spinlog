@@ -6,7 +6,7 @@ Produce reproducible performance and supply-chain evidence for the completed Pha
 
 ## Benchmark Evidence
 
-- The dependency-free benchmark harness measures built root and `spinlog/styles` cold imports, enabled and disabled style throughput, static spinner settlement, resolved promise-wrapper overhead, and intro/outro flow-message throughput.
+- The dependency-free benchmark harness measures built root and `spinlog/styles` cold imports, enabled and disabled style throughput, static spinner settlement, resolved promise-wrapper overhead, intro/outro flow-message throughput, and instance-log throughput.
 - Every full run uses warmups, calibrated iterations, at least 30 samples, median, p95, median absolute deviation, and a deterministic bootstrap confidence interval.
 - Relative median absolute deviation above 15% is inconclusive. The harness retries a scenario up to three times, then fails instead of accepting noisy evidence.
 - `bench/baseline.json` is tracked only after aggregation of five independent Node 24 Linux CI matrix jobs. Every input records the same commit and workflow attempt, a unique matrix slot, and a unique SHA-256 artifact digest. A baseline is not fabricated from a developer workstation.
@@ -20,7 +20,7 @@ npm run benchmark
 npm run benchmark:check
 ```
 
-The 2,560-byte gzip ceiling for `dist/index.js` remains a hard Phase 0 size contract, independently enforced by `npm run size` and `npm run size:limit`.
+The 4,096-byte gzip ceiling for `dist/index.js` remains a hard Phase 0 size contract, independently enforced by `npm run size` and `npm run size:limit`.
 
 ## SBOM Evidence
 
@@ -57,4 +57,4 @@ npm run check:phase3
 npm run verify:candidate
 ```
 
-`npm run check:foundation` is the ordered Phase 0-through-Phase 2 gate used before baseline collection. `npm run check:phases` is the final Phase 0-through-Phase 4 gate. Phase 3 is complete only after the Node 22/24/26 foundation matrix passes, the five Node 24 baseline jobs produce a reviewable baseline, that baseline is committed independently, and the Node 24 candidate job validates against it. The manual release-readiness workflow remains read-only; trusted publication, provenance, and post-publication verification remain Phase 5 work.
+`npm run check:foundation` is the ordered Phase 0-through-Phase 2 gate used before baseline collection. Phase 3 is complete only after the Node 22/24/26 foundation matrix passes, the five Node 24 baseline jobs produce a reviewable baseline, that baseline is committed independently, and the Node 24 candidate job validates against it. The terminal UX revision invalidates the former reviewed baseline; Phase 5 remains blocked until a new baseline and release policy are approved.

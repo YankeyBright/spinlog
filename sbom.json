@@ -12,7 +12,7 @@
     "component": {
       "author": "spinlog contributors",
       "bom-ref": "spinlog@0.1.0",
-      "description": "A zero-runtime-dependency, ESM-only terminal color and spinner primitive capped at 2,560 bytes gzipped.",
+      "description": "A zero-runtime-dependency, ESM-only terminal color and spinner primitive capped at 4,096 bytes gzipped.",
       "externalReferences": [
         {
           "type": "issue-tracker",

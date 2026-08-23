@@ -90,6 +90,7 @@ const buildConfig = readText('scripts/build-js.mjs')
 const vitestConfig = readText('vitest.config.ts')
 const output = readText('dist/index.js')
 const stylesOutput = readText('dist/styles.js')
+const declarationOutput = readText('dist/index.d.ts')
 const sourceMap = readObject('dist/index.js.map')
 const stylesSourceMap = readObject('dist/styles.js.map')
 const configuredEntryPoint = packageJson.exports?.['.']
@@ -178,8 +179,8 @@ require(!existsSync(
 
 for (const value of [
   'absWorkingDir: projectRoot',
-  "index: './src/index.ts'",
-  "styles: './src/styles.ts'",
+  "index: resolve(projectRoot, 'src/index.ts')",
+  "styles: resolve(projectRoot, 'src/styles.ts')",
   'bundle: true',
   "format: 'esm'",
   'minify: true',
@@ -188,7 +189,7 @@ for (const value of [
   'treeShaking: true',
   "platform: 'node'",
   "target: 'node22.13'",
-  "outdir: 'dist'",
+  'outdir: outputDirectory',
   "external: ['node:*']",
 ]) {
   require(buildConfig.includes(value), `scripts/build-js.mjs must contain ${value}`)
@@ -224,7 +225,7 @@ require(biome.formatter?.enabled === true, 'Biome formatter must be enabled')
 require(biome.linter?.enabled === true, 'Biome linter must be enabled')
 require(Array.isArray(sizeLimit), '.size-limit.json must be an array')
 require(sizeLimitEntry?.path === 'dist/index.js', '.size-limit.json must target dist/index.js')
-require(sizeLimitEntry?.limit === '2560 B', '.size-limit.json must enforce the 2560 B limit')
+require(sizeLimitEntry?.limit === '4096 B', '.size-limit.json must enforce the 4096 B limit')
 require(sizeLimitEntry?.gzip === true, '.size-limit.json must measure gzip size')
 require(JSON.stringify(sizeLimitEntry?.ignore) ===
   JSON.stringify([
@@ -234,6 +235,9 @@ require(JSON.stringify(sizeLimitEntry?.ignore) ===
 
 require(!output.includes('module.exports'), 'dist/index.js must not contain CommonJS output')
 require(!stylesOutput.includes('module.exports'), 'dist/styles.js must not contain CommonJS output')
+require(declarationOutput.startsWith(
+  '/// <reference lib="esnext.disposable" />\n\n',
+), 'dist/index.d.ts must reference esnext.disposable for the public disposal method')
 require(output.includes(
   'sourceMappingURL=index.js.map',
 ), 'dist/index.js must reference its external source map')
@@ -261,16 +265,20 @@ function validateSourceMap(path, map, expectedSources) {
 }
 
 validateSourceMap('dist/index.js.map', sourceMap, [
+  '../src/ansi-apply.ts',
+  '../src/ansi-metadata.ts',
   '../src/ansi.ts',
   '../src/env.ts',
   '../src/index.ts',
   '../src/messages.ts',
+  '../src/renderer.ts',
   '../src/spinner.ts',
   '../src/styles.ts',
   '../src/text.ts',
 ])
 validateSourceMap('dist/styles.js.map', stylesSourceMap, [
-  '../src/ansi.ts',
+  '../src/ansi-apply.ts',
+  '../src/ansi-metadata.ts',
   '../src/env.ts',
   '../src/styles.ts',
 ])

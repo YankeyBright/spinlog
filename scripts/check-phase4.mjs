@@ -7,7 +7,7 @@ const packageJson = JSON.parse(readFileSync('package.json', 'utf8'))
 for (const path of ['README.md', 'MIGRATION.md', 'examples', 'dist/index.js', 'sbom.json']) {
   if (!existsSync(path)) failures.push(`missing Phase 4 evidence: ${path}`)
 }
-if (contract.schemaVersion !== 6) failures.push('Phase 4 requires behavior schema version 6')
+if (contract.schemaVersion !== 9) failures.push('Phase 4 requires behavior schema version 9')
 if (
   JSON.stringify(contract.publicApi?.callableMethods) !==
   JSON.stringify(['promise', 'intro', 'outro'])

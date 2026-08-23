@@ -16,12 +16,18 @@ const REQUIRED_README_CLAIMS = Object.freeze([
   'spinlog.promise(input, options?)',
   'spinlog.intro(message?)',
   'spinlog.outro(message?)',
+  'spinner.log(message)',
+  "`static` defaults to `'symbol'`",
+  "`terminal` defaults to `'auto'`",
   'Color precedence is `NO_COLOR`, `NODE_DISABLE_COLORS`, `FORCE_COLOR`',
+  '`NO_COLOR` and `NODE_DISABLE_COLORS` disable colors only',
   'never writes to `stdout`',
   'installs no process signal listeners',
+  'one interactive spinner at a time',
+  '`Symbol.dispose`',
   'Exactly eleven files in the npm tarball',
   'zero runtime components',
-  'No production version has been published',
+  'Publication is temporarily blocked pending a new reviewed release policy.',
 ])
 const REQUIRED_MIGRATION_CLAIMS = Object.freeze([
   'not API-compatible with Chalk, Ora, or Clack',
@@ -30,7 +36,7 @@ const REQUIRED_MIGRATION_CLAIMS = Object.freeze([
   '## From Clack',
   'custom streams',
   'custom frame sets',
-  'simultaneous spinners',
+  'one interactive spinner',
   'prompts',
   'task groups',
   'progress bars',
@@ -137,6 +143,41 @@ function validateDocumentationContract(packageJson, contract, runtimeSbom, failu
     JSON.stringify(['promise', 'intro', 'outro'])
   ) {
     failures.push('documentation requires the exact callable default-export methods')
+  }
+  if (contract?.schemaVersion !== 9) {
+    failures.push('documentation requires behavior contract schema version 9')
+  }
+  if (
+    JSON.stringify(contract?.environment?.capabilityShape) !==
+      JSON.stringify(['sgr', 'cursor', 'color', 'emphasis', 'animation', 'unicode']) ||
+    contract?.environment?.noColor !== 'non-empty-disables-colors-only' ||
+    contract?.environment?.nodeDisableColors !== 'non-empty-disables-colors-only'
+  ) {
+    failures.push('documentation requires the frozen color-only disable and emphasis policy')
+  }
+  if (
+    contract?.rendering?.renderCache?.sanitization !== 'lazy-render-boundary' ||
+    contract?.rendering?.renderCache?.colorMutation !== 'reuse-text-snapshot'
+  ) {
+    failures.push('documentation requires the frozen lazy render-cache policy')
+  }
+  if (contract?.publicApi?.spinnerDisposal !== 'Symbol.dispose') {
+    failures.push('documentation requires the frozen spinner disposal API')
+  }
+  if (contract?.rendering?.interactiveLease?.activeSpinnerLimit !== 1) {
+    failures.push('documentation requires the frozen single interactive-spinner policy')
+  }
+  if (
+    JSON.stringify(contract?.rendering?.staticModes?.options) !==
+      JSON.stringify(['symbol', 'text', 'silent']) ||
+    contract?.rendering?.staticModes?.default !== 'symbol' ||
+    contract?.rendering?.log?.activeFrameCoordination !== 'clear-write-redraw' ||
+    JSON.stringify(contract?.environment?.terminalModes) !==
+      JSON.stringify(['auto', 'static', 'interactive'])
+  ) {
+    failures.push(
+      'documentation requires the frozen static-mode, terminal-override, and log policy',
+    )
   }
   if ((runtimeSbom?.components ?? []).length !== 0) {
     failures.push(

@@ -82,6 +82,19 @@ describe('Phase 4 documentation policy', () => {
     )
   })
 
+  it('rejects color-only capability and render-cache contract drift', () => {
+    const current = fixture()
+    current.contract.environment.noColor = 'non-empty-disables'
+    current.contract.rendering.renderCache.colorMutation = 'invalidate-all'
+
+    expect(validateDocumentation(current)).toEqual(
+      expect.arrayContaining([
+        'documentation requires the frozen color-only disable and emphasis policy',
+        'documentation requires the frozen lazy render-cache policy',
+      ]),
+    )
+  })
+
   it('rejects broken links and stdout-writing examples', () => {
     const current = fixture()
     current.documents['README.md'] += '\n[Missing](missing.md)\n'

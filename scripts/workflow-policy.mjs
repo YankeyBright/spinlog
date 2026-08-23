@@ -1,16 +1,20 @@
 import { parseDocument } from 'yaml'
 
 import { sortCanonicalText } from './canonical-order.mjs'
+import { validateReleaseWorkflows } from './release-policy.mjs'
 
-const PINNED_ACTION = /^[\w.-]+\/[\w.-]+@[a-f0-9]{40}$/
+const PINNED_ACTION = /^[\w.-]+\/[\w.-]+(?:\/[\w.-]+)?@[a-f0-9]{40}$/
 const ALLOWED_ACTIONS = new Set([
   'actions/checkout',
   'actions/download-artifact',
   'actions/setup-node',
   'actions/upload-artifact',
+  'actions/attest',
+  'github/codeql-action/init',
+  'github/codeql-action/analyze',
 ])
 const CI_CONCURRENCY_GROUP = `ci-\${{ github.workflow }}-\${{ github.ref }}`
-const WORKFLOW_NAMES = ['ci.yml', 'release-readiness.yml']
+const WORKFLOW_NAMES = ['ci.yml', 'codeql.yml', 'release-readiness.yml']
 const BASELINE_STATUS_OUTPUT = `\${{ steps.baseline.outputs.present }}`
 const CANDIDATE_BASELINE_CONDITION = `\${{ needs.baseline-status.outputs.present == 'true' }}`
 const BASELINE_STATUS_COMMAND = `if test -f bench/baseline.json; then
@@ -19,13 +23,6 @@ else
   echo "Committed benchmark baseline is absent; candidate verification is deferred."
   echo "present=false" >> "$GITHUB_OUTPUT"
 fi`
-const READINESS_COMMANDS = new Set([
-  'npm ci --ignore-scripts',
-  'npm run check:phases',
-  'npm run verify:release',
-  'npm audit --audit-level=low',
-  'npm pack --dry-run --json --ignore-scripts',
-])
 const CI_COMMANDS = new Set([
   'npm ci --ignore-scripts',
   'npm run check:foundation\nnpm run check:phase4',
@@ -173,25 +170,26 @@ function validateCi(workflow, failures) {
   validateCommands(workflow, 'ci.yml', CI_COMMANDS, failures)
 }
 
-function validateReadiness(workflow, failures) {
-  if (!equals(workflow.on, { workflow_dispatch: null })) {
-    failures.push('release-readiness.yml must be manual only')
-  }
-  validateReadOnly(workflow, 'release-readiness.yml', failures)
-  if (workflow.jobs?.verify?.['runs-on'] !== 'ubuntu-latest') {
-    failures.push('release-readiness.yml must use the frozen Linux verification runner')
-  }
-  const setup = steps(workflow).find(
-    (step) => typeof step.uses === 'string' && step.uses.startsWith('actions/setup-node@'),
-  )
+function validateCodeql(workflow, failures) {
   if (
-    setup?.with?.['node-version'] !== '24.x' ||
-    setup?.with?.['package-manager-cache'] !== false ||
-    'cache' in (setup?.with ?? {})
+    !equals(workflow.on, {
+      push: { branches: ['main'] },
+      pull_request: { branches: ['main'] },
+      schedule: [{ cron: '30 2 * * 1' }],
+    })
   ) {
-    failures.push('release-readiness.yml must use Node 24 with package-manager caching disabled')
+    failures.push('codeql.yml must run on main changes, pull requests, and a weekly schedule')
   }
-  validateCommands(workflow, 'release-readiness.yml', READINESS_COMMANDS, failures)
+  if (!equals(workflow.permissions, { contents: 'read' })) {
+    failures.push('codeql.yml top-level permissions must be exactly contents: read')
+  }
+  const analyze = workflow.jobs?.analyze
+  if (
+    analyze?.['runs-on'] !== 'ubuntu-latest' ||
+    !equals(analyze?.permissions, { contents: 'read', 'security-events': 'write' })
+  ) {
+    failures.push('codeql.yml analysis must use least-privilege CodeQL permissions')
+  }
 }
 
 export function parseWorkflow(source, name) {
@@ -212,7 +210,7 @@ export function parseWorkflow(source, name) {
 export function validateWorkflowPolicy(sources) {
   const failures = []
   if (!equals(sortCanonicalText(Object.keys(sources)), WORKFLOW_NAMES)) {
-    failures.push('pre-Phase-5 workflows must be exactly ci.yml and release-readiness.yml')
+    failures.push('workflows must be exactly ci.yml, codeql.yml, and release-readiness.yml')
     return failures
   }
   const parsed = Object.fromEntries(
@@ -223,7 +221,8 @@ export function validateWorkflowPolicy(sources) {
     }),
   )
   validateCi(parsed['ci.yml'], failures)
-  validateReadiness(parsed['release-readiness.yml'], failures)
+  validateCodeql(parsed['codeql.yml'], failures)
+  failures.push(...validateReleaseWorkflows(parsed))
   for (const [name, workflow] of Object.entries(parsed)) validateActions(workflow, name, failures)
   return [...new Set(failures)]
 }

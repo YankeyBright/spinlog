@@ -4,7 +4,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import spinlog from '../src/index.js'
 import { selectFrame, selectStatus } from '../src/spinner.js'
-import { sanitizeSegment } from '../src/text.js'
+import {
+  fitsSingleTerminalLine,
+  fitsSingleTerminalWidth,
+  sanitizeSegment,
+  terminalCellWidth,
+  terminalTextWidth,
+} from '../src/text.js'
 
 const ENV_KEYS = [
   'CI',
@@ -19,10 +25,15 @@ const ENV_KEYS = [
 describe('spinner lifecycle and rendering', () => {
   let environment: Record<string, string | undefined>
   let ttyDescriptor: PropertyDescriptor | undefined
+  let columnsDescriptor: PropertyDescriptor | undefined
   let write: ReturnType<typeof vi.spyOn>
 
   function setTTY(value: boolean) {
     Object.defineProperty(stderr, 'isTTY', { configurable: true, value })
+  }
+
+  function setColumns(value: number | undefined) {
+    Object.defineProperty(stderr, 'columns', { configurable: true, value })
   }
 
   function output() {
@@ -35,9 +46,12 @@ describe('spinner lifecycle and rendering', () => {
     for (const key of ENV_KEYS) delete process.env[key]
     process.env.NODE_ENV = 'production'
     process.env.FORCE_COLOR = '0'
+    process.env.TERM = 'xterm-256color'
     process.env.WT_SESSION = 'test-session'
     ttyDescriptor = Object.getOwnPropertyDescriptor(stderr, 'isTTY')
+    columnsDescriptor = Object.getOwnPropertyDescriptor(stderr, 'columns')
     setTTY(true)
+    setColumns(80)
     write = vi.spyOn(stderr, 'write').mockImplementation(() => true)
   })
 
@@ -51,6 +65,8 @@ describe('spinner lifecycle and rendering', () => {
     }
     if (ttyDescriptor) Object.defineProperty(stderr, 'isTTY', ttyDescriptor)
     else delete (stderr as { isTTY?: boolean }).isTTY
+    if (columnsDescriptor) Object.defineProperty(stderr, 'columns', columnsDescriptor)
+    else delete (stderr as { columns?: number }).columns
   })
 
   it('selects every frozen frame and Unicode fallback', () => {
@@ -85,14 +101,56 @@ describe('spinner lifecycle and rendering', () => {
     ).toBe('safe text')
   })
 
+  it('sanitizes deterministic hostile text without allowing terminal controls to survive', () => {
+    const fragments = ['safe', '\x00', '\x1b[31m', '\u061c', '\u2028', '\u2067', '\r\n', 'text']
+    let seed = 0x5eed
+
+    for (let sample = 0; sample < 64; sample += 1) {
+      let value = ''
+      for (let index = 0; index < 24; index += 1) {
+        seed = (seed * 1664525 + 1013904223) >>> 0
+        value += fragments[seed % fragments.length]
+      }
+      expect(sanitizeSegment(value)).not.toMatch(
+        /[\x00-\x1f\x7f-\x9f\u061c\u200e\u200f\u2028-\u202e\u2066-\u2069]/u,
+      )
+    }
+  })
+
+  it('counts non-ASCII text conservatively when deciding whether a frame can animate', () => {
+    setColumns(5)
+
+    expect(terminalCellWidth('')).toBe(0)
+    expect(terminalCellWidth('a')).toBe(1)
+    expect(terminalTextWidth('a\u00e9')).toBe(3)
+    expect(fitsSingleTerminalWidth(3)).toBe(true)
+    expect(fitsSingleTerminalWidth(-1)).toBe(false)
+    expect(terminalCellWidth('é')).toBe(2)
+    expect(terminalCellWidth('🦄')).toBe(2)
+    expect(fitsSingleTerminalLine('ab')).toBe(true)
+    expect(fitsSingleTerminalLine('é')).toBe(true)
+    expect(fitsSingleTerminalLine('🦄')).toBe(true)
+    expect(fitsSingleTerminalLine('éé')).toBe(false)
+    expect(fitsSingleTerminalLine('🦄🦄')).toBe(false)
+  })
+
   it('validates JavaScript inputs and every mutable field', () => {
     expect(() => spinlog(null as unknown as string)).toThrow('text must be a string')
     expect(() => spinlog('', null as unknown as never)).toThrow('options must be an object')
     expect(() => spinlog('', { color: 'orange' as never })).toThrow(
       'color must be a built-in spinner color',
     )
+    expect(() => spinlog('', { color: 'bgRed' as never })).toThrow(
+      'color must be a built-in spinner color',
+    )
     expect(() => spinlog('', { spinner: 'custom' as never })).toThrow(
       "spinner must be 'dots' or 'line'",
+    )
+    expect(() => spinlog('', { static: 'quiet' as never })).toThrow(
+      "static must be 'symbol', 'text', or 'silent'",
+    )
+    expect(() => spinlog('', { terminal: 'force' as never })).toThrow(
+      "terminal must be 'auto', 'static', or 'interactive'",
     )
 
     const spinner = spinlog()
@@ -118,26 +176,26 @@ describe('spinner lifecycle and rendering', () => {
     })
 
     expect(spinner.start()).toBe(spinner)
-    expect(output()).toEqual(['\x1b[?25l', 'p - work s'])
+    expect(output()).toEqual(['\x1b[?25lp - work s'])
     expect(vi.getTimerCount()).toBe(1)
     expect(interval.mock.results[0]?.value.hasRef()).toBe(false)
 
     spinner.start()
-    expect(output()).toHaveLength(2)
+    expect(output()).toHaveLength(1)
     expect(vi.getTimerCount()).toBe(1)
 
     vi.advanceTimersByTime(80)
-    expect(output().slice(-2)).toEqual(['\x1b[2K\r', 'p \\ work s'])
+    expect(output().at(-1)).toBe('\x1b[2K\rp \\ work s')
 
     spinner.prefix = '\x1b[35mP\x1b[0m\n'
     spinner.text = 'a\r\nb'
     spinner.suffix = '\x1b]0;title\x07S'
     spinner.color = 'yellow'
     vi.advanceTimersByTime(80)
-    expect(output().slice(-2)).toEqual(['\x1b[2K\r', 'P | a b S'])
+    expect(output().at(-1)).toBe('\x1b[2K\rP | a b S')
 
     expect(spinner.stop()).toBe(spinner)
-    expect(output().slice(-2)).toEqual(['\x1b[2K\r', '\x1b[?25h'])
+    expect(output().at(-1)).toBe('\x1b[2K\r\x1b[?25h')
     expect(vi.getTimerCount()).toBe(0)
     const writes = output().length
     spinner.stop()
@@ -153,12 +211,12 @@ describe('spinner lifecycle and rendering', () => {
     })
 
     spinner.start()
-    expect(output()[1]).toBe('prefix \x1b[35m-\x1b[39m work')
+    expect(output()[0]).toBe('\x1b[?25lprefix \x1b[35m-\x1b[39m work')
     spinner.succeed()
-    expect(output().at(-2)).toBe('prefix \x1b[32m✔\x1b[39m work\n')
+    expect(output().at(-1)).toBe('\x1b[2K\rprefix \x1b[32m✔\x1b[39m work\n\x1b[?25h')
 
     const bright = spinlog('bright', { color: 'blackBright', spinner: 'line' }).start()
-    expect(output().at(-1)).toBe('\x1b[90m-\x1b[39m bright')
+    expect(output().at(-1)).toBe('\x1b[?25l\x1b[90m-\x1b[39m bright')
     bright.stop()
   })
 
@@ -168,9 +226,9 @@ describe('spinner lifecycle and rendering', () => {
     const spinner = spinlog('work', { color: 'magenta', spinner: 'line' })
 
     spinner.start()
-    expect(output()[1]).toBe('- work')
+    expect(output()[0]).toBe('\x1b[?25l- work')
     spinner.succeed()
-    expect(output().at(-2)).toBe('✔ work\n')
+    expect(output().at(-1)).toBe('\x1b[2K\r✔ work\n\x1b[?25h')
   })
 
   it('degrades deterministically without timers or cursor control', () => {
@@ -302,6 +360,7 @@ describe('spinner lifecycle and rendering', () => {
   it.each(['idle', 'spinning', 'stopped'] as const)(
     'rejects invalid terminal overrides from the %s state without side effects',
     (source) => {
+      setTTY(false)
       const spinner = spinlog('first', { spinner: 'line' })
       if (source === 'spinning') spinner.start()
       if (source === 'stopped') spinner.stop()
@@ -349,40 +408,29 @@ describe('spinner lifecycle and rendering', () => {
     expect(vi.getTimerCount()).toBe(0)
   })
 
-  it.each([1, 2])(
-    'stops and retries after initial interactive write failure at step %s',
-    (step) => {
-      let call = 0
-      write.mockImplementation(() => {
-        call += 1
-        if (call === step) throw new Error('write failed')
-        return true
-      })
-      const spinner = spinlog('work', { spinner: 'line' })
+  it('stops and retries after an initial interactive write failure', () => {
+    write.mockImplementationOnce(() => {
+      throw new Error('write failed')
+    })
+    const spinner = spinlog('work', { spinner: 'line' })
 
-      spinner.start()
-      expect(vi.getTimerCount()).toBe(0)
-      expect(output().at(-1)).toBe('\x1b[?25h')
+    spinner.start()
+    expect(vi.getTimerCount()).toBe(0)
+    expect(output().at(-1)).toBe('\x1b[?25h')
 
-      write.mockImplementation(() => true)
-      write.mockClear()
-      spinner.start()
-      expect(output()).toEqual(['\x1b[?25l', '- work'])
-      expect(vi.getTimerCount()).toBe(1)
-    },
-  )
+    write.mockImplementation(() => true)
+    write.mockClear()
+    spinner.start()
+    expect(output()).toEqual(['\x1b[?25l- work'])
+    expect(vi.getTimerCount()).toBe(1)
+    spinner.stop()
+  })
 
-  it.each(['clear', 'frame'] as const)('stops after an interval %s write failure', (failure) => {
+  it('stops after an interval render write failure', () => {
     spinlog('work', { spinner: 'line' }).start()
     write.mockImplementationOnce(() => {
-      if (failure === 'clear') throw new Error('clear failed')
-      return true
+      throw new Error('render failed')
     })
-    if (failure === 'frame') {
-      write.mockImplementationOnce(() => {
-        throw new Error('frame failed')
-      })
-    }
 
     vi.advanceTimersByTime(80)
     expect(vi.getTimerCount()).toBe(0)
@@ -392,29 +440,27 @@ describe('spinner lifecycle and rendering', () => {
   it('suppresses stop cleanup failure and remains restartable', () => {
     const spinner = spinlog('work', { spinner: 'line' }).start()
     write.mockImplementationOnce(() => {
-      throw new Error('clear failed')
+      throw new Error('cleanup failed')
     })
-    write.mockImplementationOnce(() => true)
 
     spinner.stop()
     expect(vi.getTimerCount()).toBe(0)
     write.mockImplementation(() => true)
     spinner.start()
     expect(vi.getTimerCount()).toBe(1)
+    spinner.stop()
   })
 
-  it.each([1, 2, 3])('preserves terminal state when interactive step %s fails', (step) => {
+  it('preserves terminal state when interactive rendering fails', () => {
     const spinner = spinlog('work', { spinner: 'line' }).start()
-    let call = 0
-    write.mockImplementation(() => {
-      call += 1
-      if (call === step) throw new Error('terminal write failed')
-      return true
-    })
     write.mockClear()
+    write.mockImplementationOnce(() => {
+      throw new Error('terminal write failed')
+    })
 
     spinner.succeed()
     expect(vi.getTimerCount()).toBe(0)
+    expect(output()).toEqual(['\x1b[2K\r✔ work\n\x1b[?25h', '\x1b[?25h'])
     const calls = output().length
     spinner.fail()
     expect(output()).toHaveLength(calls)
@@ -440,6 +486,84 @@ describe('spinner lifecycle and rendering', () => {
     spinner.fail()
     expect(output()).toHaveLength(count)
     expect(output()).not.toContain('\x1b[?25h')
+  })
+
+  it('keeps one interactive owner while secondary spinners render static lines safely', () => {
+    const first = spinlog('first', { spinner: 'line' }).start()
+    const second = spinlog('second', { spinner: 'line' }).start()
+
+    expect(vi.getTimerCount()).toBe(1)
+    expect(output().at(-1)).toBe('\x1b[2K\r- second\n- first')
+
+    second.succeed()
+    expect(output().at(-1)).toBe('\x1b[2K\r✔ second\n- first')
+    first.stop()
+    expect(output().at(-1)).toBe('\x1b[2K\r\x1b[?25h')
+  })
+
+  it('falls back to static output when terminal width is unknown or too narrow', () => {
+    setColumns(undefined)
+    spinlog('unknown', { spinner: 'line' }).start()
+    expect(output()).toEqual(['- unknown\n'])
+    expect(vi.getTimerCount()).toBe(0)
+
+    write.mockClear()
+    setColumns(10)
+    spinlog('too wide', { spinner: 'line' }).start()
+    expect(output()).toEqual(['- too wide\n'])
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('demotes an active spinner after a width-changing mutation', () => {
+    const spinner = spinlog('ok', { spinner: 'line' }).start()
+    spinner.text = 'a message that cannot fit'
+    setColumns(10)
+
+    vi.advanceTimersByTime(80)
+    expect(vi.getTimerCount()).toBe(0)
+    expect(output().at(-1)).toBe('\x1b[2K\r\x1b[?25h\\ a message that cannot fit\n')
+
+    spinner.succeed()
+    expect(output().at(-1)).toBe('✔ a message that cannot fit\n')
+  })
+
+  it('invalidates cached render data on text mutations without changing assigned values', () => {
+    const spinner = spinlog('first', { prefix: 'before', spinner: 'line', suffix: 'after' }).start()
+    const rawText = '\x1b[31mnext\x1b[0m\u202eline'
+    write.mockClear()
+
+    spinner.prefix = '\x1b[34mprefix\x1b[0m'
+    spinner.text = rawText
+    spinner.suffix = 'tail\r\nend'
+    vi.advanceTimersByTime(80)
+
+    expect(spinner.text).toBe(rawText)
+    expect(output()).toEqual(['\x1b[2K\rprefix \\ next line tail end'])
+    spinner.stop()
+  })
+
+  it('contains cursor restoration failure while demoting to static output', () => {
+    const spinner = spinlog('work', { spinner: 'line' }).start()
+    spinner.text = 'a message that cannot fit'
+    setColumns(10)
+    write.mockClear()
+    write.mockImplementationOnce(() => {
+      throw new Error('demotion write failed')
+    })
+
+    vi.advanceTimersByTime(80)
+
+    expect(vi.getTimerCount()).toBe(0)
+    expect(output()).toEqual(['\x1b[2K\r\x1b[?25h\\ a message that cannot fit\n', '\x1b[?25h'])
+  })
+
+  it('provides non-enumerable Symbol.dispose cleanup without owning process shutdown', () => {
+    const spinner = spinlog('work', { spinner: 'line' }).start()
+
+    expect(Object.getOwnPropertyDescriptor(spinner, Symbol.dispose)?.enumerable).toBe(false)
+    spinner[Symbol.dispose]()
+    expect(vi.getTimerCount()).toBe(0)
+    expect(output().at(-1)).toBe('\x1b[2K\r\x1b[?25h')
   })
 
   it('does not install process or stream listeners or call host termination APIs', () => {

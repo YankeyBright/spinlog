@@ -1,7 +1,7 @@
 {
   "name": "spinlog",
   "version": "0.1.0",
-  "description": "A zero-runtime-dependency, ESM-only terminal color and spinner primitive capped at 2,560 bytes gzipped.",
+  "description": "A zero-runtime-dependency, ESM-only terminal color and spinner primitive capped at 4,096 bytes gzipped.",
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -33,6 +33,12 @@
   "homepage": "https://github.com/YankeyBright/spinlog#readme",
   "bugs": {
     "url": "https://github.com/YankeyBright/spinlog/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true,
+    "registry": "https://registry.npmjs.org/",
+    "tag": "next"
   },
   "keywords": [
     "cli",
@@ -84,24 +90,34 @@
     "check:phase1:release": "npm run sbom && npm run sbom:check && node scripts/check-phase1-release.mjs",
     "check:phase2": "npm run typecheck && npm run typecheck:contracts && npm run format:check && npm run lint && npm run test:coverage && npm run build && npm run typecheck:public && npm run api:check && npm run runtime:check && node scripts/check-phase2.mjs && npm run package:lint && npm run check:tree-shaking && npm run test:consumer && npm run size && npm run size:limit && npm run pack:check",
     "check:foundation": "npm run check:phase0 && npm run check:phase1 && npm run check:phase1:release && npm run check:phase2",
-    "check:phase3": "npm run policy:check && npm run build && npm run benchmark:smoke && npm run sbom && npm run sbom:check && npm run sbom:build && npm run sbom:build:check && npm run size && npm run size:limit && npm run package:lint && npm run pack:check && npm run reproducibility:check && node scripts/check-phase3.mjs",
+    "check:phase3": "npm run policy:check && npm run build && npm run benchmark:smoke && npm run sbom && npm run sbom:check && npm run sbom:build && npm run sbom:build:check && npm run size && npm run size:limit && npm run package:lint && npm run pack:check && npm run reproducibility:check && npm run check:baseline-scope && node scripts/check-phase3.mjs",
     "docs:update": "node scripts/sync-readme-examples.mjs",
     "docs:check": "node scripts/sync-readme-examples.mjs --check && node scripts/check-documentation.mjs",
     "test:examples": "node scripts/check-examples.mjs",
     "check:phase4": "npm run build && npm run sbom && npm run sbom:check && npm run docs:check && npm run test:examples && npm run pack:check && node scripts/check-phase4.mjs",
+    "check:phase5": "npm run check:phase-map && npm run policy:check && npm run sbom:check && npm run pack:check && npm run https:check && node scripts/check-phase5.mjs",
+    "check:baseline-scope": "node scripts/check-baseline-scope.mjs",
+    "check:release-ancestry": "node scripts/check-release-ancestry.mjs",
     "check:phases": "node scripts/check-phases.mjs",
     "verify": "npm run policy:check && npm run typecheck && npm run typecheck:contracts && npm run format:check && npm run lint && npm run test:coverage && npm run build && npm run typecheck:public && npm run api:check && npm run runtime:check && node scripts/check-phase2.mjs && npm run package:lint && npm run check:tree-shaking && npm run test:consumer && npm run size && npm run size:limit && npm run pack:check",
     "verify:release": "npm run verify && npm run sbom && npm run sbom:check",
-    "verify:candidate": "node scripts/verify-candidate.mjs"
+    "verify:candidate": "node scripts/verify-candidate.mjs",
+    "verify:preview": "node scripts/verify-preview.mjs",
+    "verify:published": "node scripts/verify-published-preview.mjs",
+    "verify:published:integrity": "node scripts/verify-published-integrity.mjs",
+    "verify:published:signatures": "node scripts/verify-published-signatures.mjs",
+    "https:check": "node scripts/check-https-policy.mjs",
+    "test:stability": "node scripts/test-stability.mjs"
   },
   "devDependencies": {
-    "@microsoft/api-extractor": "7.58.12",
     "@arethetypeswrong/cli": "0.18.5",
     "@babel/parser": "7.29.8",
-    "@biomejs/biome": "2.5.7",
+    "@biomejs/biome": "2.5.8",
+    "@microsoft/api-extractor": "7.58.12",
     "@size-limit/preset-small-lib": "13.0.3",
     "@types/node": "22.20.1",
     "@vitest/coverage-v8": "4.1.10",
+    "@xterm/headless": "6.0.0",
     "esbuild": "0.28.2",
     "marked": "9.1.6",
     "publint": "0.3.23",

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 9,
   "phase": 0,
   "identity": {
     "packageName": "spinlog",
@@ -19,7 +19,7 @@
     "artifact": "dist/index.js",
     "compression": "gzip",
     "level": 9,
-    "maximumBytes": 2560,
+    "maximumBytes": 4096,
     "singleStyleMaximumBytes": 600
   },
   "publicApi": {
@@ -28,6 +28,8 @@
     "stylesSubpath": "spinlog/styles",
     "defaultExport": "spinlog",
     "callableMethods": ["promise", "intro", "outro"],
+    "spinnerMethods": ["start", "stop", "log", "Symbol.dispose", "succeed", "fail", "warn", "info"],
+    "spinnerDisposal": "Symbol.dispose",
     "typeExports": [
       "PromiseOptions",
       "Spinlog",
@@ -83,6 +85,8 @@
     "prefix": "",
     "suffix": "",
     "spinner": "dots",
+    "static": "symbol",
+    "terminal": "auto",
     "intervalMs": 80
   },
   "rendering": {
@@ -142,6 +146,39 @@
       "stopSequence": [],
       "terminalSequence": ["render-status", "newline"]
     },
+    "staticModes": {
+      "default": "symbol",
+      "options": ["symbol", "text", "silent"],
+      "appliesFor": ["non-interactive", "lease-unavailable", "terminal-static", "width-demotion"],
+      "symbol": {
+        "startSequence": ["render-frame", "newline"],
+        "terminalSequence": ["render-status", "newline"]
+      },
+      "text": {
+        "startSequence": ["render-text", "newline"],
+        "terminalSequence": ["render-text", "newline"],
+        "color": "none",
+        "status": "none"
+      },
+      "silent": {
+        "startSequence": [],
+        "terminalSequence": [],
+        "cursorRestoreAfterDemotion": true
+      }
+    },
+    "log": {
+      "stream": "stderr",
+      "states": "all",
+      "return": "same-instance",
+      "validation": "string-before-output",
+      "sanitization": "render-boundary",
+      "output": "one-permanent-newline-terminated-line",
+      "activeFrameCoordination": "clear-write-redraw",
+      "changesState": false,
+      "changesTimer": false,
+      "backpressure": "ignore",
+      "synchronousWriteFailure": "suppress"
+    },
     "flowMessages": {
       "stream": "stderr",
       "writesPerCall": 1,
@@ -155,14 +192,38 @@
       "stateless": true,
       "paired": false,
       "touchesSpinnerState": false,
+      "activeFrameCoordination": "clear-write-redraw",
       "createsTimer": false,
       "synchronousWriteFailure": "suppress",
       "backpressure": "ignore",
       "asynchronousErrors": "host-owned"
+    },
+    "interactiveLease": {
+      "scope": "process",
+      "activeSpinnerLimit": 1,
+      "secondarySpinner": "static",
+      "release": ["stop", "terminal", "dispose", "write-failure"]
+    },
+    "widthSafety": {
+      "source": "stderr.columns",
+      "minimumColumns": 3,
+      "asciiCellWidth": 1,
+      "nonAsciiCellWidth": 2,
+      "maximumWidth": "less-than-columns-minus-one",
+      "unavailable": "static",
+      "overflow": "static",
+      "resize": "demote-to-static",
+      "mutation": "demote-to-static"
+    },
+    "renderCache": {
+      "sanitization": "lazy-render-boundary",
+      "fields": ["text", "prefix", "suffix"],
+      "colorMutation": "reuse-text-snapshot",
+      "width": "cached-conservative"
     }
   },
   "textSafety": {
-    "fields": ["text", "prefix", "suffix", "terminalText", "flowMessage"],
+    "fields": ["text", "prefix", "suffix", "terminalText", "flowMessage", "logMessage"],
     "boundary": "render-only",
     "preserveAssignedValues": true,
     "stripVTControlCharacters": true,
@@ -179,6 +240,7 @@
     "embeddedAnsi": "strip"
   },
   "environment": {
+    "capabilityShape": ["sgr", "cursor", "color", "emphasis", "animation", "unicode"],
     "colorPrecedenceDirection": "highest-to-lowest",
     "colorPrecedence": [
       "NO_COLOR",
@@ -187,24 +249,51 @@
       "CI",
       "TERM=dumb",
       "NODE_ENV=test",
-      "stderr.isTTY"
+      "stderr.isTTY",
+      "known-terminal-profile"
     ],
-    "noColor": "non-empty-disables",
+    "noColor": "non-empty-disables-colors-only",
     "noColorOverridesForceColor": true,
-    "nodeDisableColors": "non-empty-disables",
+    "nodeDisableColors": "non-empty-disables-colors-only",
     "nodeDisableColorsOverridesForceColor": true,
     "forceColorFalseValues": ["0", "false"],
     "forceColorOtherDefinedValues": "enable",
     "forceColorEnablesAnimation": false,
+    "forceColorEnablesEmphasis": true,
+    "interactiveEmphasisWhenColorDisabled": true,
+    "nonInteractiveEmphasis": "disabled",
     "ci": "non-empty-disables",
     "termDumb": "exact-disables",
     "nodeEnvTest": "exact-disables",
-    "unicodeWindowsHeuristic": "WT_SESSION-required"
+    "unicodeWindowsHeuristic": "WT_SESSION-required",
+    "cursorTerminalPrefixes": [
+      "xterm",
+      "screen",
+      "tmux",
+      "rxvt",
+      "linux",
+      "cygwin",
+      "st",
+      "alacritty",
+      "kitty",
+      "wezterm",
+      "foot",
+      "konsole",
+      "vte",
+      "eterm",
+      "putty"
+    ],
+    "terminalProfileMatch": "ascii-lowercase-exact-or-dash-suffix",
+    "unknownTerminalProfile": "auto-static-and-no-default-sgr",
+    "limitedTerminalProfiles": ["vt100", "vt220"],
+    "terminalModes": ["auto", "static", "interactive"],
+    "staticTerminalMode": "disables-animation",
+    "interactiveTerminalMode": "tty-and-not-dumb-overrides-profile-ci-test-only"
   },
   "inputValidation": {
     "factoryText": "string",
     "options": "non-null-non-array-object",
-    "textFields": ["text", "prefix", "suffix", "terminalText", "flowMessage"],
+    "textFields": ["text", "prefix", "suffix", "terminalText", "flowMessage", "logMessage"],
     "spinnerNames": ["dots", "line"],
     "colors": "publicApi.SpinnerColor",
     "mutableFields": ["text", "color", "prefix", "suffix"],
@@ -213,6 +302,11 @@
     "invalidMutation": "throw-TypeError-and-preserve-value",
     "invalidTerminalOverride": "throw-TypeError-before-idempotency-state-mutation-timer-or-output",
     "invalidFlowMessage": "throw-TypeError-before-capability-or-output",
+    "staticModes": ["symbol", "text", "silent"],
+    "terminalModes": ["auto", "static", "interactive"],
+    "invalidStaticMode": "throw-TypeError-before-output",
+    "invalidTerminalMode": "throw-TypeError-before-output",
+    "invalidLogMessage": "throw-TypeError-before-output",
     "invalidPromiseOptions": "reject-TypeError-before-start-or-input",
     "invalidStyleInput": "throw-TypeError-before-capability-detection"
   },
@@ -301,6 +395,13 @@
     "nestedStylesRestoreParent": true,
     "resetBehavior": "hard-reset-boundary",
     "resetRestoresParent": false,
+    "metadata": {
+      "singleSourceOfTruth": true,
+      "colorClassification": ["foreground", "background"],
+      "emphasisClassification": ["reset", "modifiers"],
+      "spinnerColorValidation": "foreground-only",
+      "nestedRestore": "metadata-driven"
+    },
     "capabilityStream": "stderr",
     "escapePrefix": "\u001b[",
     "escapeSuffix": "m",
@@ -351,7 +452,8 @@
     "killCalls": false,
     "globalStreamErrorListeners": false,
     "applicationOwnsShutdown": true,
-    "explicitMethodsRestoreCursor": true
+    "explicitMethodsRestoreCursor": true,
+    "disposalRestoresCursor": true
   },
   "writeFailures": {
     "catchSynchronousWrites": true,
@@ -400,7 +502,7 @@
     {
       "id": "concurrent-spinners",
       "api": "multiple active spinners",
-      "reason": "Shared-line coordination belongs with the deferred task-group renderer."
+      "reason": "Only one interactive spinner owns the terminal lease; multi-row task coordination remains separate."
     },
     {
       "id": "advanced-colors",

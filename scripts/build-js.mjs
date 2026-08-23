@@ -13,14 +13,14 @@ rmSync(outputDirectory, { force: true, recursive: true })
 await build({
   absWorkingDir: projectRoot,
   entryPoints: {
-    index: './src/index.ts',
-    styles: './src/styles.ts',
+    index: resolve(projectRoot, 'src/index.ts'),
+    styles: resolve(projectRoot, 'src/styles.ts'),
   },
   bundle: true,
   platform: 'node',
   format: 'esm',
   target: 'node22.13',
-  outdir: 'dist',
+  outdir: outputDirectory,
   minify: true,
   treeShaking: true,
   sourcemap: 'linked',
