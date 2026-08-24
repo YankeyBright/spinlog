@@ -78,7 +78,7 @@ jobs:
           npm pack --json --ignore-scripts --pack-destination artifacts/package
 
       - name: Upload Packed Runtime
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: spinlog-packed-runtime
           path: artifacts/package/*.tgz
@@ -170,7 +170,7 @@ jobs:
           npm run benchmark
 
       - name: Upload Immutable Baseline Input
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: phase3-baseline-run-${{ matrix.slot }}
           path: artifacts/phase3/benchmark.json
@@ -204,7 +204,7 @@ jobs:
         run: node bench/aggregate-baseline.mjs artifacts/phase3/baseline-runs/phase3-baseline-run-1/benchmark.json artifacts/phase3/baseline-runs/phase3-baseline-run-2/benchmark.json artifacts/phase3/baseline-runs/phase3-baseline-run-3/benchmark.json artifacts/phase3/baseline-runs/phase3-baseline-run-4/benchmark.json artifacts/phase3/baseline-runs/phase3-baseline-run-5/benchmark.json --out artifacts/phase3/baseline-candidate.json
 
       - name: Upload Baseline Candidate For Review
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: phase3-baseline-candidate
           path: artifacts/phase3/baseline-candidate.json
@@ -238,7 +238,7 @@ jobs:
           npm run check:phases
 
       - name: Upload Phase 3 Evidence
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: phase3-node24-evidence
           path: artifacts/phase3
