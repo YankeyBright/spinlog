@@ -223,7 +223,7 @@ writeFileSync(
       node: process.version,
       platform: process.platform,
       provenance: {
-        commit: process.env.GITHUB_SHA ?? null,
+        commit: process.env.BENCHMARK_SOURCE_COMMIT ?? process.env.GITHUB_SHA ?? null,
         githubRunAttempt: process.env.GITHUB_RUN_ATTEMPT ?? null,
         githubRunId: process.env.GITHUB_RUN_ID ?? null,
         slot: process.env.BENCHMARK_RUN_SLOT ?? null,

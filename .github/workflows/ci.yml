@@ -166,6 +166,7 @@ jobs:
       - name: Build And Measure Baseline Input
         env:
           BENCHMARK_RUN_SLOT: ${{ matrix.slot }}
+          BENCHMARK_SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           npm run build
           npm run benchmark
@@ -234,6 +235,8 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Verify Candidate Against The Committed Baseline
+        env:
+          BENCHMARK_SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           npm run verify:candidate
           npm run check:phases

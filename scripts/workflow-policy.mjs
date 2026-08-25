@@ -17,6 +17,7 @@ const CI_CONCURRENCY_GROUP = `ci-\${{ github.workflow }}-\${{ github.ref }}`
 const WORKFLOW_NAMES = ['ci.yml', 'codeql.yml', 'release-readiness.yml']
 const BASELINE_STATUS_OUTPUT = `\${{ steps.baseline.outputs.present }}`
 const CANDIDATE_BASELINE_CONDITION = `\${{ needs.baseline-status.outputs.present == 'true' }}`
+const SOURCE_COMMIT_EXPRESSION = `\${{ github.event.pull_request.head.sha || github.sha }}`
 const BASELINE_STATUS_COMMAND = `if test -f bench/baseline.json; then
   echo "present=true" >> "$GITHUB_OUTPUT"
 else
@@ -139,6 +140,12 @@ function validateCi(workflow, failures) {
   const baselineCandidate = workflow.jobs?.['benchmark-baseline-candidate']
   const candidate = workflow.jobs?.candidate
   const baselineReport = steps({ jobs: { baselineStatus } }).find((step) => step?.id === 'baseline')
+  const baselineMeasure = steps({ jobs: { baselineRun } }).find(
+    (step) => step?.name === 'Build And Measure Baseline Input',
+  )
+  const candidateVerify = steps({ jobs: { candidate } }).find(
+    (step) => step?.name === 'Verify Candidate Against The Committed Baseline',
+  )
   if (!equals(baselineRun?.strategy?.matrix?.slot, [1, 2, 3, 4, 5])) {
     failures.push('ci.yml must collect baseline inputs in five independent matrix slots')
   }
@@ -160,6 +167,15 @@ function validateCi(workflow, failures) {
     candidate?.if !== CANDIDATE_BASELINE_CONDITION
   ) {
     failures.push('ci.yml candidate verification must run only with a committed benchmark baseline')
+  }
+  if (
+    !equals(baselineMeasure?.env, {
+      BENCHMARK_RUN_SLOT: `\${{ matrix.slot }}`,
+      BENCHMARK_SOURCE_COMMIT: SOURCE_COMMIT_EXPRESSION,
+    }) ||
+    !equals(candidateVerify?.env, { BENCHMARK_SOURCE_COMMIT: SOURCE_COMMIT_EXPRESSION })
+  ) {
+    failures.push('ci.yml benchmark evidence must use the immutable source commit SHA')
   }
   if (JSON.stringify(workflow).includes('--out bench/baseline.json')) {
     failures.push('ci.yml must never overwrite the committed benchmark baseline')
