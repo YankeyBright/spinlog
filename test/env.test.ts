@@ -1,12 +1,61 @@
-import { describe, expect, it } from 'vitest'
+import type { Writable } from 'node:stream'
 
-import { getCapabilities } from '../src/env.js'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { getCapabilities, type TerminalMode, type UnicodeMode } from '../src/env.js'
+import type { RenderTarget } from '../src/text.js'
 
 const XTERM = { TERM: 'xterm-256color' }
+const ENV_KEYS = [
+  'CI',
+  'FORCE_COLOR',
+  'NO_COLOR',
+  'NODE_DISABLE_COLORS',
+  'NODE_ENV',
+  'TERM',
+  'WT_SESSION',
+] as const
+const stream = { write: () => true } as unknown as Writable
+
+function target(isTTY: boolean): RenderTarget {
+  return { stream, isTTY, columns: 80, rows: 24 }
+}
 
 describe('terminal capabilities', () => {
+  let originalEnvironment: Record<(typeof ENV_KEYS)[number], string | undefined>
+  let platform: NodeJS.Platform
+
+  beforeEach(() => {
+    originalEnvironment = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]))
+    for (const key of ENV_KEYS) delete process.env[key]
+    platform = process.platform
+    vi.spyOn(process, 'platform', 'get').mockImplementation(() => platform)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    for (const key of ENV_KEYS) {
+      const value = originalEnvironment[key]
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+  })
+
+  function capabilities(
+    env: NodeJS.ProcessEnv = {},
+    isTTY = true,
+    nextPlatform: NodeJS.Platform = 'linux',
+    terminal: TerminalMode = 'auto',
+    unicode: UnicodeMode = 'auto',
+  ) {
+    for (const key of ENV_KEYS) delete process.env[key]
+    Object.assign(process.env, env)
+    platform = nextPlatform
+    return getCapabilities(target(isTTY), terminal, unicode)
+  }
+
   it('enables known SGR and cursor capabilities on an ordinary TTY', () => {
-    expect(getCapabilities(XTERM, true, 'linux')).toEqual({
+    expect(capabilities(XTERM)).toEqual({
       sgr: true,
       cursor: true,
       color: true,
@@ -14,7 +63,7 @@ describe('terminal capabilities', () => {
       animation: true,
       unicode: true,
     })
-    expect(Object.isFrozen(getCapabilities(XTERM, true, 'linux'))).toBe(true)
+    expect(Object.isFrozen(capabilities(XTERM))).toBe(true)
   })
 
   it.each([
@@ -24,7 +73,7 @@ describe('terminal capabilities', () => {
     [{ ...XTERM, NO_COLOR: '1', NODE_DISABLE_COLORS: '1', FORCE_COLOR: '1' }, false],
     [{ ...XTERM, NO_COLOR: '', NODE_DISABLE_COLORS: '', FORCE_COLOR: '1' }, true],
   ])('applies explicit color precedence for %j', (env, expected) => {
-    expect(getCapabilities(env, true, 'linux').color).toBe(expected)
+    expect(capabilities(env).color).toBe(expected)
   })
 
   it.each([
@@ -33,7 +82,7 @@ describe('terminal capabilities', () => {
     [{ ...XTERM, FORCE_COLOR: '' }, true],
     [{ ...XTERM, FORCE_COLOR: '1' }, true],
   ])('interprets FORCE_COLOR=%j below explicit disable variables', (env, expected) => {
-    expect(getCapabilities(env, true, 'linux').color).toBe(expected)
+    expect(capabilities(env).color).toBe(expected)
   })
 
   it.each([
@@ -47,10 +96,7 @@ describe('terminal capabilities', () => {
   ])(
     'separates color, emphasis, and animation policy for %j',
     (env, color, emphasis, animation) => {
-      const capabilities = getCapabilities(env, true, 'linux')
-      expect(capabilities.color).toBe(color)
-      expect(capabilities.emphasis).toBe(emphasis)
-      expect(capabilities.animation).toBe(animation)
+      expect(capabilities(env)).toMatchObject({ color, emphasis, animation })
     },
   )
 
@@ -72,11 +118,11 @@ describe('terminal capabilities', () => {
       'eterm',
       'putty-256color',
     ]) {
-      expect(getCapabilities({ TERM: term }, true, 'linux').cursor, term).toBe(true)
+      expect(capabilities({ TERM: term }).cursor, term).toBe(true)
     }
 
     for (const term of ['', 'unknown', 'vt100', 'vt220', 'xtermish', 'puttyx', 'screen_256color']) {
-      expect(getCapabilities({ TERM: term }, true, 'linux')).toMatchObject({
+      expect(capabilities({ TERM: term })).toMatchObject({
         sgr: false,
         cursor: false,
         color: false,
@@ -87,52 +133,39 @@ describe('terminal capabilities', () => {
   })
 
   it('keeps physical stream constraints while honoring explicit terminal modes', () => {
-    expect(
-      getCapabilities({ TERM: 'unknown', CI: '1' }, true, 'linux', 'interactive'),
-    ).toMatchObject({
+    expect(capabilities({ TERM: 'unknown', CI: '1' }, true, 'linux', 'interactive')).toMatchObject({
       cursor: false,
       color: false,
       emphasis: false,
       animation: true,
     })
-    expect(getCapabilities(XTERM, true, 'linux', 'static').animation).toBe(false)
-    expect(getCapabilities({ TERM: 'dumb' }, true, 'linux', 'interactive').animation).toBe(false)
-    expect(getCapabilities(XTERM, false, 'linux', 'interactive').animation).toBe(false)
+    expect(capabilities(XTERM, true, 'linux', 'static').animation).toBe(false)
+    expect(capabilities({ TERM: 'dumb' }, true, 'linux', 'interactive').animation).toBe(false)
+    expect(capabilities(XTERM, false, 'linux', 'interactive').animation).toBe(false)
   })
 
   it('keeps forced color separate from cursor animation and supports Windows Terminal', () => {
-    expect(getCapabilities({ FORCE_COLOR: '1' }, false, 'linux')).toEqual({
-      sgr: false,
+    expect(capabilities({ FORCE_COLOR: '1' }, false)).toEqual({
+      sgr: true,
       cursor: false,
       color: true,
-      emphasis: false,
+      emphasis: true,
       animation: false,
       unicode: true,
     })
-    expect(getCapabilities({ NO_COLOR: '1', FORCE_COLOR: '1' }, false, 'linux')).toEqual({
-      sgr: false,
+    expect(capabilities({ NO_COLOR: '1', FORCE_COLOR: '1' }, false)).toEqual({
+      sgr: true,
       cursor: false,
       color: false,
-      emphasis: false,
+      emphasis: true,
       animation: false,
       unicode: true,
     })
-    expect(getCapabilities({}, true, 'win32').unicode).toBe(false)
-    expect(getCapabilities({ WT_SESSION: 'session' }, true, 'win32')).toMatchObject({
+    expect(capabilities({}, true, 'win32').unicode).toBe(false)
+    expect(capabilities({ WT_SESSION: 'session' }, true, 'win32')).toMatchObject({
       sgr: true,
       cursor: true,
       unicode: true,
-    })
-  })
-
-  it('supports process defaults without throwing', () => {
-    expect(getCapabilities()).toEqual({
-      sgr: expect.any(Boolean),
-      cursor: expect.any(Boolean),
-      color: expect.any(Boolean),
-      emphasis: expect.any(Boolean),
-      animation: expect.any(Boolean),
-      unicode: expect.any(Boolean),
     })
   })
 })

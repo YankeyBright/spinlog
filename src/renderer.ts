@@ -1,45 +1,151 @@
-import { tryWrite } from './text.js'
+import {
+  acquireTargetLease,
+  enqueueCosmeticTask,
+  enqueuePermanentTask,
+  flushTargetQueue,
+  releaseTargetLease,
+  targetState,
+} from './renderer-queue.js'
+import type { InteractiveLease, OutputTask } from './renderer-types.js'
+import { CLEAR_LINE } from './terminal-control.js'
+import type { RenderTarget } from './text.js'
 
-const CLEAR_LINE = '\x1b[2K\r'
+export type { InteractiveLease } from './renderer-types.js'
 
-/** An interactive spinner that owns the terminal's current physical line. */
-export interface InteractiveLease {
-  currentFrame(): string
-  stopAfterRenderFailure(): void
+/** Acquire one interactive surface for a target. */
+export function acquireInteractiveLease(target: RenderTarget, lease: InteractiveLease): boolean {
+  return acquireTargetLease(target, lease)
 }
 
-let activeLease: InteractiveLease | undefined
+/** Release an interactive surface only when it owns the supplied target. */
+export function releaseInteractiveLease(target: RenderTarget, lease: InteractiveLease): void {
+  releaseTargetLease(target, lease)
+}
 
-/** Acquire the single interactive terminal line without taking host-process ownership. */
-export function acquireInteractiveLease(lease: InteractiveLease): boolean {
-  if (activeLease === undefined) {
-    activeLease = lease
-    return true
+/** Resolve after already-accepted permanent output for a target has drained. */
+export function flushTarget(target: RenderTarget): Promise<void> {
+  return flushTargetQueue(target)
+}
+
+/** Write an active frame while coalescing superseded frames through backpressure. */
+export function writeInteractiveFrame(
+  target: RenderTarget,
+  lease: InteractiveLease,
+  value: string,
+): boolean {
+  const state = targetState(target)
+  if (state.lease !== lease) return enqueuePermanentTask(state, rawTask(value))
+
+  let failed = false
+  return enqueueCosmeticTask(state, {
+    kind: 'cosmetic',
+    bytes: 0,
+    render: (active) => {
+      if (active.lease !== lease) return undefined
+      if (!prepareLease(lease)) {
+        if (active.lease === lease) {
+          active.lease = undefined
+          failLease(lease)
+          failed = true
+        }
+        return undefined
+      }
+      return value
+    },
+    didWrite: () => notifyLease(lease),
+    fail: () => failLease(lease),
+    owner: () => lease,
+    failed: () => failed,
+  })
+}
+
+/** Insert a permanent line above only the interactive surface owned by target. */
+export function writeCoordinatedLine(
+  target: RenderTarget,
+  value: string,
+  onFailure?: () => void,
+): boolean {
+  const state = targetState(target)
+  let reconstructedLease: InteractiveLease | undefined
+  let deferred = false
+  return enqueuePermanentTask(state, {
+    kind: 'permanent',
+    bytes: Buffer.byteLength(value),
+    render: (active) => {
+      const lease = active.lease
+      if (lease === undefined) return value
+      if (!prepareLease(lease)) {
+        // A surface may write its static fallback while preflighting. Let that
+        // re-entrant output settle before the caller's permanent line.
+        if (active.lease !== lease) {
+          deferred = true
+          return undefined
+        }
+        return value
+      }
+      if (active.lease !== lease) return value
+      try {
+        const frame = lease.currentFrame()
+        if (active.lease !== lease) return value
+        reconstructedLease = lease
+        return `${clearActiveFrame(active.target, lease)}${value}${frame}`
+      } catch {
+        if (active.lease === lease) {
+          active.lease = undefined
+          failLease(lease)
+        }
+        return value
+      }
+    },
+    didWrite: () => reconstructedLease === undefined || notifyLease(reconstructedLease),
+    fail: () => {
+      if (reconstructedLease !== undefined) failLease(reconstructedLease)
+      onFailure?.()
+    },
+    owner: () => reconstructedLease,
+    defer: () => {
+      const shouldDefer = deferred
+      deferred = false
+      return shouldDefer
+    },
+  })
+}
+
+/** Queue an ordered non-frame write for a target-owned lifecycle transition. */
+export function writeTarget(target: RenderTarget, value: string, onFailure?: () => void): boolean {
+  return enqueuePermanentTask(targetState(target), { ...rawTask(value), fail: onFailure })
+}
+
+/** Clear the supplied target surface before replacing its rendered contents. */
+export function clearActiveFrame(_target: RenderTarget, lease: InteractiveLease): string {
+  return lease.clearFrame?.() ?? CLEAR_LINE
+}
+
+function rawTask(value: string): OutputTask {
+  return { kind: 'permanent', bytes: Buffer.byteLength(value), render: () => value }
+}
+
+function prepareLease(lease: InteractiveLease): boolean {
+  try {
+    return lease.prepareFrame?.() !== false
+  } catch {
+    return false
   }
-  return activeLease === lease
 }
 
-/** Release an interactive line only when it is owned by the calling spinner. */
-export function releaseInteractiveLease(lease: InteractiveLease): void {
-  if (activeLease === lease) activeLease = undefined
+function notifyLease(lease: InteractiveLease): boolean {
+  try {
+    lease.didWriteFrame?.()
+    return true
+  } catch {
+    return false
+  }
 }
 
-/** Write an active frame and stop its owner if the cosmetic write throws. */
-export function writeInteractiveFrame(lease: InteractiveLease, value: string): boolean {
-  return writeWithLease(lease, value)
-}
-
-/** Insert a permanent line above the active frame without leaving the frame corrupted. */
-export function writeCoordinatedLine(value: string): boolean {
-  const lease = activeLease
-  return writeWithLease(
-    lease,
-    lease === undefined ? value : `${CLEAR_LINE}${value}${lease.currentFrame()}`,
-  )
-}
-
-function writeWithLease(lease: InteractiveLease | undefined, value: string): boolean {
-  if (tryWrite(value)) return true
-  if (lease !== undefined && activeLease === lease) lease.stopAfterRenderFailure()
-  return false
+function failLease(lease: InteractiveLease): void {
+  try {
+    lease.stopAfterRenderFailure()
+  } catch {
+    // Cosmetic failures never take host application control flow.
+  }
 }

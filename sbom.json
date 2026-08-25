@@ -5,14 +5,14 @@
   "dependencies": [
     {
       "dependsOn": [],
-      "ref": "spinlog@0.1.0"
+      "ref": "spinlog@0.2.0"
     }
   ],
   "metadata": {
     "component": {
       "author": "spinlog contributors",
-      "bom-ref": "spinlog@0.1.0",
-      "description": "A zero-runtime-dependency, ESM-only terminal color and spinner primitive capped at 4,096 bytes gzipped.",
+      "bom-ref": "spinlog@0.2.0",
+      "description": "A zero-runtime-dependency, ESM-only terminal feedback library with target-local rendering capped at 10,240 bytes gzipped.",
       "externalReferences": [
         {
           "type": "issue-tracker",
@@ -35,10 +35,10 @@
         }
       ],
       "name": "spinlog",
-      "purl": "pkg:npm/spinlog@0.1.0",
+      "purl": "pkg:npm/spinlog@0.2.0",
       "scope": "required",
       "type": "library",
-      "version": "0.1.0"
+      "version": "0.2.0"
     },
     "lifecycles": [
       {

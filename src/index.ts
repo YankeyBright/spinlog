@@ -1,11 +1,24 @@
 /// <reference lib="esnext.disposable" />
 
+import type { Writable } from 'node:stream'
+
 import { intro, outro } from './messages.js'
-import { createSpinner, requireOptions } from './spinner.js'
+import { createGroup } from './group.js'
+import { createProgress } from './progress.js'
+import { flushTarget } from './renderer.js'
+import { createSpinner } from './spinner.js'
+import { requireOptions } from './spinner-options.js'
 import * as styles from './styles.js'
+import { requireString, resolveRenderTarget } from './text.js'
 
 /** Built-in spinner animation names. */
 export type SpinnerName = 'dots' | 'line'
+
+/** Caller-provided animation data, copied and validated before rendering begins. */
+export interface SpinnerDefinition {
+  readonly frames: readonly string[]
+  readonly interval?: number
+}
 
 /** ANSI-16 foreground colors available to spinner frames. */
 export type SpinnerColor =
@@ -26,20 +39,68 @@ export type SpinnerColor =
   | 'cyanBright'
   | 'whiteBright'
 
-/** Options used to create a spinner. */
-export interface SpinnerOptions {
-  color?: SpinnerColor
-  prefix?: string
-  suffix?: string
-  spinner?: SpinnerName
+/** Controls whether built-in Unicode glyphs may be used for one render target. */
+export type UnicodeMode = 'auto' | boolean
+
+/** Shared output policy for an explicit writable render target. */
+export interface RenderOptions {
+  /** Destination for this surface. Defaults to `process.stderr`. */
+  stream?: Writable
+  /** Disable all automatic ANSI color, or select the spinner frame color. */
+  color?: SpinnerColor | false
+  /** Select built-in Unicode glyphs automatically or explicitly. */
+  unicode?: UnicodeMode
+  /** Hide the cursor while this surface owns an interactive lease. Defaults to `true`. */
+  hideCursor?: boolean
+  /** Leading spaces added to every line written by this surface. */
+  indent?: number
+  /** Static fallback policy when interactive rendering is unavailable. */
   static?: 'symbol' | 'text' | 'silent'
+  /** Terminal rendering policy. */
   terminal?: 'auto' | 'static' | 'interactive'
 }
 
-/** Options used by the `Spinlog.promise` overloads. */
-export interface PromiseOptions extends SpinnerOptions {
-  text?: string
+/** Options used to create a spinner. */
+export interface SpinnerOptions extends RenderOptions {
+  prefix?: string
+  suffix?: string
+  spinner?: SpinnerName | SpinnerDefinition
 }
+
+/** Rendering policy shared by every child of a task group. */
+export interface GroupOptions extends RenderOptions {
+  /** Maximum interactive group rows. Defaults to the safe target row budget, capped at 10. */
+  maxRows?: number
+}
+
+/** Options used by a determinate progress indicator. */
+export interface ProgressOptions extends Omit<SpinnerOptions, 'spinner'> {
+  total: number
+  value?: number
+  /** Number of visible progress cells, from 5 through 40. Defaults to 20. */
+  width?: number
+  /** Built-in bar appearance. `blocks` falls back to ASCII when Unicode is unavailable. */
+  style?: 'blocks' | 'ascii'
+}
+
+/** Text used when a promise-backed spinner settles, optionally derived from its result. */
+export type PromiseSettlementText<T> = string | ((value: T) => string)
+
+/** Options used by the `Spinlog.promise` overloads. */
+export interface PromiseOptions<T = unknown> extends SpinnerOptions {
+  text?: string
+  /** Text rendered after fulfillment, optionally derived from the fulfillment value. */
+  successText?: PromiseSettlementText<T>
+  /** Text rendered after rejection, optionally derived from the rejection reason. */
+  failText?: PromiseSettlementText<unknown>
+}
+
+/** Options used by `intro()` and `outro()`. */
+export interface FlowOptions
+  extends Pick<RenderOptions, 'stream' | 'color' | 'unicode' | 'indent'> {}
+
+/** Options used by `spinlog.flush()` to await output on one target. */
+export interface FlushOptions extends Pick<RenderOptions, 'stream'> {}
 
 /** A mutable spinner with idempotent lifecycle methods. */
 export interface Spinner {
@@ -51,8 +112,10 @@ export interface Spinner {
   start(): this
   /** Stops an active cycle and restores owned terminal state. */
   stop(): this
-  /** Writes a permanent sanitized stderr line without changing spinner lifecycle state. */
+  /** Writes a permanent sanitized line to this spinner's target without changing lifecycle state. */
   log(message: string): this
+  /** Resolves once already-accepted permanent output on this target has drained. */
+  flush(): Promise<void>
   /** Releases terminal state when a `using` declaration leaves scope. */
   [Symbol.dispose](): void
   /** Persists the first successful terminal result for the current cycle. */
@@ -65,13 +128,54 @@ export interface Spinner {
   info(text?: string): this
 }
 
+/** A target-local task surface whose child spinners share one terminal lease. */
+export interface SpinnerGroup {
+  /** Creates an idle child that follows the group's target and rendering policy. */
+  add(
+    text?: string,
+    options?: Omit<
+      SpinnerOptions,
+      'color' | 'hideCursor' | 'indent' | 'static' | 'stream' | 'terminal' | 'unicode'
+    > & { color?: SpinnerColor },
+  ): Spinner
+  /** Stops every active child and restores terminal state owned by the group. */
+  stop(): this
+  /** Resolves once already-accepted permanent output on this target has drained. */
+  flush(): Promise<void>
+  /** Releases terminal state when a `using` declaration leaves scope. */
+  [Symbol.dispose](): void
+}
+
+/** A determinate progress indicator with the standard spinner lifecycle. */
+export interface Progress
+  extends Omit<Spinner, 'start' | 'stop' | 'succeed' | 'fail' | 'warn' | 'info' | 'log'> {
+  readonly total: number
+  value: number
+  start(): this
+  stop(): this
+  log(message: string): this
+  /** Resolves once already-accepted permanent output on this target has drained. */
+  flush(): Promise<void>
+  succeed(text?: string): this
+  fail(text?: string): this
+  warn(text?: string): this
+  info(text?: string): this
+  /** Replaces the completed amount without changing lifecycle state. */
+  update(value: number): this
+  /** Adds a positive completed amount without changing lifecycle state. */
+  increment(amount?: number): this
+}
+
 /** Callable spinner factory with promise and flow-message integration. */
 export interface Spinlog {
   (text?: string, options?: SpinnerOptions): Spinner
-  promise<T>(input: PromiseLike<T>, options?: PromiseOptions): Promise<T>
-  promise<T>(task: () => PromiseLike<T>, options?: PromiseOptions): Promise<T>
-  intro(message?: string): void
-  outro(message?: string): void
+  promise<T>(input: PromiseLike<T>, options?: PromiseOptions<T>): Promise<T>
+  promise<T>(task: () => PromiseLike<T>, options?: PromiseOptions<T>): Promise<T>
+  intro(message?: string, options?: FlowOptions): void
+  outro(message?: string, options?: FlowOptions): void
+  flush(options?: FlushOptions): Promise<void>
+  group(options?: GroupOptions): SpinnerGroup
+  progress(text: string, options: ProgressOptions): Progress
 }
 
 export const reset: (text: string) => string = styles.reset
@@ -116,23 +220,62 @@ export const bgCyanBright: (text: string) => string = styles.bgCyanBright
 export const bgWhiteBright: (text: string) => string = styles.bgWhiteBright
 
 const factory = (text = '', options: SpinnerOptions = {}): Spinner => createSpinner(text, options)
+const group: Spinlog['group'] = (options = {}) => createGroup(options)
+const progress: Spinlog['progress'] = (text, options) => createProgress(text, options)
+const flush: Spinlog['flush'] = (options = {}) => {
+  const safeOptions = requireOptions(options)
+  return flushTarget(resolveRenderTarget(safeOptions.stream))
+}
 
 const promise: Spinlog['promise'] = async <T>(
   input: PromiseLike<T> | (() => PromiseLike<T>),
-  options: PromiseOptions = {},
+  options: PromiseOptions<T> = {},
 ) => {
   const safeOptions = requireOptions(options)
+  const successText = requirePromiseSettlementText<T>(safeOptions.successText, 'successText')
+  const failText = requirePromiseSettlementText<unknown>(safeOptions.failText, 'failText')
   const spinner = factory(safeOptions.text, safeOptions).start()
   try {
     const value = await (typeof input === 'function' ? input() : input)
-    spinner.succeed()
+    spinner.succeed(resolvePromiseSettlementText(successText, value, 'successText'))
     return value
   } catch (error) {
-    spinner.fail()
+    spinner.fail(resolvePromiseSettlementText(failText, error, 'failText'))
     throw error
   }
 }
 
-const spinlog: Spinlog = /* @__PURE__ */ Object.assign(factory, { promise, intro, outro })
+function requirePromiseSettlementText<T>(
+  value: unknown,
+  field: string,
+): PromiseSettlementText<T> | undefined {
+  if (value === undefined || typeof value === 'string' || typeof value === 'function') {
+    return value as PromiseSettlementText<T> | undefined
+  }
+  throw new TypeError(`${field} must be a string or function`)
+}
+
+function resolvePromiseSettlementText<T>(
+  configured: PromiseSettlementText<T> | undefined,
+  value: T,
+  field: string,
+): string | undefined {
+  if (configured === undefined) return undefined
+  try {
+    return requireString(typeof configured === 'function' ? configured(value) : configured, field)
+  } catch {
+    // A cosmetic callback must never replace the task's fulfillment or rejection.
+    return undefined
+  }
+}
+
+const spinlog: Spinlog = /* @__PURE__ */ Object.assign(factory, {
+  promise,
+  intro,
+  outro,
+  flush,
+  group,
+  progress,
+})
 
 export default spinlog

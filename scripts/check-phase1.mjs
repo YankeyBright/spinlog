@@ -197,6 +197,8 @@ for (const value of [
 
 for (const value of [
   "environment: 'node'",
+  'hookTimeout: 120_000',
+  'testTimeout: 120_000',
   "provider: 'v8'",
   "include: ['src/**/*.ts']",
   "reporter: ['text', ['json', { file: 'coverage-final.json' }]]",
@@ -225,7 +227,7 @@ require(biome.formatter?.enabled === true, 'Biome formatter must be enabled')
 require(biome.linter?.enabled === true, 'Biome linter must be enabled')
 require(Array.isArray(sizeLimit), '.size-limit.json must be an array')
 require(sizeLimitEntry?.path === 'dist/index.js', '.size-limit.json must target dist/index.js')
-require(sizeLimitEntry?.limit === '4096 B', '.size-limit.json must enforce the 4096 B limit')
+require(sizeLimitEntry?.limit === '10240 B', '.size-limit.json must enforce the 10240 B limit')
 require(sizeLimitEntry?.gzip === true, '.size-limit.json must measure gzip size')
 require(JSON.stringify(sizeLimitEntry?.ignore) ===
   JSON.stringify([
@@ -269,11 +271,19 @@ validateSourceMap('dist/index.js.map', sourceMap, [
   '../src/ansi-metadata.ts',
   '../src/ansi.ts',
   '../src/env.ts',
+  '../src/group-rendering.ts',
+  '../src/group.ts',
   '../src/index.ts',
   '../src/messages.ts',
+  '../src/progress.ts',
+  '../src/renderer-queue.ts',
   '../src/renderer.ts',
+  '../src/spinner-data.ts',
+  '../src/spinner-options.ts',
+  '../src/spinner-rendering.ts',
   '../src/spinner.ts',
   '../src/styles.ts',
+  '../src/terminal-control.ts',
   '../src/text.ts',
 ])
 validateSourceMap('dist/styles.js.map', stylesSourceMap, [

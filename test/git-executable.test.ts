@@ -16,4 +16,14 @@ describe('Git executable resolution', () => {
     expect(gitExecutableCandidates({ SPINLOG_GIT_EXECUTABLE: executable })).toEqual([executable])
     expect(isAbsolute(executable)).toBe(true)
   })
+
+  it.each([
+    ['POSIX', {}, 'linux'],
+    ['Windows', { ProgramFiles: 'C:\\Program Files' }, 'win32'],
+  ])('returns a mutable candidate array for %s', (_name, environment, platform) => {
+    const candidates = gitExecutableCandidates(environment, platform)
+
+    expect(Array.isArray(candidates)).toBe(true)
+    expect(candidates).not.toBe(gitExecutableCandidates(environment, platform))
+  })
 })

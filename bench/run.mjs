@@ -139,6 +139,20 @@ const scenarios = [
       ),
     ),
   ),
+  await stableMeasurement('custom-spinner-settlement-ns', () =>
+    withSilentStderr(() =>
+      withEnvironment({ CI: '1', FORCE_COLOR: '0', NO_COLOR: '1', NODE_ENV: 'production' }, () =>
+        measureSync(() =>
+          rootModule
+            .default('benchmark', {
+              spinner: { frames: ['-', '+'], interval: 80 },
+            })
+            .start()
+            .succeed(),
+        ),
+      ),
+    ),
+  ),
   await stableMeasurement('resolved-promise-wrapper-ns', () =>
     withSilentStderr(() =>
       withEnvironment({ CI: '1', FORCE_COLOR: '0', NO_COLOR: '1', NODE_ENV: 'production' }, () =>
@@ -164,6 +178,33 @@ const scenarios = [
     withSilentStderr(() =>
       withEnvironment({ CI: '1', FORCE_COLOR: '0', NO_COLOR: '1', NODE_ENV: 'production' }, () =>
         measureSync(() => rootModule.default('benchmark', { static: 'silent' }).log('benchmark')),
+      ),
+    ),
+  ),
+  await stableMeasurement('group-static-settlement-ns', () =>
+    withSilentStderr(() =>
+      withEnvironment({ CI: '1', FORCE_COLOR: '0', NO_COLOR: '1', NODE_ENV: 'production' }, () =>
+        measureSync(() => {
+          const group = rootModule.default.group({ terminal: 'static' })
+          group.add('benchmark').start().succeed()
+          group.stop()
+        }),
+      ),
+    ),
+  ),
+  await stableMeasurement('progress-static-settlement-ns', () =>
+    withSilentStderr(() =>
+      withEnvironment({ CI: '1', FORCE_COLOR: '0', NO_COLOR: '1', NODE_ENV: 'production' }, () =>
+        measureSync(() =>
+          rootModule.default
+            .progress('benchmark', {
+              total: 1,
+              terminal: 'static',
+            })
+            .start()
+            .increment()
+            .succeed(),
+        ),
       ),
     ),
   ),

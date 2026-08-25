@@ -1,4 +1,7 @@
+import type { RenderTarget } from './text.js'
+
 export type TerminalMode = 'auto' | 'static' | 'interactive'
+export type UnicodeMode = 'auto' | boolean
 
 const CURSOR_TERMINAL =
   /^(?:xterm|screen|tmux|rxvt|linux|cygwin|st|alacritty|kitty|wezterm|foot|konsole|vte|eterm|putty)(?:-|$)/u
@@ -32,9 +35,22 @@ function disablesAutomaticFeatures(env: NodeJS.ProcessEnv, isTTY: boolean): bool
   return Boolean(env.CI) || isDumbTerminal(env) || env.NODE_ENV === 'test' || !isTTY
 }
 
+function explicitlyDisablesColor(env: NodeJS.ProcessEnv): boolean {
+  return Boolean(env.NO_COLOR || env.NODE_DISABLE_COLORS)
+}
+
+function enablesForcedColor(env: NodeJS.ProcessEnv): boolean {
+  return env.FORCE_COLOR !== undefined && env.FORCE_COLOR !== '0' && env.FORCE_COLOR !== 'false'
+}
+
+/** SGR and cursor support are related but independent terminal capabilities. */
+function hasSgrSupport(env: NodeJS.ProcessEnv, isTTY: boolean): boolean {
+  return !isDumbTerminal(env) && (hasKnownCursorProfile(env, isTTY) || enablesForcedColor(env))
+}
+
 function resolveColor(env: NodeJS.ProcessEnv, sgr: boolean, automaticDisabled: boolean): boolean {
-  if (env.NO_COLOR || env.NODE_DISABLE_COLORS) return false
-  if (env.FORCE_COLOR !== undefined) return env.FORCE_COLOR !== '0' && env.FORCE_COLOR !== 'false'
+  if (explicitlyDisablesColor(env)) return false
+  if (env.FORCE_COLOR !== undefined) return enablesForcedColor(env)
   return sgr && !automaticDisabled
 }
 
@@ -50,40 +66,56 @@ function resolveAnimation(
 
 function resolveStyleCapabilities(env: NodeJS.ProcessEnv, isTTY: boolean): number {
   const automaticDisabled = disablesAutomaticFeatures(env, isTTY)
-  const sgr = hasKnownCursorProfile(env, isTTY)
+  const sgr = hasSgrSupport(env, isTTY)
   const color = resolveColor(env, sgr, automaticDisabled)
+  const emphasis =
+    sgr &&
+    (enablesForcedColor(env) || (isTTY && (!automaticDisabled || explicitlyDisablesColor(env))))
 
-  return (
-    (color ? COLOR_CAPABILITY : 0) |
-    (sgr && (color || !automaticDisabled) ? EMPHASIS_CAPABILITY : 0)
-  )
+  return (color ? COLOR_CAPABILITY : 0) | (emphasis ? EMPHASIS_CAPABILITY : 0)
 }
 
 /** Resolve only the SGR decisions needed by the tree-shakeable styles entrypoint. */
-export function getStyleCapabilities(
-  env: NodeJS.ProcessEnv = process.env,
-  isTTY: boolean = process.stderr.isTTY === true,
-): number {
-  return resolveStyleCapabilities(env, isTTY)
+export function getStyleCapabilities(): number {
+  return resolveStyleCapabilities(process.env, process.stderr.isTTY === true)
 }
 
 /** Resolve terminal capabilities without writing to, or taking ownership of, a stream. */
 export function getCapabilities(
-  env: NodeJS.ProcessEnv = process.env,
-  isTTY: boolean = process.stderr.isTTY === true,
-  platform: NodeJS.Platform = process.platform,
+  target: RenderTarget,
   terminal: TerminalMode = 'auto',
+  unicode: UnicodeMode = 'auto',
+): Capabilities {
+  return resolveCapabilities(process.env, target.isTTY, process.platform, terminal, unicode)
+}
+
+function resolveCapabilities(
+  env: NodeJS.ProcessEnv,
+  isTTY: boolean,
+  platform: NodeJS.Platform,
+  terminal: TerminalMode,
+  unicode: UnicodeMode,
 ): Capabilities {
   const cursor = hasKnownCursorProfile(env, isTTY)
+  const sgr = hasSgrSupport(env, isTTY)
   const style = resolveStyleCapabilities(env, isTTY)
 
   return Object.freeze({
-    sgr: cursor,
+    sgr,
     cursor,
     color: (style & COLOR_CAPABILITY) !== 0,
     // NO_COLOR controls color only; emphasis remains useful on a known capable terminal.
     emphasis: (style & EMPHASIS_CAPABILITY) !== 0,
     animation: resolveAnimation(env, isTTY, cursor, terminal),
-    unicode: platform !== 'win32' || Boolean(env.WT_SESSION),
+    unicode: resolveUnicode(env, platform, unicode),
   })
+}
+
+function resolveUnicode(
+  env: NodeJS.ProcessEnv,
+  platform: NodeJS.Platform,
+  unicode: UnicodeMode,
+): boolean {
+  if (typeof unicode === 'boolean') return unicode
+  return platform !== 'win32' || Boolean(env.WT_SESSION)
 }

@@ -1,67 +1,50 @@
 # Architecture
 
-## Phase 2 Module Layout
+## Phase 2 module layout
 
 ```text
 src/
-  index.ts    public ESM factory, promise wrapper, types, and style re-exports
-  ansi.ts     canonical SGR registry, validation, and generic nesting normalization
-  ansi-apply.ts SGR composition and metadata-driven restoration primitives
-  ansi-metadata.ts read-only SGR definition records
-  env.ts      named SGR, cursor, color, emphasis, animation, and Unicode decisions
-  messages.ts coordinated intro/outro stderr renderer
-  renderer.ts process-local interactive-line lease and coordinated writes
-  spinner.ts  lifecycle state machine and stderr renderer
-  styles.ts   public side-effect-free ANSI-16 style entrypoint
-  text.ts     shared validation, width measurement, and render-boundary sanitization
+  index.ts            public ESM factory, promise wrapper, types, and style re-exports
+  ansi.ts             canonical SGR registry and validation
+  env.ts              target-local terminal capability resolution
+  text.ts             RenderTarget, validation, sanitization, width, and write outcomes
+  renderer.ts         coordinated-write and lease facade
+  renderer-types.ts   renderer task, lease, waiter, and target-state contracts
+  renderer-queue.ts   WeakMap target queues, backpressure, and stream completion
+  terminal-control.ts shared cursor and line-control sequences
+  spinner-data.ts     sole built-in frames, intervals, statuses, colors, and fallbacks
+  spinner-options.ts  shared surface-option validation
+  spinner-rendering.ts pure spinner formatting, snapshots, and width calculation
+  spinner.ts          single-surface lifecycle and scheduling
+  group-rendering.ts  group row data, snapshots, width, and formatting
+  group.ts            group sessions, persisted rows, height safety, and scheduling
+  progress.ts         determinate rendering and immutable total/value state
+  messages.ts         target-local intro/outro composition
+  styles.ts           tree-shakeable ANSI-16 style entrypoint
 ```
 
-Phase 0 and Phase 1 did not create these runtime modules beyond the inert entry point. The declarations in `specs/v1-public-api.d.ts` and `specs/v1-styles-api.d.ts` were specification artifacts until Phase 2 implemented them.
+## Target and lease boundaries
 
-## Responsibilities
+`text.ts` resolves a `RenderTarget` around a caller-supplied `Writable` or `process.stderr`. It does not modify the target. TTY state, width, and height are read live so resize safety requires no process-global listener. It returns typed synchronous write outcomes: `written`, `backpressured`, or `failed`.
 
-### `ansi.ts`
+`renderer-queue.ts` owns a `WeakMap<Writable, TargetState>` behind the `renderer.ts` facade. Each identity has at most one interactive surface. A group owns multiple rows through one lease; roots on independent streams do not contend. Ready permanent output is attempted immediately. During backpressure, only the latest cosmetic frame is retained while pending permanent output is capped at 64 tasks or 64 KiB. Temporary `drain`, `finish`, and `close` listeners resume, resolve, or reject target-local work without owning asynchronous stream errors.
 
-Owns the canonical metadata table for every supported SGR helper: opening and closing codes, color/emphasis category, foreground spinner eligibility, and nesting-restoration strategy. It performs no stream or process-lifecycle operations.
+## Surface boundaries
 
-### `ansi-metadata.ts` and `ansi-apply.ts`
+`spinner-data.ts` is the sole source of truth for dots/line frames, ANSI-16 status colors, status glyphs, default interval, and built-in Unicode fallback. `spinner.ts`, `group-rendering.ts`, and `progress.ts` consume that data rather than duplicating tables.
 
-Own the individual metadata records and the small SGR composition primitives. This split keeps the canonical registry available to spinner validation while allowing `spinlog/styles` to retain only the selected helper metadata after bundling. Neither module writes to streams or observes process lifecycle.
+`spinner.ts` owns one mutable spinner’s lifecycle, unreferenced timer, cursor policy, static degradation, and explicit cleanup. `spinner-options.ts` centralizes shared validation, while `spinner-rendering.ts` owns lazy sanitized snapshots and grapheme-aware formatting. Failures remain scoped to the affected target surface.
 
-### `styles.ts`
+`group.ts` owns the multi-row session lifecycle. It distinguishes live rows, permanently persisted rows, and explicitly stopped children eligible for a fresh session. It requires width and height capacity before lease acquisition and atomically demotes all active rows on constraint loss. `group-rendering.ts` contains pure row formatting and cached measurements.
 
-Owns the public style-only entrypoint. Helpers validate string input, consult the named `env.ts` capabilities, and delegate SGR composition to metadata-driven primitives. Color helpers require color capability; reset and modifiers require emphasis capability. Nested non-reset styles restore their enclosing style; reset remains a hard SGR boundary. Helpers are side-effect-free and never write streams.
+`progress.ts` owns a timer-free determinate surface. It keeps total private and exposes it through a getter, validates exact value bounds and positive increments, uses floor-based fill, and completes to total on success. It shares target-local rendering primitives with spinner and group.
 
-### `env.ts`
+`messages.ts` writes stateless target-local intro/outro lines. `styles.ts` remains stream-free and only returns ANSI strings.
 
-Returns a frozen named capability snapshot for SGR, cursor control, color, emphasis, animation, and Unicode. It implements the exact environment precedence and conservative terminal-profile allowlist in `specs/v1-behavior.json`. Automatic animation requires a known cursor-capable profile; the explicit terminal override remains guarded by TTY and `TERM=dumb`. The package is Node-only, so it does not carry browser emulation.
+## Ownership rules
 
-### `spinner.ts`
-
-Owns lifecycle state, unreferenced timer creation and cleanup, mutable properties, cursor visibility during active animation, static-mode selection, conservative width degradation, and synchronous write containment. It lazily caches sanitized fields and their conservative width at the render boundary, invalidating only field mutations that can change terminal text. Its instance-scoped `log()` writes a permanent coordinated stderr line without changing lifecycle resources. It writes only to stderr and does not install process or stream-global listeners.
-
-### `renderer.ts`
-
-Owns the process-local lease for the single interactive terminal line. It composes flow, instance-log, and static-secondary lines with a clear-and-redraw transaction, then notifies the owner when a synchronous cosmetic write fails. It owns neither signals nor stream listeners.
-
-### `text.ts`
-
-Owns shared string validation, render-boundary sanitization, conservative Unicode-cell measurement, and the contained synchronous stderr write primitive. It preserves caller-owned values, ignores backpressure, and installs no stream listener.
-
-### `messages.ts`
-
-Owns intro/outro line composition and one coordinated stderr write. It reuses `env.ts`, `ansi.ts`, `renderer.ts`, and `text.ts` without observing or mutating public spinner state.
-
-### `index.ts`
-
-Exports the callable default factory, promise overload implementation, intro/outro methods, type surface, and exact named style functions. It adds no CommonJS wrapper or post-MVP API; style-only users may import `spinlog/styles` without bundling the spinner.
-
-## Ownership Rules
-
-- The library owns only resources created by a spinner instance.
-- Explicit lifecycle methods and `Symbol.dispose` clear instance timers and restore cursor state.
-- The host application owns signals, process termination, and asynchronous stream errors.
-- One spinner may animate interactively; simultaneous later spinners degrade to safe static output until a multi-row renderer is specified.
-- Runtime code uses Node built-ins and local modules only.
-- The Phase 2 gate must compare emitted declarations and runtime exports with the frozen Phase 0 contract.
-- The build emits linked source maps for diagnostics, while the npm payload remains an exact allowlist.
+- The library owns only timers, cursor state, leases, and temporary drain/finish/close listeners created for one target.
+- The host application owns direct stream writes, stdin, signals, process termination, and asynchronous stream errors.
+- Explicit lifecycle methods and `Symbol.dispose` release a surface’s resources.
+- The implementation uses Node built-ins and local modules only.
+- Emitted declarations and runtime exports must match the Phase 0 contract; the root implementation stays within the 10,240-byte gzip ceiling.

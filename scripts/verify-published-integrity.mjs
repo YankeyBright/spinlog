@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url'
 
 const packageJson = JSON.parse(readFileSync('package.json', 'utf8'))
 const npmCli = process.env.npm_execpath
-const tarball = 'artifacts/phase3/spinlog-0.1.0.tgz'
+const tarball = 'artifacts/phase3/spinlog-0.2.0.tgz'
 const registry = 'https://registry.npmjs.org/'
 
 export function validatePublishedIntegrity(expected, actual) {

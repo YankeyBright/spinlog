@@ -25,7 +25,7 @@ else
 fi`
 const CI_COMMANDS = new Set([
   'npm ci --ignore-scripts',
-  'npm run check:foundation\nnpm run check:phase4',
+  'npm run check:foundation\nnpm run check:phase4\nnpm run test:stability',
   'npm audit --audit-level=low',
   "npm ci --ignore-scripts\nnpm run build\nnpm run sbom\nnpm run pack:check\nnode -e \"require('fs').mkdirSync('artifacts/package',{recursive:true})\"\nnpm pack --json --ignore-scripts --pack-destination artifacts/package",
   'node scripts/verify-packed-runtime.mjs artifacts/package',

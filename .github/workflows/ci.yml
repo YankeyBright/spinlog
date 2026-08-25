@@ -43,10 +43,11 @@ jobs:
       - name: Install Dependencies Without Lifecycle Hooks
         run: npm ci --ignore-scripts
 
-      - name: Verify Foundation And Documentation
+      - name: Verify Foundation, Documentation, And Test Stability
         run: |
           npm run check:foundation
           npm run check:phase4
+          npm run test:stability
 
       - name: Audit Dependency Graph
         run: npm audit --audit-level=low
@@ -113,7 +114,7 @@ jobs:
           name: spinlog-packed-runtime
           path: artifacts/package
 
-      - name: Verify Runtime Without Development Dependencies
+      - name: Verify Packed Runtime And Explicit TTY Targets
         run: node scripts/verify-packed-runtime.mjs artifacts/package
 
   baseline-status:

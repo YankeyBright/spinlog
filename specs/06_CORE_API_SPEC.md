@@ -1,59 +1,57 @@
 # Core API Specification
 
-The public declarations in `specs/v1-public-api.d.ts` and `specs/v1-styles-api.d.ts`, plus the behavior model in `specs/v1-behavior.json`, are the normative v1 API contract. Phase 2 implementation and declarations must conform exactly; undocumented exports are contract violations.
+`specs/v1-public-api.d.ts`, `specs/v1-styles-api.d.ts`, and `specs/v1-behavior.json` are the normative 0.2 pre-1.0 API contract. Implementation and emitted declarations must conform exactly; undocumented exports are contract violations.
 
-## Export Surface
+## Export surface
 
-The default export is the callable `spinlog` factory. Named type exports are `SpinnerName`, `SpinnerColor`, `SpinnerOptions`, `PromiseOptions`, `Spinner`, and `Spinlog`.
+The default export is the callable `spinlog` factory. Named types are `FlowOptions`, `GroupOptions`, `PromiseOptions`, `Progress`, `ProgressOptions`, `RenderOptions`, `Spinlog`, `Spinner`, `SpinnerColor`, `SpinnerDefinition`, `SpinnerGroup`, `SpinnerName`, `SpinnerOptions`, and `UnicodeMode`. Runtime named exports are exactly the 38 ANSI-16 style functions. `spinlog/styles` exports the same styles and `Style` without spinner runtime.
 
-Named runtime exports are exactly:
+The callable has exactly five methods: `promise`, `intro`, `outro`, `group`, and `progress`. It adds no aliases, CommonJS wrapper, truecolor API, prompt API, structured-log API, or global-output interception.
 
-- Modifiers: `reset`, `bold`, `dim`, `italic`, `underline`, `strikethrough`.
-- Foreground: `black`, `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `white`, and their `Bright` variants.
-- Background: the corresponding `bg*` and `bg*Bright` functions.
+## Render options
 
-Aliases, style chaining, advanced color modes, named factory aliases, and CommonJS exports are excluded.
+`RenderOptions` is shared by spinner, group, progress, and promise options:
 
-The `spinlog/styles` subpath exports exactly the 38 style functions and the `Style` type. It omits the spinner runtime so style-only consumers receive the smallest tree-shakeable entrypoint.
+- `stream?: Writable` defaults to `process.stderr`.
+- `color?: SpinnerColor | false` defaults to cyan. `false` disables automatic frame and status color.
+- `unicode?: 'auto' | boolean` defaults to auto. `false` selects ASCII built-ins.
+- `hideCursor?: boolean` defaults to `true`.
+- `indent?: number` is a safe integer from 0 through 40 and defaults to zero.
+- `static?: 'symbol' | 'text' | 'silent'` defaults to `'symbol'`.
+- `terminal?: 'auto' | 'static' | 'interactive'` defaults to `'auto'`.
 
-The callable default export also has exactly three properties: `promise`, `intro`, and `outro`. `intro(message?)` and `outro(message?)` return `void`; they add no named exports or option types.
+`FlowOptions` deliberately exposes only `stream`, `color`, `unicode`, and `indent`, because flow lines are stateless and never own an interactive lease. All output coordination is target-local. One interactive surface may own each writable stream; independent stream identities may animate concurrently.
 
-## Factory And Defaults
+## Spinner and custom frames
 
-`spinlog(text?, options?)` returns `Spinner`. Options are limited to `color`, `prefix`, `suffix`, `spinner`, `static`, and `terminal`. Defaults are empty text/prefix/suffix, cyan, dots, `static: 'symbol'`, `terminal: 'auto'`, and an 80ms interval. Spinner names are exactly `dots` and `line`; spinner colors are the 16 foreground names. Static values are exactly `'symbol'`, `'text'`, and `'silent'`; terminal values are exactly `'auto'`, `'static'`, and `'interactive'`.
+`spinlog(text?, options?)` returns a `Spinner`. Its mutable fields are exactly `text`, `color`, `prefix`, and `suffix`. `start`, `stop`, `log`, `succeed`, `fail`, `warn`, and `info` return the same instance; `Symbol.dispose` is equivalent to `stop` and non-enumerable.
 
-The mutable instance properties are exactly `text`, `color`, `prefix`, and `suffix`. Lifecycle methods return the same instance for chaining and accept no undocumented parameters. `spinner.log(message)` accepts one string, emits one coordinated permanent sanitized stderr line in every lifecycle state, and returns the same instance without mutating lifecycle, timer, or cursor ownership. `Spinner[Symbol.dispose]()` returns `void` and is the sole cleanup addition; it is equivalent to `stop()` and is intentionally non-enumerable.
+`spinner.log(message)` validates and sanitizes its string before effects, writes one permanent newline-terminated line on the spinner’s target, and does not change lifecycle state, timers, or cursor ownership. On an active target it clears, writes, and redraws the owned frame as one coordinated transaction.
 
-At runtime, invalid factory text, option objects, option values, terminal text overrides, and mutable assignments throw `TypeError` before output. Terminal overrides are validated before idempotency, state changes, mutation, timer cleanup, or writes; a failed validation preserves the current text, state, timer ownership, and output history. A failed mutation preserves its previous value. Invalid promise options reject before spinner start, direct thenable observation, or task invocation. Unknown option keys are ignored for forward compatibility.
+Spinner names are `dots` and `line`. A `SpinnerDefinition` has one to 64 visible frames and an optional safe-integer interval from 16 through 60,000ms. Definitions are snapshotted before output. A one-frame definition stays static and owns no timer.
 
-## Lifecycle
+## Groups
 
-The internal states are `idle`, `spinning`, `stopped`, `succeeded`, `failed`, `warned`, and `informed`.
+`spinlog.group(options?)` creates a target-local multi-row surface. `group.add(text?, options?)` creates an idle child. Children inherit target, static policy, terminal policy, Unicode policy, cursor policy, and indentation; child options may choose color, prefix, suffix, and spinner definition only. `group.stop()` stops all active children and `Symbol.dispose` performs the same cleanup.
 
-| Operation | Idle or stopped | Spinning | Terminal state |
-| --- | --- | --- | --- |
-| `start()` | Begin a new cycle | Idempotent no-op | Begin a new cycle |
-| `stop()` | Enter/remain stopped without output | Clear, restore, and stop | Idempotent no-op |
-| Terminal method | Persist the requested status once | Stop, restore, and persist once | Preserve the first terminal result |
+`maxRows` is a positive safe integer. Its dynamic default is `min(10, target.rows - 1)`. Groups must fit width and known height before acquiring a lease. A height or width loss demotes the complete surface atomically. Static and settled output is persisted and never re-rendered in later sessions. A static child must be explicitly stopped and restarted before it is eligible for a new interactive session; once a session has no active rows, it releases its target-local lease. Groups do not nest or reorder rows dynamically.
 
-Mutation never changes state and becomes visible on the next render. An optional terminal text argument replaces stored text before persistence. Rendering sanitizes user-controlled segments without changing their assigned property values. A new `start()` resets terminal idempotency for the next cycle. The per-method, per-source-state matrices in `specs/v1-behavior.json` are exhaustive; a destination or effect not listed there is illegal.
+## Progress
 
-## Promise Wrapper
+`spinlog.progress(text, { total, value?, width?, style?, ...options })` returns `Progress`. `total` is a positive safe integer and is exposed as an immutable runtime getter. `value` and `update(value)` are safe integers in the inclusive range zero through total. `increment(amount?)` defaults to one and accepts only positive safe integers, preserving value on invalid input.
 
-`spinlog.promise(...)` has exactly two generic overloads: a `PromiseLike<T>` input or a zero-argument function returning `PromiseLike<T>`. Both accept optional `PromiseOptions` and return `Promise<T>`.
+Progress width is a safe integer from 5 through 40, default 20. Style is `'blocks'` by default or `'ascii'`; blocks automatically fall back to ASCII when Unicode is unavailable. Fill is calculated with `Math.floor`, preventing visual overstatement. `succeed()` first sets the value to total. `fail()`, `warn()`, and `info()` retain the actual value. Progress owns no timer.
 
-The spinner starts before a direct input is observed or a callback is invoked. The callback runs once, thenables are assimilated, synchronous callback throws become rejections, and resolution calls `succeed` while rejection calls `fail`. The fulfillment value or original rejection reason is preserved. Cosmetic failures never replace action settlement.
+## Promise and flow methods
 
-## Flow Messages
+`spinlog.promise(...)` has generic overloads for a `PromiseLike<T>` and a zero-argument function returning `PromiseLike<T>`. Both return `Promise<T>`. The spinner starts before observing the input or invoking the callback; thenables are assimilated, synchronous callback throws become rejections, and cosmetic failures never change fulfillment values or rejection reasons.
 
-`spinlog.intro(message?)` and `spinlog.outro(message?)` emit one sanitized, newline-terminated line to `stderr`. Unicode markers are `┌` and `└`; ASCII fallbacks are `>` and `<`. Two ASCII spaces separate a marker from a non-empty message. Only the marker is styled with `blackBright` when color is enabled. When an interactive spinner owns stderr's current line, each flow write clears and redraws that frame atomically.
+`PromiseOptions<T>` includes `text`, all spinner render options, `successText?: string | ((value: T) => string)`, and `failText?: string | ((error: unknown) => string)`. Fulfillment calls `succeed` with the resolved text; rejection calls `fail` with the resolved failure text.
 
-Flow calls are synchronous, repeatable, and do not inspect or mutate public spinner state. They do not create a timer, own a signal, terminate the process, or write to `stdout`. Invalid messages throw `TypeError` before capability detection or output. Synchronous write failures are cosmetic and suppressed.
+`spinlog.intro(message?, options?)` and `spinlog.outro(message?, options?)` emit one sanitized, newline-terminated flow line to their target. Unicode markers are `┌` and `└`; ASCII fallback markers are `>` and `<`. Calls are synchronous, stateless, repeatable, and coordinate only with the active surface on that target.
 
-## Terminal Degradation
+## Lifecycle, validation, and non-goals
 
-Interactive rendering uses stderr and unreferenced timers. At most one instance receives the interactive line lease; later instances use their configured static behavior. In automatic mode, animation requires a conservative recognized terminal profile and a one-line fit using `stderr.columns`; unavailable or insufficient width, resize, and text mutation demote to static output. `terminal: 'static'` always uses static output, while the informed `terminal: 'interactive'` override permits animation on any TTY except `TERM=dumb`. Non-interactive execution creates no timer. `'symbol'` preserves static frame/status lines, `'text'` emits two unstyled sanitized text lines, and `'silent'` suppresses automatic static output only. An active synchronous write failure ends only that rendering cycle in `stopped`; terminal state and promise settlement remain logical outcomes rather than I/O outcomes. Rendered text is lazily sanitized and width-measured into an immutable snapshot that is invalidated only by text, prefix, or suffix mutation. Style helpers remain side-effect-free and stream-free while using separate SGR, cursor, color, and emphasis decisions. Non-empty `NO_COLOR` and `NODE_DISABLE_COLORS` values outrank `FORCE_COLOR` for colors only; explicit emphasis remains available only on a known capable interactive terminal. Color forcing never enables animation.
+The lifecycle states are `idle`, `spinning`, `stopped`, `succeeded`, `failed`, `warned`, and `informed`. `start()` is idempotent while spinning; any terminal state can begin a fresh cycle. The first terminal result in a cycle wins. Input validation occurs before output and before idempotency can suppress it. Mutable-property failures preserve the previous value.
 
-## Explicitly Excluded From v1
-
-The complete deferred list and rationale are in `specs/16_POST_MVP_FEATURES.md`. Phase 2 may not export task groups, progress, prompts, structured logs, custom streams, custom animations, multi-row concurrent spinners, or advanced color APIs.
+Spinlog never owns stdin, signals, process exit, arbitrary stream writes, or asynchronous stream errors. The exact deferred rationale appears in `specs/16_POST_MVP_FEATURES.md`. CommonJS and browser-first runtime remain permanent non-goals.

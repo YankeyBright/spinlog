@@ -88,6 +88,13 @@ class DeclarationScanner {
     const character = this.source[this.index]
     this.index += 1
     if (character === '|' && previousToken === 'punctuation:=') return undefined
+    if (character === ',' && /[\])}]/u.test(this.nextNonWhitespaceCharacter())) return undefined
     return `punctuation:${character}`
+  }
+
+  nextNonWhitespaceCharacter() {
+    let index = this.index
+    while (index < this.source.length && /\s/u.test(this.source[index])) index += 1
+    return this.source[index] ?? ''
   }
 }

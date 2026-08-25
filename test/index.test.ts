@@ -69,6 +69,7 @@ describe('public runtime surface', () => {
       'start',
       'stop',
       'log',
+      'flush',
       'succeed',
       'fail',
       'warn',
@@ -78,6 +79,7 @@ describe('public runtime surface', () => {
     expectTypeOf(spinlog()[Symbol.dispose]).returns.toBeVoid()
     expectTypeOf(spinlog().log).parameter(0).toEqualTypeOf<string>()
     expectTypeOf(spinlog().log).returns.toEqualTypeOf<Spinner>()
+    expectTypeOf(spinlog().flush).returns.toEqualTypeOf<Promise<void>>()
   })
 })
 
@@ -186,6 +188,7 @@ describe('intro and outro flow messages', () => {
     write.mockImplementationOnce(() => false)
     expect(() => spinlog.outro('Done')).not.toThrow()
     expect(write).toHaveBeenCalledTimes(2)
+    stderr.emit('drain')
   })
 
   it('coordinates flow messages around an active spinner without process ownership', () => {
@@ -261,6 +264,41 @@ describe('promise wrapper', () => {
     expect(write).toHaveBeenLastCalledWith('p ✔ task\n')
   })
 
+  it('renders generic settlement text without changing fulfillment or rejection semantics', async () => {
+    await expect(
+      spinlog.promise(Promise.resolve('artifact'), {
+        text: 'build',
+        successText: 'built',
+      }),
+    ).resolves.toBe('artifact')
+    expect(write).toHaveBeenLastCalledWith('\u2714 built\n')
+
+    const fulfilled = await spinlog.promise(Promise.resolve({ artifact: 'dist/index.js' }), {
+      text: 'build',
+      successText: (value) => `built ${value.artifact}`,
+    })
+    expect(fulfilled).toEqual({ artifact: 'dist/index.js' })
+    expect(write).toHaveBeenLastCalledWith('\u2714 built dist/index.js\n')
+
+    const reason = new Error('network unavailable')
+    await expect(
+      spinlog.promise(Promise.reject(reason), {
+        text: 'publish',
+        failText: (error) => `publish failed: ${(error as Error).message}`,
+      }),
+    ).rejects.toBe(reason)
+    expect(write).toHaveBeenLastCalledWith('\u2716 publish failed: network unavailable\n')
+
+    await expect(
+      spinlog.promise(Promise.resolve('kept'), {
+        successText() {
+          throw new Error('cosmetic callback failure')
+        },
+      }),
+    ).resolves.toBe('kept')
+    expect(write).toHaveBeenLastCalledWith('\u2714\n')
+  })
+
   it('preserves rejection reasons and converts synchronous task throws', async () => {
     const reason = { reason: 'original' }
     await expect(spinlog.promise(Promise.reject(reason), { text: 'reject' })).rejects.toBe(reason)
@@ -289,6 +327,11 @@ describe('promise wrapper', () => {
     await expect(spinlog.promise(task, null as unknown as never)).rejects.toThrow(
       'options must be an object',
     )
+    expect(task).not.toHaveBeenCalled()
+
+    await expect(
+      spinlog.promise(task, { successText: 1 as unknown as (value: string) => string }),
+    ).rejects.toThrow('successText must be a string or function')
     expect(task).not.toHaveBeenCalled()
   })
 })

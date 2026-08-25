@@ -14,59 +14,65 @@ function loadFixture() {
   }
 }
 
+type Fixture = ReturnType<typeof loadFixture>
+
+const DECLARATION_MUTATIONS = [
+  [
+    'a missing root style export',
+    (fixture: Fixture) => {
+      fixture.declaration = fixture.declaration.replace(
+        'export declare const bgWhiteBright: (text: string) => string\n',
+        '',
+      )
+    },
+    'public API declaration must match the generated closed contract',
+  ],
+  [
+    'a missing disposable-library reference',
+    (fixture: Fixture) => {
+      fixture.declaration = fixture.declaration.replace(
+        '/// <reference lib="esnext.disposable" />\n\n',
+        '',
+      )
+    },
+    'public API declaration must match the generated closed contract',
+  ],
+  [
+    'styles subpath declaration drift',
+    (fixture: Fixture) => {
+      fixture.stylesDeclaration = fixture.stylesDeclaration.replace(
+        'export declare const bgWhiteBright: Style\n',
+        '',
+      )
+    },
+    'styles API declaration must match the generated closed contract',
+  ],
+] as const
+
 describe('Phase 0 contract policy', () => {
   it('accepts the canonical API, behavior, identity, and documents', () => {
     expect(validatePhase0Contract(loadFixture())).toEqual([])
   })
 
-  it('rejects a missing style export', () => {
+  it.each(DECLARATION_MUTATIONS)('rejects %s', (_name, mutate, expectedFailure) => {
     const fixture = loadFixture()
-    fixture.declaration = fixture.declaration.replace(
-      'export declare const bgWhiteBright: (text: string) => string\n',
-      '',
-    )
+    mutate(fixture)
 
-    expect(validatePhase0Contract(fixture)).toContain(
-      'public API declaration must match the generated closed contract',
-    )
-  })
-
-  it('rejects a declaration without the disposable-library reference', () => {
-    const fixture = loadFixture()
-    fixture.declaration = fixture.declaration.replace(
-      '/// <reference lib="esnext.disposable" />\n\n',
-      '',
-    )
-
-    expect(validatePhase0Contract(fixture)).toContain(
-      'public API declaration must match the generated closed contract',
-    )
-  })
-
-  it('rejects styles subpath declaration drift', () => {
-    const fixture = loadFixture()
-    fixture.stylesDeclaration = fixture.stylesDeclaration.replace(
-      'export declare const bgWhiteBright: Style\n',
-      '',
-    )
-
-    expect(validatePhase0Contract(fixture)).toContain(
-      'styles API declaration must match the generated closed contract',
-    )
+    expect(validatePhase0Contract(fixture)).toContain(expectedFailure)
   })
 
   it('reports the required contract version and phase accurately', () => {
     const fixture = loadFixture()
     fixture.contract.schemaVersion = 4
 
-    expect(validatePhase0Contract(fixture)).toContain('contract version and phase must be 9 and 0')
+    expect(validatePhase0Contract(fixture)).toContain('contract version and phase must be 12 and 0')
   })
 
   it('rejects changed promise overload semantics', () => {
     const fixture = loadFixture()
     fixture.declaration = fixture.declaration.replace(
-      'promise<T>(task: () => PromiseLike<T>, options?: PromiseOptions): Promise<T>',
-      'promise<T>(task: () => T, options?: PromiseOptions): T',
+      'promise<T>(task: () => PromiseLike<T>, options?: PromiseOptions<T>): Promise<T>',
+      'promise<T>(task: () => T, options?: PromiseOptions<T>): T',
     )
 
     expect(validatePhase0Contract(fixture)).toContain(
@@ -76,7 +82,10 @@ describe('Phase 0 contract policy', () => {
 
   it('rejects missing flow methods and altered flow semantics', () => {
     const fixture = loadFixture()
-    fixture.declaration = fixture.declaration.replace('  intro(message?: string): void\n', '')
+    fixture.declaration = fixture.declaration.replace(
+      '  intro(message?: string, options?: FlowOptions): void\n',
+      '',
+    )
     fixture.contract.rendering.flowMessages.writesPerCall = 2
 
     expect(validatePhase0Contract(fixture)).toEqual(

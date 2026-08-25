@@ -28,7 +28,7 @@ export function gitExecutableCandidates(environment = process.env, platform = pr
     return [configured]
   }
 
-  if (platform !== 'win32') return POSIX_GIT_PATHS
+  if (platform !== 'win32') return [...POSIX_GIT_PATHS]
 
   const programFiles = [environment.ProgramW6432, environment.ProgramFiles].filter(
     (directory) => typeof directory === 'string' && directory.length > 0,

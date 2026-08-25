@@ -1,22 +1,23 @@
 import { isDeepStrictEqual } from 'node:util'
 
 const FREEZE = Object.freeze({
-  schemaVersion: 2,
+  schemaVersion: 3,
   package: 'spinlog',
-  version: '0.1.0',
+  version: '0.2.0',
   repository: 'YankeyBright/spinlog',
   status: 'blocked',
   reason:
-    'The unpublished v1.1 terminal revision changed runtime, build, benchmark, and package inputs after the reviewed preview receipt.',
+    'The pre-1.0 0.2 target-local rendering redesign changed runtime, contracts, terminal evidence, benchmarks, and package inputs after the prior preview receipt.',
 })
 const BLOCKED_PUBLICATION = Object.freeze({
-  version: '0.1.0',
-  tag: 'v0.1.0',
+  version: '0.2.0',
+  tag: 'v0.2.0',
   distTag: 'next',
   registry: 'https://registry.npmjs.org/',
 })
 const REQUIRED_REVALIDATION = Object.freeze([
-  'Review the revised Phase 0 contract and Phase 2 runtime behavior.',
+  'Review the pre-1.0 0.2 Phase 0 contract and Phase 2 runtime behavior.',
+  'Complete three consecutive full green test runs, including target-local terminal coverage.',
   'Commit a new five-run Linux Node 24 benchmark baseline.',
   'Regenerate Phase 3 reproducibility, SBOM, consumer, and candidate evidence.',
   'Complete the Phase 4 documentation review.',
@@ -24,7 +25,8 @@ const REQUIRED_REVALIDATION = Object.freeze([
 ])
 const READINESS_COMMAND = `npm run check:foundation
 npm run check:phase3
-npm run check:phase4`
+npm run check:phase4
+npm run test:stability`
 
 /** Validate the explicit hold that supersedes the obsolete preview receipt. */
 export function validatePreviewContract(contract, packageJson) {
@@ -35,7 +37,7 @@ export function validatePreviewContract(contract, packageJson) {
     }
   }
   if (!isDeepStrictEqual(contract?.blockedPublication, BLOCKED_PUBLICATION)) {
-    failures.push('release freeze must identify the blocked 0.1.0 next publication exactly')
+    failures.push('release freeze must identify the blocked 0.2.0 next publication exactly')
   }
   if (!isDeepStrictEqual(contract?.requiredRevalidation, REQUIRED_REVALIDATION)) {
     failures.push('release freeze must list the complete revalidation sequence')
@@ -67,7 +69,10 @@ export function validateReleaseWorkflows(workflows) {
   if (!isDeepStrictEqual(readiness.permissions, { contents: 'read' })) {
     failures.push('release-readiness.yml must use read-only permissions')
   }
-  if (!isDeepStrictEqual(Object.keys(readiness.jobs ?? {}).sort(), ['verify'])) {
+  const jobNames = Object.keys(readiness.jobs ?? {}).sort((left, right) =>
+    left.localeCompare(right),
+  )
+  if (!isDeepStrictEqual(jobNames, ['verify'])) {
     failures.push('release-readiness.yml must contain only the revalidation job')
   }
   const job = readiness.jobs?.verify

@@ -5,8 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import spinlog from '../src/index.js'
 import { selectFrame, selectStatus } from '../src/spinner.js'
 import {
-  fitsSingleTerminalLine,
   fitsSingleTerminalWidth,
+  resolveRenderTarget,
   sanitizeSegment,
   terminalCellWidth,
   terminalTextWidth,
@@ -117,21 +117,25 @@ describe('spinner lifecycle and rendering', () => {
     }
   })
 
-  it('counts non-ASCII text conservatively when deciding whether a frame can animate', () => {
+  it('measures grapheme clusters and full-width terminal cells', () => {
     setColumns(5)
+    const target = resolveRenderTarget(stderr)
 
     expect(terminalCellWidth('')).toBe(0)
     expect(terminalCellWidth('a')).toBe(1)
-    expect(terminalTextWidth('a\u00e9')).toBe(3)
-    expect(fitsSingleTerminalWidth(3)).toBe(true)
-    expect(fitsSingleTerminalWidth(-1)).toBe(false)
-    expect(terminalCellWidth('é')).toBe(2)
+    expect(terminalTextWidth('a\u00e9')).toBe(2)
+    expect(fitsSingleTerminalWidth(target, 3)).toBe(true)
+    expect(fitsSingleTerminalWidth(target, -1)).toBe(false)
+    expect(terminalCellWidth('é')).toBe(1)
     expect(terminalCellWidth('🦄')).toBe(2)
-    expect(fitsSingleTerminalLine('ab')).toBe(true)
-    expect(fitsSingleTerminalLine('é')).toBe(true)
-    expect(fitsSingleTerminalLine('🦄')).toBe(true)
-    expect(fitsSingleTerminalLine('éé')).toBe(false)
-    expect(fitsSingleTerminalLine('🦄🦄')).toBe(false)
+    expect(terminalTextWidth('e\u0301')).toBe(1)
+    expect(terminalTextWidth('👨‍👩‍👧‍👦')).toBe(2)
+    expect(terminalTextWidth('界')).toBe(2)
+    expect(fitsSingleTerminalWidth(target, terminalTextWidth('ab'))).toBe(true)
+    expect(fitsSingleTerminalWidth(target, terminalTextWidth('é'))).toBe(true)
+    expect(fitsSingleTerminalWidth(target, terminalTextWidth('🦄'))).toBe(true)
+    expect(fitsSingleTerminalWidth(target, terminalTextWidth('éé'))).toBe(true)
+    expect(fitsSingleTerminalWidth(target, terminalTextWidth('🦄🦄'))).toBe(false)
   })
 
   it('validates JavaScript inputs and every mutable field', () => {
@@ -240,6 +244,12 @@ describe('spinner lifecycle and rendering', () => {
     expect(vi.getTimerCount()).toBe(0)
     spinner.stop()
     expect(output()).toEqual(['⠋ static\n'])
+  })
+
+  it('does not add indentation to an empty static text row', () => {
+    spinlog('', { indent: 2, terminal: 'static', static: 'text' }).start()
+
+    expect(output()).toEqual(['\n'])
   })
 
   it.each([
@@ -406,6 +416,15 @@ describe('spinner lifecycle and rendering', () => {
     expect(vi.getTimerCount()).toBe(1)
     spinner.stop()
     expect(vi.getTimerCount()).toBe(0)
+    // A false write is accepted by Node; complete its backpressure cycle so
+    // this test leaves the shared stderr target idle for the next case.
+    write.mockImplementation(() => true)
+    stderr.emit('drain')
+  })
+
+  it('exposes a resolved flush boundary for settled spinner output', async () => {
+    const spinner = spinlog('work', { spinner: 'line' }).start().succeed()
+    await expect(spinner.flush()).resolves.toBeUndefined()
   })
 
   it('stops and retries after an initial interactive write failure', () => {
@@ -525,6 +544,28 @@ describe('spinner lifecycle and rendering', () => {
 
     spinner.succeed()
     expect(output().at(-1)).toBe('✔ a message that cannot fit\n')
+  })
+
+  it('preflights a resized target before coordinated logs and flow messages redraw its frame', () => {
+    const spinner = spinlog('short', { spinner: 'line' }).start()
+    setColumns(5)
+
+    spinner.log('checkpoint')
+    expect(output()).toEqual(['\x1b[?25l- short', '\x1b[2K\r\x1b[?25h- short\n', 'checkpoint\n'])
+    expect(vi.getTimerCount()).toBe(0)
+
+    setColumns(80)
+    const flowOwner = spinlog('flow', { spinner: 'line' }).start()
+    setColumns(5)
+    spinlog.intro('next')
+
+    expect(output().slice(-3)).toEqual([
+      '\x1b[?25l- flow',
+      '\x1b[2K\r\x1b[?25h- flow\n',
+      '┌  next\n',
+    ])
+    expect(vi.getTimerCount()).toBe(0)
+    flowOwner.stop()
   })
 
   it('invalidates cached render data on text mutations without changing assigned values', () => {

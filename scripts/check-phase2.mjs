@@ -36,7 +36,7 @@ function readObject(path) {
 const contract = readObject('specs/v1-behavior.json')
 const packageJson = readObject('package.json')
 const coverage = readObject('coverage/coverage-final.json')
-require(contract.schemaVersion === 9, 'Phase 2 requires behavior schema version 9')
+require(contract.schemaVersion === 13, 'Phase 2 requires behavior schema version 13')
 require(JSON.stringify(contract.environment?.capabilityShape) ===
   JSON.stringify([
     'sgr',
@@ -53,7 +53,7 @@ require(contract.environment?.noColor === 'non-empty-disables-colors-only' &&
 require(contract.rendering?.renderCache?.sanitization === 'lazy-render-boundary' &&
   contract.rendering?.renderCache?.colorMutation === 'reuse-text-snapshot' &&
   contract.rendering?.renderCache?.width ===
-    'cached-conservative', 'Phase 2 requires the frozen render-cache policy')
+    'cached-grapheme-cells', 'Phase 2 requires the frozen render-cache policy')
 require(contract.styles?.metadata?.singleSourceOfTruth === true &&
   contract.styles?.metadata?.spinnerColorValidation === 'foreground-only' &&
   contract.styles?.metadata?.nestedRestore ===
@@ -61,30 +61,71 @@ require(contract.styles?.metadata?.singleSourceOfTruth === true &&
 require(JSON.stringify(contract.defaults) ===
   JSON.stringify({
     text: '',
+    stream: 'process.stderr',
     color: 'cyan',
+    unicode: 'auto',
+    hideCursor: true,
+    indent: 0,
     prefix: '',
     suffix: '',
     spinner: 'dots',
     static: 'symbol',
     terminal: 'auto',
     intervalMs: 80,
+    groupMaxRows: 'min(10, target.rows - 1)',
+    progressBarWidth: 20,
+    progressStyle: 'blocks',
   }), 'Phase 2 requires the frozen static and terminal defaults')
 require(JSON.stringify(contract.publicApi?.spinnerMethods) ===
   JSON.stringify([
     'start',
     'stop',
     'log',
+    'flush',
     'Symbol.dispose',
     'succeed',
     'fail',
     'warn',
     'info',
   ]), 'Phase 2 requires the exact spinner method surface, including log()')
+require(JSON.stringify(contract.publicApi?.groupMethods) ===
+  JSON.stringify([
+    'add',
+    'stop',
+    'flush',
+    'Symbol.dispose',
+  ]), 'Phase 2 requires the exact group method surface')
+require(JSON.stringify(contract.publicApi?.progressMethods) ===
+  JSON.stringify([
+    'start',
+    'stop',
+    'log',
+    'flush',
+    'Symbol.dispose',
+    'succeed',
+    'fail',
+    'warn',
+    'info',
+    'update',
+    'increment',
+  ]), 'Phase 2 requires the exact progress method surface')
+require(contract.rendering?.customFrames?.maximumFrames === 64 &&
+  JSON.stringify(contract.rendering?.customFrames?.intervalRangeMs) ===
+    JSON.stringify([16, 60_000]) &&
+  contract.rendering?.groups?.interactiveSurface === 'one-target-local-lease' &&
+  contract.rendering?.groups?.defaultMaxRows === 'min(10, target.rows - 1)' &&
+  contract.rendering?.progress?.defaultBarWidth === 20 &&
+  JSON.stringify(contract.rendering?.progress?.barWidthRange) === JSON.stringify([5, 40]) &&
+  contract.rendering?.progress?.filledCells === 'floor' &&
+  contract.rendering?.progress?.succeedValue ===
+    'total', 'Phase 2 requires the frozen custom-frame, group, and progress policy')
 require(contract.rendering?.staticModes?.default === 'symbol' &&
   JSON.stringify(contract.rendering?.staticModes?.options) ===
     JSON.stringify(['symbol', 'text', 'silent']) &&
-  contract.rendering?.log?.activeFrameCoordination ===
-    'clear-write-redraw', 'Phase 2 requires the frozen static-mode and coordinated-log policy')
+  contract.rendering?.log?.activeFrameCoordination === 'clear-write-redraw-target-local' &&
+  contract.rendering?.interactiveLease?.scope === 'writable-stream-identity' &&
+  contract.rendering?.writeBackpressure?.cosmeticFrames ===
+    'coalesce-latest-until-drain', 'Phase 2 requires the frozen static-mode and coordinated-log policy')
 require(JSON.stringify(contract.environment?.terminalModes) ===
   JSON.stringify(['auto', 'static', 'interactive']) &&
   contract.environment?.unknownTerminalProfile ===
@@ -120,6 +161,10 @@ require(packageJson.devDependencies?.yaml ===
 
 const expectedCoveragePaths = runtimeFiles.map(({ path }) => `/src/${path}`)
 const coverageEntries = Object.entries(coverage)
+const structurallyEmptyCoverage = new Map([
+  ['/src/renderer-types.ts', new Set(['statements', 'functions', 'branches', 'lines'])],
+  ['/src/terminal-control.ts', new Set(['functions', 'branches'])],
+])
 require(coverageEntries.length ===
   runtimeFiles.length, `coverage must contain exactly ${runtimeFiles.length} source files`)
 
@@ -128,6 +173,7 @@ for (const suffix of expectedCoveragePaths) {
   require(matches.length === 1, `coverage must contain exactly one entry ending in ${suffix}`)
   const entry = matches[0]?.[1]
   if (!entry) continue
+  const allowedEmpty = structurallyEmptyCoverage.get(suffix) ?? new Set()
 
   for (const [metric, counters] of [
     ['statements', entry.s],
@@ -135,7 +181,8 @@ for (const suffix of expectedCoveragePaths) {
     ['branches', entry.b],
   ]) {
     const values = Object.values(counters ?? {}).flat()
-    require(values.length > 0, `${suffix} must contain executable ${metric}`)
+    require(values.length > 0 ||
+      allowedEmpty.has(metric), `${suffix} must contain executable ${metric}`)
     require(values.every((value) => value > 0), `${suffix} must have complete ${metric} coverage`)
   }
 
@@ -147,7 +194,8 @@ for (const suffix of expectedCoveragePaths) {
       executableLines.set(line, (executableLines.get(line) ?? 0) + count)
     }
   }
-  require(executableLines.size > 0, `${suffix} must contain executable lines`)
+  require(executableLines.size > 0 ||
+    allowedEmpty.has('lines'), `${suffix} must contain executable lines`)
   require([...executableLines.values()].every(
     (count) => count > 0,
   ), `${suffix} must have complete line coverage`)

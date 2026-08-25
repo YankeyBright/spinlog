@@ -62,9 +62,9 @@
 
 ## Size Creep
 
-**Risk:** The runtime grows beyond the frozen 4,096-byte gzip ceiling.
+**Risk:** The runtime grows beyond the frozen 10,240-byte gzip ceiling.
 
-**Mitigation:** Enforce the exact level-9 gzip limit in CI and through an independent Size Limit check. The ceiling was revised to 4,096 bytes for coordinated rendering and terminal-width safety; future expansion must revise Phase 0 rather than bypassing either gate.
+**Mitigation:** Enforce the exact level-9 gzip limit in CI and through an independent Size Limit check. The ceiling was revised to 10,240 bytes for coordinated rendering, custom frames, groups, progress, terminal-width safety, bounded output queues, and the flush boundary; future expansion must revise Phase 0 rather than bypassing either gate.
 
 ## Release Workflow Compromise
 

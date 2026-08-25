@@ -1,7 +1,7 @@
 import { runGit } from './git-executable.mjs'
 
 const expectedRepository = 'YankeyBright/spinlog'
-const expectedTag = 'v0.1.0'
+const expectedTag = 'v0.2.0'
 
 function git(arguments_) {
   return runGit(arguments_, { encoding: 'utf8', windowsHide: true }).trim()

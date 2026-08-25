@@ -8,7 +8,7 @@ This document identifies product categories and migration expectations. It does 
 - **Spinner libraries:** Ora and nanospinner cover indeterminate terminal feedback with broader or different option surfaces.
 - **Task and prompt systems:** listr2, Clack, and Inquirer own orchestration or input domains intentionally excluded from v1.
 
-`spinlog` is not a drop-in API replacement for these packages. Its v1 goal is a deliberately smaller combination of ANSI-16 style functions and one spinner primitive under a strict package and stream policy.
+`spinlog` is not a drop-in API replacement for these packages. Its v1 goal is a deliberately smaller combination of ANSI-16 style functions, caller-defined spinner frames, one leased terminal surface, coordinated task rows, and determinate progress under a strict package and stream policy.
 
 ## Feature Ownership
 
@@ -16,12 +16,14 @@ This document identifies product categories and migration expectations. It does 
 | --- | --- | --- | --- |
 | Color functions (red, green, blue, etc.) | chalk, picocolors | Frozen v1 surface | Phase 2 |
 | Tree-shakeable named style exports | picocolors, yoctocolors | Frozen v1 surface | Phase 2 |
-| Spinner with fixed 80ms cadence | ora | Frozen v1 surface | Phase 2 |
+| Spinner with built-in or caller-defined frames | ora | Frozen v1 surface | Phase 2 |
 | Succeed/fail/warn/info lifecycle | ora | Frozen v1 surface | Phase 2 |
 | Text/color/prefix/suffix mutation | spinner libraries | Frozen v1 surface | Phase 2 |
 | Non-TTY static degradation | spinner libraries | Frozen v1 behavior | Phase 2 |
 | Promise wrapping | spinner libraries | Frozen v1 behavior | Phase 2 |
-| Task groups, progress, and prompts | task/input libraries | Explicitly deferred | Post-MVP |
+| Coordinated task groups | task libraries | Frozen v1 surface | Phase 2 |
+| Determinate progress | progress libraries | Frozen v1 surface | Phase 2 |
+| Prompts | input libraries | Explicitly deferred | Post-MVP |
 | Structured stdout schemas | logging libraries | Explicitly deferred | Post-MVP |
 | npm OIDC provenance configuration | release infrastructure | Package control | Phase 1 |
 | Runtime-only CycloneDX SBOM | release infrastructure | Package control | Phase 1 |

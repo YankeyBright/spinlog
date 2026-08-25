@@ -31,7 +31,7 @@ describe('release freeze policy', () => {
 
     expect(validatePreviewContract(alteredContract, packageJson)).toEqual(
       expect.arrayContaining([
-        'release freeze must identify the blocked 0.1.0 next publication exactly',
+        'release freeze must identify the blocked 0.2.0 next publication exactly',
         'release freeze must list the complete revalidation sequence',
       ]),
     )
@@ -50,6 +50,18 @@ describe('release freeze policy', () => {
     const altered = parseWorkflow(source, 'release-readiness.yml').value
 
     expect(validateReleaseWorkflows({ 'release-readiness.yml': altered })).not.toEqual([])
+  })
+
+  it('rejects additional jobs after sorting their names explicitly', () => {
+    const readiness = workflows['release-readiness.yml']
+    const altered = {
+      ...readiness,
+      jobs: { zebra: {}, ...readiness.jobs },
+    }
+
+    expect(validateReleaseWorkflows({ 'release-readiness.yml': altered })).toContain(
+      'release-readiness.yml must contain only the revalidation job',
+    )
   })
 })
 

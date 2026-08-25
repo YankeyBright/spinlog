@@ -6,10 +6,10 @@ Produce reproducible performance and supply-chain evidence for the completed Pha
 
 ## Benchmark Evidence
 
-- The dependency-free benchmark harness measures built root and `spinlog/styles` cold imports, enabled and disabled style throughput, static spinner settlement, resolved promise-wrapper overhead, intro/outro flow-message throughput, and instance-log throughput.
+- The dependency-free benchmark harness measures built root and `spinlog/styles` cold imports, enabled and disabled style throughput, static spinner and custom-frame settlement, resolved promise-wrapper overhead, intro/outro flow-message throughput, instance-log throughput, group settlement, and static progress settlement.
 - Every full run uses warmups, calibrated iterations, at least 30 samples, median, p95, median absolute deviation, and a deterministic bootstrap confidence interval.
 - Relative median absolute deviation above 15% is inconclusive. The harness retries a scenario up to three times, then fails instead of accepting noisy evidence.
-- `bench/baseline.json` is tracked only after aggregation of five independent Node 24 Linux CI matrix jobs. Every input records the same commit and workflow attempt, a unique matrix slot, and a unique SHA-256 artifact digest. A baseline is not fabricated from a developer workstation.
+- `bench/baseline.json` is tracked only after aggregation of five independent Node 24 Linux CI matrix jobs. Each schema-5 run covers the twelve ordered scenarios, including custom frames, groups, and progress. Every input records the same commit and workflow attempt, a unique matrix slot, and a unique SHA-256 artifact digest. A baseline is not fabricated from a developer workstation.
 - CI writes the aggregate only to `artifacts/phase3/baseline-candidate.json`. A reviewer must accept and commit it in a separate change; candidate verification never overwrites the tracked baseline or compares a candidate against a baseline produced from itself.
 - CI reports when the reviewed baseline is absent and defers candidate verification until it is committed. Once present, candidate verification still validates the baseline and fails on malformed or regressive evidence.
 - A median regression above 25% with a non-overlapping confidence interval is a warning. Candidate verification fails above 2x baseline when the candidate lower confidence bound is above 1.5x baseline median.
@@ -20,7 +20,7 @@ npm run benchmark
 npm run benchmark:check
 ```
 
-The 4,096-byte gzip ceiling for `dist/index.js` remains a hard Phase 0 size contract, independently enforced by `npm run size` and `npm run size:limit`.
+The 10,240-byte gzip ceiling for `dist/index.js` remains a hard Phase 0 size contract, independently enforced by `npm run size` and `npm run size:limit`.
 
 ## SBOM Evidence
 
@@ -57,4 +57,4 @@ npm run check:phase3
 npm run verify:candidate
 ```
 
-`npm run check:foundation` is the ordered Phase 0-through-Phase 2 gate used before baseline collection. Phase 3 is complete only after the Node 22/24/26 foundation matrix passes, the five Node 24 baseline jobs produce a reviewable baseline, that baseline is committed independently, and the Node 24 candidate job validates against it. The terminal UX revision invalidates the former reviewed baseline; Phase 5 remains blocked until a new baseline and release policy are approved.
+`npm run check:foundation` is the ordered Phase 0-through-Phase 2 gate used before baseline collection. Phase 3 is complete only after the Node 22/24/26 foundation matrix passes, the five Node 24 baseline jobs produce a reviewable baseline, that baseline is committed independently, and the Node 24 candidate job validates against it. The custom-frame, group, and progress revision invalidates the former reviewed baseline; Phase 5 remains blocked until a new baseline and release policy are approved.

@@ -177,6 +177,7 @@ describe('static policies and coordinated logging', () => {
     write.mockImplementationOnce(() => false)
     expect(() => spinner.log('backpressure')).not.toThrow()
     expect(vi.getTimerCount()).toBe(1)
+    stderr.emit('drain')
 
     write.mockImplementationOnce(() => {
       throw new Error('stderr unavailable')

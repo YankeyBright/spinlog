@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-const packageName = 'spinlog@0.1.0'
+const packageName = 'spinlog@0.2.0'
 const registry = 'https://registry.npmjs.org/'
 const workspace = mkdtempSync(join(tmpdir(), 'spinlog-published-preview-'))
 

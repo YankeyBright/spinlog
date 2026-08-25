@@ -1,22 +1,20 @@
 # spinlog
 
-An ESM-only terminal style and spinner library with zero consumer runtime dependencies and an exact 4,096-byte gzip ceiling.
+An ESM-only terminal feedback library with zero consumer runtime dependencies and an exact 10,240-byte gzip ceiling.
 
 ## Status
 
-Phase 0 freezes the product contract. Phase 1 establishes the secure package shell. As frozen, the v1 runtime API begins in Phase 2, and the current implementation belongs to Phase 2. Phase 3 supplies reviewed benchmark and supply-chain evidence, while Phase 4 documentation is validated by repository gates. Publication is temporarily blocked while this terminal UX revision is revalidated; no version is currently authorized for npm release.
+This is the final pre-1.0 API redesign: `spinlog@0.2.0`. It intentionally includes breaking changes from 0.1.x, documented in [MIGRATION.md](MIGRATION.md). Publication remains blocked on the `next` tag until the full verification and release-evidence sequence is reviewed.
 
-The normative v1 contracts are [`specs/v1-public-api.d.ts`](specs/v1-public-api.d.ts), [`specs/v1-styles-api.d.ts`](specs/v1-styles-api.d.ts), and [`specs/v1-behavior.json`](specs/v1-behavior.json).
+The normative contracts are [specs/v1-public-api.d.ts](specs/v1-public-api.d.ts), [specs/v1-styles-api.d.ts](specs/v1-styles-api.d.ts), and [specs/v1-behavior.json](specs/v1-behavior.json).
 
-## Runtime Support
+## Runtime support
 
 spinlog supports Node.js `^22.13.0 || ^24.0.0 || ^26.0.0`. It is ESM-only and exposes the root `spinlog` entrypoint plus the style-only `spinlog/styles` subpath.
 
-The source is compiled against ES2023, Node20 module semantics, and Node 22 type definitions. This prevents accidental use of Node 26-only APIs while compatibility is tested across Node 22, 24, and 26.
-
 ## Spinner
 
-`spinlog(text?, options?)` returns a mutable spinner. Options are `color`, `prefix`, `suffix`, `spinner`, `static`, and `terminal`; built-in animations are `dots` and `line`.
+`spinlog(text?, options?)` returns a mutable spinner. Built-in animations are `dots` and `line`; `spinner` may also be a snapshotted definition with one to 64 visible frames and an optional 16ms–60,000ms interval.
 
 <!-- example:spinner:start -->
 ```js
@@ -24,6 +22,7 @@ import spinlog from 'spinlog'
 
 const spinner = spinlog('Building', {
   color: 'cyan',
+  indent: 2,
   prefix: 'build',
   spinner: 'dots',
 }).start()
@@ -34,15 +33,74 @@ spinner.succeed('Built')
 ```
 <!-- example:spinner:end -->
 
-Mutable fields are exactly `text`, `color`, `prefix`, and `suffix`. Lifecycle methods are `start()`, `stop()`, `succeed()`, `fail()`, `warn()`, and `info()`; every method returns the same instance.
+Mutable fields are exactly `text`, `color`, `prefix`, and `suffix`. Lifecycle methods are `start()`, `stop()`, `succeed()`, `fail()`, `warn()`, and `info()`; each returns the same instance. `start()` is idempotent while active. The first terminal result in a cycle wins, and a later terminal call is an idempotent no-op after its optional text has been validated.
 
-`spinner.log(message)` writes one sanitized permanent line to `stderr` and returns the same instance. When that instance or another Spinlog spinner owns the interactive line, the line is inserted above the frame and the frame is redrawn in the same write. It never changes the spinner text, state, timer, or cursor ownership.
+`spinner.log(message)` writes one sanitized permanent line to the spinner’s configured target and returns the same instance. When a Spinlog surface owns that target’s interactive frame, the line is placed above the frame and the frame is redrawn. It never changes spinner state, timers, or cursor ownership.
 
-`start()` is idempotent while active. The first terminal result in a cycle wins, and a later terminal call is an idempotent no-op after its optional text argument has been validated. Calling `start()` after a terminal result begins a new cycle.
+`spinner.flush()` returns a promise that resolves when already-accepted permanent output for its target has drained. `group.flush()`, `progress.flush()`, and `spinlog.flush(options?)` provide the same explicit durability boundary. It does not take ownership of application writes made directly to the stream.
 
-## Promise Wrapper
+## Render targets and controls
 
-`spinlog.promise(input, options?)` accepts a `PromiseLike<T>` or a zero-argument task returning one. It starts before observing or invoking the input, settles the spinner cosmetically, and preserves the exact fulfillment value or rejection reason.
+Spinner, group, progress, promise, and flow calls accept an explicit `stream?: Writable`; the default is `process.stderr`. Spinlog never patches `console`, `process.stderr.write`, or any arbitrary stream method. Direct writes remain application-owned and may interleave; use the instance `log()` method or flow methods for coordinated lines on a target.
+
+TypeScript projects using `stream` should make the normal Node declarations available (for example, `@types/node` when their toolchain does not already provide them).
+
+| Option | Default | Contract |
+| --- | --- | --- |
+| `stream` | `process.stderr` | A Node writable target. One interactive surface is allowed per writable identity. |
+| `color` | `'cyan'` | A named ANSI-16 frame color, or `false` to disable all automatic color for that surface, including status symbols. |
+| `unicode` | `'auto'` | `false` forces ASCII built-ins and progress bars; custom frame text remains caller supplied and sanitized. |
+| `hideCursor` | `true` | Set `false` to leave cursor visibility untouched during an interactive cycle. |
+| `indent` | `0` | Leading spaces on every generated line; a safe integer from 0 through 40. |
+| `static` | `'symbol'` | Static fallback: `'symbol'`, `'text'`, or `'silent'`. |
+| `terminal` | `'auto'` | `'auto'`, `'static'`, or the informed `'interactive'` override. |
+
+<!-- example:custom-stream:start -->
+```js
+import { PassThrough } from 'node:stream'
+
+import spinlog from 'spinlog'
+
+// Stream ownership stays with the application. This target is deliberately
+// non-TTY, so it demonstrates deterministic static output as well.
+const output = new PassThrough()
+output.pipe(process.stderr, { end: false })
+
+const spinner = spinlog('Writing report', {
+  color: false,
+  stream: output,
+  terminal: 'static',
+  unicode: false,
+}).start()
+
+spinner.succeed('Report written')
+output.end()
+```
+<!-- example:custom-stream:end -->
+
+Independent writable streams may animate independently. On the same stream, a later root surface follows its configured static behavior until it is explicitly restarted after the earlier surface releases its lease. A group counts as one multi-row surface.
+
+## Custom frames
+
+<!-- example:custom-spinner:start -->
+```js
+import spinlog from 'spinlog'
+
+const spinner = spinlog('Deploying', {
+  color: false,
+  spinner: { frames: ['.', 'o', 'O', 'o'], interval: 100 },
+  unicode: false,
+}).start()
+
+spinner.succeed('Deployed')
+```
+<!-- example:custom-spinner:end -->
+
+Definitions are copied before rendering. A one-frame definition deliberately uses static output and creates no timer. Frame text is sanitized only at the terminal boundary, like spinner text.
+
+## Promise wrapper
+
+`spinlog.promise(input, options?)` accepts a `PromiseLike<T>` or a zero-argument task returning one. It starts before observing or invoking the input, settles cosmetically, and preserves the exact fulfillment value or rejection reason. `successText` and `failText` accept a string or a callback that derives the terminal text from the settled value or error.
 
 <!-- example:promise:start -->
 ```js
@@ -50,28 +108,89 @@ import spinlog from 'spinlog'
 
 const artifact = await spinlog.promise(() => Promise.resolve('dist/index.js'), {
   text: 'Building package',
+  successText: (path) => `Built ${path}`,
+  failText: (error) => `Build failed: ${String(error)}`,
 })
 
 if (artifact !== 'dist/index.js') throw new Error('unexpected artifact')
 ```
 <!-- example:promise:end -->
 
-## Intro And Outro
+## Intro and outro
 
-`spinlog.intro(message?)` and `spinlog.outro(message?)` synchronously write independent flow lines to `stderr` and return `void`.
+`spinlog.intro(message?, options?)` and `spinlog.outro(message?, options?)` synchronously write stateless flow lines and return `void`. Flow options support `stream`, `color`, `unicode`, and `indent` because they never own an interactive cursor lease.
 
 <!-- example:flow:start -->
 ```js
 import spinlog from 'spinlog'
 
-spinlog.intro('Deployment')
-const spinner = spinlog('Verifying').start()
+const output = { color: false, indent: 2, unicode: false }
+
+spinlog.intro('Deployment', output)
+const spinner = spinlog('Verifying', output).start()
 spinner.succeed()
-spinlog.outro('Complete')
+spinlog.outro('Complete', output)
 ```
 <!-- example:flow:end -->
 
-Unicode output uses U+250C for intro and U+2514 for outro, followed by two spaces and the message; unsupported Windows terminals use `>  Message` and `<  Message`. Empty messages produce marker-only lines. Calls do not pair or create timers. During interactive animation, a flow line is inserted above the active frame and that frame is redrawn atomically.
+## Groups
+
+`spinlog.group(options?)` creates one coordinated multi-row surface on its target. `group.add()` returns an idle child spinner; children inherit the group target, static mode, terminal policy, Unicode policy, cursor policy, and indentation. Child options may set their own frame color, prefix, suffix, and frame set.
+
+<!-- example:group:start -->
+```js
+import spinlog from 'spinlog'
+
+const group = spinlog.group({ indent: 2, maxRows: 4 })
+const install = group.add('Installing packages').start()
+const build = group.add('Building assets').start()
+
+install.succeed('Installed')
+build.succeed('Built')
+group.stop()
+```
+<!-- example:group:end -->
+
+`maxRows` must be a positive safe integer. Its default is `min(10, stream.rows - 1)`. Groups use static output when target rows are unavailable or active rows exceed that budget. A width or height loss demotes the complete group atomically. Settled and static rows are persisted; a later child start never redraws permanent history. A child that started static stays static until explicitly stopped and restarted; once a session has no active rows, its lease session is idle and a later restart can acquire a lease again.
+
+Groups do not nest or dynamically reorder rows.
+
+## Progress
+
+`spinlog.progress(text, { total, value?, width?, style?, ...options })` creates a determinate, timer-free indicator. Its callable signature is `spinlog.progress(text, options)`. `total` is a positive safe integer and immutable at runtime. Values are safe integers from zero through `total`; `update()` replaces the value and `increment()` accepts only a positive safe integer.
+
+<!-- example:progress:start -->
+```js
+import spinlog from 'spinlog'
+
+const progress = spinlog
+  .progress('Uploading', {
+    total: 3,
+    style: 'blocks',
+    width: 20,
+  })
+  .start()
+progress.increment()
+progress.update(2)
+progress.succeed('Uploaded')
+```
+<!-- example:progress:end -->
+
+`width` is a safe integer from 5 through 40 and defaults to 20. `style` is `'blocks'` by default or `'ascii'`; block bars automatically fall back to ASCII when Unicode is unavailable. Filled cells use `Math.floor()`, so a frame never claims more completion than its exact value. `succeed()` completes the value to 100% before it renders; `fail()`, `warn()`, and `info()` retain the actual value.
+
+## Terminal policy
+
+spinlog never writes to `stdout` by default and never manages stdin. It installs no process signal listeners, never terminates the host process, and does not own asynchronous stream errors. Applications own shutdown and should call `stop()` on active surfaces during graceful shutdown.
+
+In automatic mode, interactive animation requires a target TTY, a conservative recognized terminal profile, usable width, and—only for groups—known usable height. `terminal: 'interactive'` remains an informed override for a non-dumb TTY, but it does not bypass group height safety. Non-interactive surfaces produce deterministic static output with no timer or cursor control.
+
+`static` defaults to `'symbol'` and `terminal` defaults to `'auto'`. `'text'` writes unstyled sanitized text, and `'silent'` suppresses automatic static start and settlement lines while leaving explicit logs available. Every interactive lease is target-local. `unicode: false` forces ASCII built-ins, and `hideCursor: false` suppresses both cursor-hide and cursor-show escapes for that surface. The `Symbol.dispose` method provides explicit block-scoped cleanup.
+
+`NO_COLOR`, `NODE_DISABLE_COLORS`, and `FORCE_COLOR` retain their precedence. `FORCE_COLOR` enables ANSI SGR (including emphasis) but never enables cursor animation. `color: false` is an explicit surface-level override that disables automatic color even if terminal capability and environment variables allow it.
+
+User-controlled terminal text is sanitized lazily at the render boundary. ANSI, OSC, C0/C1 controls, bidi controls, and line separators cannot create extra terminal lines. Assigned spinner values remain unchanged; sanitized text and grapheme-aware terminal width are cached until text, prefix, or suffix changes. Combining sequences occupy their base width, East Asian wide/full-width and emoji clusters occupy two cells, and custom frames are measured in full.
+
+Synchronous cosmetic write failures are contained to the affected surface and restore a cursor it owns. A `Writable.write()` result of `false` is backpressure rather than failure: no later bytes are written to that target until `drain`, permanent lines retain order, and the latest cosmetic redraw is coalesced. Ready targets attempt a permanent write before applying backlog limits; only pending output is bounded to 64 tasks or 64 KiB. Temporary `drain`, `finish`, and `close` listeners settle or reject `flush()` and are removed on every completion path, so an ended target cannot leave a flush pending indefinitely.
 
 ## Styles
 
@@ -85,67 +204,46 @@ process.stderr.write(`${bold(green('Ready'))}\n`)
 ```
 <!-- example:styles:end -->
 
-Styles validate string input, return a string, write no stream, and restore enclosing nested styles. `reset` is a hard reset boundary. The named surface includes six modifiers, 16 foreground colors, and 16 background colors.
-
-## Terminal Policy
-
-Spinner and flow output goes only to `stderr`; the library never writes to `stdout`. Non-interactive use emits deterministic static lines without timers or cursor controls. `static` defaults to `'symbol'`, preserving the frame line at start and the colored status line at settlement. `'text'` writes two unstyled sanitized text lines without a frame or status symbol, and `'silent'` suppresses automatic static start and settlement lines while leaving `spinner.log(message)` available. The library permits one interactive spinner at a time; later spinners use their configured static behavior until explicitly restarted. Animation is also disabled when stderr width is unknown, narrow, or conservatively too small for a single frame.
-
-Interactive timers are unreferenced. `stop()`, terminal methods, and the `Symbol.dispose` method (`spinner[Symbol.dispose]()`) restore the cursor on explicit cleanup. `using spinner = spinlog('Work').start()` provides block-scoped cleanup on supported Node runtimes. Signals, forced termination, and other abrupt shutdown paths remain application-owned.
-
-`terminal` defaults to `'auto'`. In automatic mode, cursor animation requires a TTY, usable width, and a conservative recognized terminal profile; unknown profiles, `vt100`, `vt220`, empty `TERM`, CI, test mode, `TERM=dumb`, and non-TTY stderr use the configured static behavior. `'static'` always disables animation and cursor control. `'interactive'` is an informed caller override that permits animation for any TTY except `TERM=dumb`, including CI and test environments; it never enables color by itself.
-
-SGR, cursor control, color, emphasis, animation, and Unicode are resolved independently. Color precedence is `NO_COLOR`, `NODE_DISABLE_COLORS`, `FORCE_COLOR`, `CI`, `TERM=dumb`, `NODE_ENV=test`, stderr TTY detection, then the recognized terminal profile. Explicit disable variables outrank `FORCE_COLOR`, and forced color never forces animation. `NO_COLOR` and `NODE_DISABLE_COLORS` disable colors only; explicitly requested emphasis such as bold or underline remains available on a known capable interactive stderr terminal. CI, dumb terminals, test mode, and non-TTY stderr remain plain by default.
-
-User-controlled terminal text is sanitized lazily at the render boundary. ANSI, OSC, C0/C1 controls, bidi controls, and line separators cannot create extra terminal lines. Assigned spinner values remain unchanged; sanitized text and conservative width are cached until text, prefix, or suffix changes.
-
-Synchronous cosmetic write failures are contained and backpressure returns are ignored. Asynchronous stream errors, signals, shutdown, and process termination remain application-owned. The library installs no process signal listeners and never terminates the host process. Intro, outro, and `spinner.log()` calls coordinate with an active spinlog frame; unrelated `stderr` or `console.error` writes remain application-owned and can interleave, so applications should use `spinner.log()` or settle a spinner before their own permanent output.
-
-ANSI transcripts are replayed through a headless terminal emulator in automated tests. This is protocol evidence rather than a universal physical-terminal claim; contributors manually smoke-test Windows Terminal, macOS Terminal or iTerm, and a mainstream Linux terminal before a release candidate.
+Styles validate string input, return a string, write no stream, and restore enclosing nested styles. `reset` is a hard reset boundary. The style entrypoint remains capability-aware using the default stderr target; it does not claim ownership of custom render targets.
 
 ## Migration
 
-See [`MIGRATION.md`](MIGRATION.md) for behavior-based guidance from Chalk, Ora, and Clack. spinlog is not API-compatible with those packages, and v1 intentionally excludes custom streams, custom animations, concurrent spinners, advanced colors, prompts, progress bars, task groups, and structured logs.
+See [MIGRATION.md](MIGRATION.md) for migration from 0.1.x, Chalk, Ora, and Clack. spinlog is not API-compatible with those packages. This release intentionally excludes truecolor, themes, ETA/rate, prompts, structured task logs, global write interception, stdin handling, CommonJS, and browser-first runtime support.
 
-## Package Evidence
+## Package evidence
 
 - Zero runtime, optional, and peer dependencies.
 - No npm lifecycle scripts.
 - Exactly eleven files in the npm tarball.
-- `dist/index.js` currently measures 3,860 bytes using gzip level 9, below the 4,096-byte hard ceiling.
-- A one-style `spinlog/styles` consumer measures 593 gzip bytes against a 600-byte tree-shaking ceiling.
+- `dist/index.js` currently measures 9,889 bytes using gzip level 9, below the 10,240-byte hard ceiling.
+- A one-style `spinlog/styles` consumer remains constrained by a 768-byte tree-shaking ceiling.
 - A canonical CycloneDX 1.5 runtime SBOM with zero runtime components is included in the tarball.
-- Build-tool SBOM, benchmark, reproducibility, and candidate-manifest evidence remain outside the tarball.
-- The temporary release-revalidation workflow is manual, read-only, and cannot publish, attest, authenticate to npm, or create a GitHub release.
-- Publication is temporarily blocked pending a new reviewed release policy. A future preview must use the HTTPS npm registry and must never publish `latest` without a separate contract revision.
+- Publication is temporarily blocked pending refreshed runtime, terminal, package, SBOM, benchmark, and documentation evidence for the `0.2.0` pre-1.0 contract.
 
 These controls reduce defined risks. They are not a security certification, provenance claim, SLSA claim, or guarantee of zero risk.
 
 ## Verification
 
-Full contributor tooling uses Node 22.18.0 or later on the Node 22 line because of development-tool engine requirements. Runtime-floor compatibility at Node 22.13.0 is tested only through the packed package.
+Full contributor tooling uses Node 22.18.0 or later on the Node 22 line because of development-tool engine requirements. Runtime-floor compatibility at Node 22.13.0 is tested through the packed package.
 
 ```bash
 npm ci --ignore-scripts
-npm run check:foundation
-npm run check:phase3
+npm run format:check
+npm run lint
+npm run typecheck
+npm run typecheck:contracts
+npm run api:check
+npm test
+npm run test:stability
 npm run check:phase4
 npm run check:phase5
-npm run check:phases
-npm audit --audit-level=low
 ```
 
-The final aggregate is fail-fast and emits this only after all Phase 0 through Phase 4 gates pass:
-
-```json
-{"phase0":"pass","phase1":"pass","phase1Release":"pass","phase2":"pass","phase3":"pass","phase4":"pass"}
-```
-
-`npm run check:phase5` validates the static trusted-release policy separately and reports `phase5=hold` while publication is blocked. Terminal UX hardening changed runtime, build, dependency, package, and benchmark inputs after the former preview receipt. It therefore cannot be used for publication. A new reviewed five-run Node 24 Linux baseline and fresh Phase 3/4 evidence are required before a new release policy can be approved. Baseline collection uses `check:foundation` to avoid circularly accepting its own evidence.
+Release acceptance additionally requires package checks, size checks, terminal-emulation and cross-platform TTY-target smoke coverage, and three consecutive full green test runs. `npm run check:phase5` validates the static trusted-release policy separately and reports `phase5=hold` while publication is blocked.
 
 ## Security
 
-Report vulnerabilities privately through the [GitHub Security Advisory form](https://github.com/YankeyBright/spinlog/security/advisories/new). See [`SECURITY.md`](SECURITY.md) for response and support policy.
+Report vulnerabilities privately through the [GitHub Security Advisory form](https://github.com/YankeyBright/spinlog/security/advisories/new). See [SECURITY.md](SECURITY.md) for response and support policy.
 
 ## License
 

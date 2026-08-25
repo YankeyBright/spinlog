@@ -2,6 +2,7 @@ import spinlog from 'spinlog'
 
 const spinner = spinlog('Building', {
   color: 'cyan',
+  indent: 2,
   prefix: 'build',
   spinner: 'dots',
 }).start()

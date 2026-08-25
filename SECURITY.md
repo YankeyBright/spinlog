@@ -1,13 +1,11 @@
 # Security Policy
 
 ## Supported Versions
+No package version is currently authorized for publication. The `spinlog@0.2.0` pre-1.0 preview target is blocked pending revalidation of the target-local terminal UX redesign. Security fixes target the default branch.
 
-No package version is currently authorized for publication. The prior `spinlog@0.1.0` preview receipt is blocked pending revalidation of the terminal UX revision. Security fixes target the default branch.
-
-The v1 runtime requires Node.js `^22.13.0 || ^24.0.0 || ^26.0.0`. Users must run security-supported patch releases from those lines.
+The pre-1.0 runtime requires Node.js `^22.13.0 || ^24.0.0 || ^26.0.0`. Users must run security-supported patch releases from those lines.
 
 ## Reporting A Vulnerability
-
 Use a private GitHub Security Advisory in [`YankeyBright/spinlog`](https://github.com/YankeyBright/spinlog/security/advisories/new). Do not open a public issue for an undisclosed vulnerability.
 
 Maintainers target acknowledgement within five business days. Severity, remediation, release timing, and disclosure are determined after triage; acknowledgement is not a promise of a fixed resolution date.

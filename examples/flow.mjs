@@ -1,6 +1,8 @@
 import spinlog from 'spinlog'
 
-spinlog.intro('Deployment')
-const spinner = spinlog('Verifying').start()
+const output = { color: false, indent: 2, unicode: false }
+
+spinlog.intro('Deployment', output)
+const spinner = spinlog('Verifying', output).start()
 spinner.succeed()
-spinlog.outro('Complete')
+spinlog.outro('Complete', output)

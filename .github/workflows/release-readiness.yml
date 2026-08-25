@@ -31,3 +31,4 @@ jobs:
           npm run check:foundation
           npm run check:phase3
           npm run check:phase4
+          npm run test:stability
