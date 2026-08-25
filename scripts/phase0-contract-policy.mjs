@@ -1,13 +1,16 @@
 import { isDeepStrictEqual } from 'node:util'
 
 import { sortCanonicalText } from './canonical-order.mjs'
-import { SPINNER_COLORS } from './phase0-contract-catalog.mjs'
 import {
   renderPublicApiDeclaration,
   renderStylesApiDeclaration,
 } from './phase0-contract-declarations.mjs'
 
-export { renderPublicApiDeclaration, renderStylesApiDeclaration }
+export { SPINNER_COLORS } from './phase0-contract-catalog.mjs'
+export {
+  renderPublicApiDeclaration,
+  renderStylesApiDeclaration,
+} from './phase0-contract-declarations.mjs'
 
 const STYLE_EXPORTS = Object.freeze([
   'reset',
@@ -1074,4 +1077,4 @@ export function validatePhase0Contract({
   return failures
 }
 
-export { DOCUMENT_PATHS, SPINNER_COLORS, STATES, STYLE_EXPORTS, TYPE_EXPORTS }
+export { DOCUMENT_PATHS, STATES, STYLE_EXPORTS, TYPE_EXPORTS }

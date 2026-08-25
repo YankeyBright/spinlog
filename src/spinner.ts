@@ -229,13 +229,8 @@ export function createSpinner(text = '', options: SpinnerOptions = {}): Spinner 
     releaseInteractiveLease(target, lease)
     renderMode = 'static'
     const output = renderSpinnerStaticStart(presentation, active, frameIndex, staticMode)
-    if (
-      !writeTarget(
-        target,
-        `${CLEAR_LINE}${cursorShow()}${output === undefined ? '' : `${output}\n`}`,
-      )
-    )
-      abortCycle(true)
+    const staticLine = output === undefined ? '' : `${output}\n`
+    if (!writeTarget(target, `${CLEAR_LINE}${cursorShow()}${staticLine}`)) abortCycle(true)
   }
 
   function canAnimate(active: Capabilities): boolean {

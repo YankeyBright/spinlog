@@ -2,6 +2,7 @@ import spinlog, {
   bgBlueBright,
   red,
   type FlowOptions,
+  type FlushOptions,
   type PromiseOptions,
   type PromiseSettlementText,
   type Progress,
@@ -38,13 +39,15 @@ const promiseOptions: PromiseOptions<number> = {
   ...options,
   text: 'working',
   successText: settlementText,
-  failText: (error) => String(error),
+  failText: String,
 }
-const renderOptions: RenderOptions = { color: false, unicode: 'auto', indent: 1 }
-const flowOptions: FlowOptions = { color: false, unicode: false, indent: 1 }
 const unicode: UnicodeMode = 'auto'
+const renderOptions: RenderOptions = { color: false, unicode, indent: 1 }
+const flowOptions: FlowOptions = { color: false, unicode: false, indent: 1 }
+const flushOptions: FlushOptions = {}
 const factory: Spinlog = spinlog
 const spinner: Spinner = factory('working', options)
+const customSpinner: Spinner = factory('custom', customOptions)
 const group: SpinnerGroup = factory.group({ terminal: 'static', maxRows: 3, color: false })
 const groupChild: Spinner = group.add('child', { spinner: custom })
 const progressOptions: ProgressOptions = {
@@ -58,12 +61,14 @@ const progress: Progress = factory.progress('copy', progressOptions)
 const styled: string = red(bgBlueBright('value'))
 const direct: Promise<number> = factory.promise(Promise.resolve(1), promiseOptions)
 const task: Promise<string> = factory.promise(() => Promise.resolve('value'))
+const flushed: Promise<void> = factory.flush(flushOptions)
 factory.intro('starting', flowOptions)
 factory.outro(undefined, { ...renderOptions, color: 'blue' })
 const subpathStyle: Style = subpathBlue
 
 spinner.start().stop().start().succeed().start().fail().start().warn().start().info()
 spinner.log('permanent line').start()
+customSpinner.stop()
 groupChild.start().succeed()
 group.stop()
 progress.increment().update(2).succeed()
@@ -73,6 +78,10 @@ spinner.text = styled
 subpathStyle(styled)
 await direct
 await task
+await spinner.flush()
+await group.flush()
+await progress.flush()
+await flushed
 
 // @ts-expect-error custom spinner names remain a closed union
 factory('invalid', { spinner: 'custom' })
@@ -103,6 +112,3 @@ progress.update('two')
 factory.progress('invalid', { total: 1, style: 'gradient' })
 // @ts-expect-error group child options cannot override the shared target
 group.add('invalid', { stream: process.stderr })
-
-void customOptions
-void unicode

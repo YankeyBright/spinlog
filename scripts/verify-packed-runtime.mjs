@@ -102,7 +102,7 @@ function npmCliPath() {
 function verifyPackedRuntimeOutput(workspace) {
   writeFileSync(
     join(workspace, 'verify.mjs'),
-    `import spinlog from 'spinlog'
+    String.raw`import spinlog from 'spinlog'
 import { red } from 'spinlog/styles'
 import { PassThrough } from 'node:stream'
 process.env.FORCE_COLOR = '1'
@@ -126,7 +126,7 @@ spinlog('Custom', {
   color: false,
   unicode: false,
 }).start().succeed('Done')
-if (targetOutput !== '\\x1b[?25l- Custom\\x1b[2K\\r+ Done\\n\\x1b[?25h') {
+if (targetOutput !== '\x1b[?25l- Custom\x1b[2K\r+ Done\n\x1b[?25h') {
   throw new Error('custom TTY target policy failed: ' + JSON.stringify(targetOutput))
 }
 `,
