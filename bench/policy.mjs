@@ -2,17 +2,21 @@ import { sortCanonicalText } from '../scripts/canonical-order.mjs'
 
 import { summarize } from './statistics.mjs'
 
-export const BENCHMARK_SCHEMA_VERSION = 3
-export const BASELINE_SCHEMA_VERSION = 3
+export const BENCHMARK_SCHEMA_VERSION = 5
+export const BASELINE_SCHEMA_VERSION = 5
 export const BENCHMARK_SCENARIOS = Object.freeze([
   'root-cold-import-ns',
   'styles-cold-import-ns',
   'enabled-style-ns',
   'disabled-style-ns',
   'static-spinner-settlement-ns',
+  'custom-spinner-settlement-ns',
   'resolved-promise-wrapper-ns',
   'intro-flow-message-ns',
   'outro-flow-message-ns',
+  'instance-log-ns',
+  'group-static-settlement-ns',
+  'progress-static-settlement-ns',
 ])
 
 const COMMIT = /^[0-9a-f]{40}$/u
@@ -117,7 +121,7 @@ export function validateBenchmarkResult(result, expectedMode) {
       BENCHMARK_SCENARIOS,
     )
   ) {
-    failures.push('benchmark must contain the eight ordered Phase 3 scenarios exactly once')
+    failures.push('benchmark must contain the twelve ordered Phase 3 scenarios exactly once')
   }
 
   for (const scenario of scenarios) {
@@ -171,7 +175,7 @@ export function validateBaseline(baseline) {
     typeof scenarios !== 'object' ||
     !sameValues(sortCanonicalText(Object.keys(scenarios)), sortCanonicalText(BENCHMARK_SCENARIOS))
   ) {
-    failures.push('benchmark baseline must contain exactly the eight Phase 3 scenarios')
+    failures.push('benchmark baseline must contain exactly the twelve Phase 3 scenarios')
   } else {
     for (const name of BENCHMARK_SCENARIOS) {
       const scenario = scenarios[name]

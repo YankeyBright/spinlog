@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 3,
+  "package": "spinlog",
+  "version": "0.2.0",
+  "repository": "YankeyBright/spinlog",
+  "status": "blocked",
+  "reason": "The pre-1.0 0.2 target-local rendering redesign changed runtime, contracts, terminal evidence, benchmarks, and package inputs after the prior preview receipt.",
+  "blockedPublication": {
+    "version": "0.2.0",
+    "tag": "v0.2.0",
+    "distTag": "next",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "requiredRevalidation": [
+    "Review the pre-1.0 0.2 Phase 0 contract and Phase 2 runtime behavior.",
+    "Complete three consecutive full green test runs, including target-local terminal coverage.",
+    "Commit a new five-run Linux Node 24 benchmark baseline.",
+    "Regenerate Phase 3 reproducibility, SBOM, consumer, and candidate evidence.",
+    "Complete the Phase 4 documentation review.",
+    "Create a new reviewed preview-release policy before restoring publication workflows."
+  ]
+}

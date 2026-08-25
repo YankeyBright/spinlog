@@ -25,11 +25,7 @@ export const AUTHORITATIVE_PHASE_FILES = Object.freeze([
 ])
 
 const REQUIRED_TEXT = Object.freeze({
-  'README.md': [
-    'Phase 0 freezes the product contract. Phase 1 establishes the secure package shell.',
-    'the v1 runtime API begins in Phase 2',
-    'the current implementation belongs to Phase 2',
-  ],
+  'README.md': ['final pre-1.0 API redesign', 'spinlog@0.2.0', 'Publication remains blocked'],
   'specs/00_PHASE_MAP.md': CANONICAL_PHASES.map(({ number, title }) => `| ${number} | ${title} |`),
   'specs/03_COMPETITIVE_ANALYSIS.md': [
     '| Color functions (red, green, blue, etc.) | chalk, picocolors |',
@@ -43,7 +39,7 @@ const REQUIRED_TEXT = Object.freeze({
   'specs/12_PHASE_3_BENCHMARK_SBOM.md': ['# Phase 3: Benchmarking and SBOM Hardening'],
   'specs/13_PHASE_4_DOCS_MIGRATION.md': ['# Phase 4: Documentation and Migration'],
   'specs/14_PHASE_5_RELEASE.md': ['# Phase 5: Trusted Release'],
-  'specs/16_POST_MVP_FEATURES.md': ['after the Phase 2 core is stable and tested'],
+  'specs/16_POST_MVP_FEATURES.md': ['outside the frozen 0.2 pre-1.0 surface'],
 })
 
 const LEGACY_TAXONOMY = Object.freeze([

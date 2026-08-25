@@ -2,8 +2,12 @@ import { lexer, walkTokens } from 'marked'
 
 export const DOCUMENTED_EXAMPLES = Object.freeze([
   { document: 'README.md', id: 'spinner', path: 'examples/spinner.mjs' },
+  { document: 'README.md', id: 'custom-stream', path: 'examples/custom-stream.mjs' },
   { document: 'README.md', id: 'promise', path: 'examples/promise.mjs' },
   { document: 'README.md', id: 'flow', path: 'examples/flow.mjs' },
+  { document: 'README.md', id: 'custom-spinner', path: 'examples/custom-spinner.mjs' },
+  { document: 'README.md', id: 'group', path: 'examples/group.mjs' },
+  { document: 'README.md', id: 'progress', path: 'examples/progress.mjs' },
   { document: 'README.md', id: 'styles', path: 'examples/styles.mjs' },
   { document: 'MIGRATION.md', id: 'migration-chalk', path: 'examples/migration-chalk.mjs' },
   { document: 'MIGRATION.md', id: 'migration-ora', path: 'examples/migration-ora.mjs' },
@@ -12,28 +16,46 @@ export const DOCUMENTED_EXAMPLES = Object.freeze([
 const ENGINE = '^22.13.0 || ^24.0.0 || ^26.0.0'
 const REQUIRED_README_CLAIMS = Object.freeze([
   ENGINE,
+  'spinlog@0.2.0',
   'spinlog(text?, options?)',
   'spinlog.promise(input, options?)',
-  'spinlog.intro(message?)',
-  'spinlog.outro(message?)',
-  'Color precedence is `NO_COLOR`, `NODE_DISABLE_COLORS`, `FORCE_COLOR`',
-  'never writes to `stdout`',
+  'spinlog.intro(message?, options?)',
+  'spinlog.outro(message?, options?)',
+  'spinlog.flush(options?)',
+  'spinlog.group(options?)',
+  'spinlog.progress(text, options)',
+  'spinner.log(message)',
+  "`static` defaults to `'symbol'`",
+  "`terminal` defaults to `'auto'`",
+  '`color: false`',
+  '`unicode: false`',
+  '`hideCursor: false`',
+  'One interactive surface is allowed per writable identity',
+  'never patches `console`',
+  'never manages stdin',
+  'never writes to `stdout` by default',
   'installs no process signal listeners',
+  '`Symbol.dispose`',
+  '`Math.floor()`',
+  '`succeed()` completes the value to 100%',
+  '`min(10, stream.rows - 1)`',
   'Exactly eleven files in the npm tarball',
   'zero runtime components',
-  'No production version has been published',
+  'Publication is temporarily blocked',
 ])
 const REQUIRED_MIGRATION_CLAIMS = Object.freeze([
   'not API-compatible with Chalk, Ora, or Clack',
   '## From Chalk',
   '## From Ora',
   '## From Clack',
+  '## From spinlog 0.1',
   'custom streams',
-  'custom frame sets',
-  'simultaneous spinners',
+  'custom writable streams',
+  'caller-defined frame sets',
+  'spinlog.group()',
+  'spinlog.progress()',
+  'one interactive terminal surface per stream',
   'prompts',
-  'task groups',
-  'progress bars',
 ])
 const EXTERNAL_LINK_PREFIXES = Object.freeze(['http:', 'https:', 'mailto:'])
 
@@ -126,7 +148,11 @@ function validateClaims(document, claims, failurePrefix, failures) {
 }
 
 function validateDocumentationContract(packageJson, contract, runtimeSbom, failures) {
-  if (packageJson?.engines?.node !== ENGINE || contract?.runtime?.engines !== ENGINE) {
+  if (
+    packageJson?.engines?.node !== ENGINE ||
+    contract?.runtime?.engines !== ENGINE ||
+    packageJson?.version !== '0.2.0'
+  ) {
     failures.push('README Node support must derive from the frozen package and behavior contract')
   }
   if (JSON.stringify(contract?.runtime?.supportedMajors) !== JSON.stringify([22, 24, 26])) {
@@ -134,11 +160,67 @@ function validateDocumentationContract(packageJson, contract, runtimeSbom, failu
   }
   if (
     JSON.stringify(contract?.publicApi?.callableMethods) !==
-    JSON.stringify(['promise', 'intro', 'outro'])
+    JSON.stringify(['promise', 'intro', 'outro', 'flush', 'group', 'progress'])
   ) {
     failures.push('documentation requires the exact callable default-export methods')
   }
-  if ((runtimeSbom?.components ?? []).length !== 0) {
+  if (contract?.schemaVersion !== 13) {
+    failures.push('documentation requires behavior contract schema version 12')
+  }
+  if (
+    JSON.stringify(contract?.environment?.capabilityShape) !==
+      JSON.stringify(['sgr', 'cursor', 'color', 'emphasis', 'animation', 'unicode']) ||
+    contract?.environment?.noColor !== 'non-empty-disables-colors-only' ||
+    contract?.environment?.nodeDisableColors !== 'non-empty-disables-colors-only' ||
+    contract?.environment?.capabilityResolution !== 'per-render-target'
+  ) {
+    failures.push('documentation requires the frozen color-only disable and emphasis policy')
+  }
+  if (
+    contract?.rendering?.renderCache?.sanitization !== 'lazy-render-boundary' ||
+    contract?.rendering?.renderCache?.colorMutation !== 'reuse-text-snapshot'
+  ) {
+    failures.push('documentation requires the frozen lazy render-cache policy')
+  }
+  if (contract?.publicApi?.spinnerDisposal !== 'Symbol.dispose') {
+    failures.push('documentation requires the frozen spinner disposal API')
+  }
+  if (
+    contract?.rendering?.interactiveLease?.activeSurfaceLimit !== 1 ||
+    contract?.rendering?.interactiveLease?.scope !== 'writable-stream-identity' ||
+    contract?.rendering?.defaultStream !== 'process.stderr' ||
+    contract?.rendering?.explicitWritableStreams !== true
+  ) {
+    failures.push('documentation requires the frozen target-local interactive-surface policy')
+  }
+  if (
+    contract?.rendering?.customFrames?.maximumFrames !== 64 ||
+    contract?.rendering?.groups?.interactiveSurface !== 'one-target-local-lease' ||
+    contract?.rendering?.groups?.defaultMaxRows !== 'min(10, target.rows - 1)' ||
+    contract?.rendering?.progress?.defaultBarWidth !== 20 ||
+    JSON.stringify(contract?.rendering?.progress?.barWidthRange) !== JSON.stringify([5, 40]) ||
+    contract?.rendering?.progress?.filledCells !== 'floor' ||
+    contract?.rendering?.progress?.succeedValue !== 'total'
+  ) {
+    failures.push('documentation requires the frozen custom-frame, group, and progress policy')
+  }
+  if (
+    JSON.stringify(contract?.rendering?.staticModes?.options) !==
+      JSON.stringify(['symbol', 'text', 'silent']) ||
+    contract?.rendering?.staticModes?.default !== 'symbol' ||
+    contract?.rendering?.log?.activeFrameCoordination !== 'clear-write-redraw-target-local' ||
+    contract?.rendering?.writeBackpressure?.cosmeticFrames !== 'coalesce-latest-until-drain' ||
+    JSON.stringify(contract?.environment?.terminalModes) !==
+      JSON.stringify(['auto', 'static', 'interactive'])
+  ) {
+    failures.push(
+      'documentation requires the frozen static-mode, terminal-override, and log policy',
+    )
+  }
+  if (
+    (runtimeSbom?.components ?? []).length !== 0 ||
+    runtimeSbom?.metadata?.component?.version !== packageJson?.version
+  ) {
     failures.push(
       'README zero-runtime-component claim requires an empty runtime SBOM component list',
     )

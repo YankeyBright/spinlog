@@ -22,7 +22,7 @@
 
 **Risk:** An uncatchable termination can occur while the interactive cursor is hidden.
 
-**Mitigation:** Restore in every explicit lifecycle path, keep process ownership with the application, document the limitation, and avoid claiming cleanup for uncatchable termination.
+**Mitigation:** Restore in every explicit lifecycle path and through `Symbol.dispose`, keep process ownership with the application, document the limitation, and avoid claiming cleanup for uncatchable termination.
 
 ## Unicode False Positive
 
@@ -34,7 +34,19 @@
 
 **Risk:** Closing an inner style resets its enclosing style.
 
-**Mitigation:** Reopen the parent style after an inner close and behavior-test nested foreground, background, modifier, and reset combinations.
+**Mitigation:** Use one explicit ANSI metadata table for SGR codes, categories, and restoration strategy; behavior-test nested foreground, background, modifier, and reset combinations.
+
+## External Stream Interleaving
+
+**Risk:** An application writes directly to stderr while a spinner owns the interactive line.
+
+**Mitigation:** Coordinate only spinlog-owned intro/outro, instance `spinner.log()`, and static lines. Do not monkey-patch host streams or install global listeners; document that applications use `spinner.log()` or settle active spinners before unrelated permanent output.
+
+## Limited Terminal Profiles
+
+**Risk:** `stderr.isTTY` identifies an attached terminal but does not prove cursor-control or SGR behavior.
+
+**Mitigation:** Use a conservative profile allowlist for automatic animation and default SGR. Offer only an explicit, TTY-only `terminal: 'interactive'` caller assertion, retaining the `TERM=dumb` refusal and never enabling color from the override.
 
 ## Timer Leak
 
@@ -50,12 +62,12 @@
 
 ## Size Creep
 
-**Risk:** The runtime grows beyond the frozen 2,560-byte gzip ceiling.
+**Risk:** The runtime grows beyond the frozen 10,240-byte gzip ceiling.
 
-**Mitigation:** Enforce the exact level-9 gzip limit in CI and through an independent Size Limit check. The final pre-publication contract was revised to 2,560 bytes only after deterministic runtime validation, the style-only subpath, and the direct build measured 2,279 bytes; future expansion must revise Phase 0 rather than bypassing either gate.
+**Mitigation:** Enforce the exact level-9 gzip limit in CI and through an independent Size Limit check. The ceiling was revised to 10,240 bytes for coordinated rendering, custom frames, groups, progress, terminal-width safety, bounded output queues, and the flush boundary; future expansion must revise Phase 0 rather than bypassing either gate.
 
 ## Release Workflow Compromise
 
 **Risk:** Build infrastructure is modified even though publishing uses OIDC.
 
-**Mitigation:** Keep publication technically absent until Phase 5. Then pin actions to immutable commits, minimize permissions, disable persisted checkout credentials, protect the release environment, prohibit long-lived publish tokens, and verify provenance after publication.
+**Mitigation:** The Phase 5 preview uses immutable action commits, minimum permissions, disabled persisted checkout credentials, a protected release environment, no long-lived publish token, GitHub attestations, npm integrity comparison, and post-publication provenance verification. Stable promotion remains a separate policy change.

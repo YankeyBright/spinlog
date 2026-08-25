@@ -1,7 +1,46 @@
-import { applyAnsiStyle } from './ansi.js'
 import { type Capabilities, getCapabilities } from './env.js'
-import type { Spinner, SpinnerColor, SpinnerName, SpinnerOptions } from './index.js'
-import { requireString, sanitizeSegment, tryWrite } from './text.js'
+import type { Spinner, SpinnerOptions } from './index.js'
+import {
+  acquireInteractiveLease,
+  flushTarget,
+  releaseInteractiveLease,
+  writeCoordinatedLine,
+  writeInteractiveFrame,
+  writeTarget,
+  type InteractiveLease,
+} from './renderer.js'
+import {
+  requireColor,
+  requireColorOption,
+  requireHideCursor,
+  requireIndent,
+  requireOptions,
+  requireStaticMode,
+  requireTerminalMode,
+  requireUnicodeMode,
+} from './spinner-options.js'
+import {
+  createSpinnerPresentation,
+  invalidateSpinnerText,
+  renderSpinnerFrame,
+  renderSpinnerFrameWidth,
+  renderSpinnerStaticStart,
+  renderSpinnerStaticTerminal,
+  renderSpinnerStatus,
+} from './spinner-rendering.js'
+import {
+  DEFAULT_SPINNER_COLOR,
+  createFrameSet,
+  hasAnimatedFrames,
+  type TerminalAction,
+} from './spinner-data.js'
+import { CLEAR_LINE, HIDE_CURSOR, SHOW_CURSOR } from './terminal-control.js'
+import {
+  fitsSingleTerminalWidth,
+  requireString,
+  resolveRenderTarget,
+  sanitizeSegment,
+} from './text.js'
 
 const IDLE = 0
 const SPINNING = 1
@@ -11,131 +50,103 @@ const FAILED = 4
 const WARNED = 5
 const INFORMED = 6
 type State = 0 | 1 | 2 | 3 | 4 | 5 | 6
-type TerminalAction = 0 | 1 | 2 | 3
-type Status = readonly [state: State, unicode: string, ascii: string, color: SpinnerColor]
-const HIDE_CURSOR = '\x1b[?25l'
-const SHOW_CURSOR = '\x1b[?25h'
-const CLEAR_LINE = '\x1b[2K\r'
-const DOTS_FRAMES = '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
-const LINE_FRAMES = String.raw`-\|/`
-const SPINNER_COLORS = new Set(
-  'black red green yellow blue magenta cyan white blackBright redBright greenBright yellowBright blueBright magentaBright cyanBright whiteBright'.split(
-    ' ',
-  ),
-)
-const STATUS = {
-  0: [SUCCEEDED, '✔', '+', 'green'],
-  1: [FAILED, '✖', 'x', 'red'],
-  2: [WARNED, '⚠', '!', 'yellow'],
-  3: [INFORMED, 'ℹ', 'i', 'blue'],
-} as const satisfies Record<TerminalAction, Status>
-function requireColor(value: unknown): SpinnerColor {
-  if (typeof value !== 'string' || !SPINNER_COLORS.has(value)) {
-    throw new TypeError('color must be a built-in spinner color')
-  }
-  return value as SpinnerColor
-}
+type RenderMode = 'interactive' | 'static' | undefined
 
-function requireSpinnerName(value: unknown): SpinnerName {
-  if (value !== 'dots' && value !== 'line') throw new TypeError("spinner must be 'dots' or 'line'")
-  return value
-}
-
-export function requireOptions<T extends object>(value: T): T {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-    throw new TypeError('options must be an object')
-  }
-  return value
-}
-
-export function selectFrame(spinner: SpinnerName, unicode: boolean, index: number): string {
-  const frames = spinner === 'dots' && unicode ? DOTS_FRAMES : LINE_FRAMES
-  return frames.charAt(index % frames.length)
-}
-
-export function selectStatus(
-  action: TerminalAction,
-  unicode: boolean,
-): readonly [symbol: string, color: SpinnerColor] {
-  const [, unicodeSymbol, asciiSymbol, color] = STATUS[action]
-  return [unicode ? unicodeSymbol : asciiSymbol, color]
-}
+// Compatibility exports for focused internal definition tests.
+export { selectBuiltinFrame as selectFrame, selectStatus } from './spinner-data.js'
 
 /** Create a mutable spinner with instance-owned rendering state. */
 export function createSpinner(text = '', options: SpinnerOptions = {}): Spinner {
   const safeOptions = requireOptions(options)
+  const target = resolveRenderTarget(safeOptions.stream)
+  const configuredColor = requireColorOption(safeOptions.color, DEFAULT_SPINNER_COLOR)
+  const automaticColor = configuredColor !== false
+  const unicodeMode = requireUnicodeMode(safeOptions.unicode ?? 'auto')
+  const hideCursor = requireHideCursor(safeOptions.hideCursor ?? true)
+  const indent = ' '.repeat(requireIndent(safeOptions.indent ?? 0))
+  const frameSet = createFrameSet(safeOptions.spinner)
+  const staticMode = requireStaticMode(safeOptions.static ?? 'symbol')
+  const terminalMode = requireTerminalMode(safeOptions.terminal ?? 'auto')
+  const presentation = createSpinnerPresentation(
+    requireString(text, 'text'),
+    configuredColor === false ? DEFAULT_SPINNER_COLOR : configuredColor,
+    requireString(safeOptions.prefix ?? '', 'prefix'),
+    requireString(safeOptions.suffix ?? '', 'suffix'),
+    indent,
+    frameSet,
+  )
   let state: State = IDLE
   let timer: NodeJS.Timeout | undefined
   let frameIndex = 0
   let capabilities: Capabilities | undefined
-  let currentText = requireString(text, 'text')
-  let currentColor = requireColor(safeOptions.color ?? 'cyan')
-  let currentPrefix = requireString(safeOptions.prefix ?? '', 'prefix')
-  let currentSuffix = requireString(safeOptions.suffix ?? '', 'suffix')
-  const spinnerName = requireSpinnerName(safeOptions.spinner ?? 'dots')
+  let renderMode: RenderMode
 
   const spinner: Spinner = {
     get text() {
-      return currentText
+      return presentation.text
     },
     set text(value) {
-      currentText = requireString(value, 'text')
+      presentation.text = requireString(value, 'text')
+      invalidateSpinnerText(presentation)
     },
     get color() {
-      return currentColor
+      return presentation.color
     },
     set color(value) {
-      currentColor = requireColor(value)
+      presentation.color = requireColor(value)
     },
     get prefix() {
-      return currentPrefix
+      return presentation.prefix
     },
     set prefix(value) {
-      currentPrefix = requireString(value, 'prefix')
+      presentation.prefix = requireString(value, 'prefix')
+      invalidateSpinnerText(presentation)
     },
     get suffix() {
-      return currentSuffix
+      return presentation.suffix
     },
     set suffix(value) {
-      currentSuffix = requireString(value, 'suffix')
+      presentation.suffix = requireString(value, 'suffix')
+      invalidateSpinnerText(presentation)
     },
     start() {
       if (state === SPINNING) return this
-
       state = SPINNING
       frameIndex = 0
-      const activeCapabilities = getCapabilities()
-      capabilities = activeCapabilities
-      const [, animationEnabled] = activeCapabilities
+      const active = resolveCapabilities()
+      capabilities = active
+      const frame = renderSpinnerFrame(presentation, active, frameIndex)
 
-      if (!animationEnabled) {
-        if (!tryWrite(`${renderFrame(activeCapabilities)}\n`)) abortCycle(false)
+      if (!canAnimate(active) || !acquireInteractiveLease(target, lease)) {
+        startStatic(active)
         return this
       }
-      if (!tryWrite(HIDE_CURSOR) || !tryWrite(renderFrame(activeCapabilities))) {
-        abortCycle(true)
-        return this
-      }
-
-      timer = setInterval(() => tick(activeCapabilities), 80)
+      renderMode = 'interactive'
+      if (!writeInteractiveFrame(target, lease, `${cursorHide()}${frame}`)) return this
+      timer = setInterval(() => tick(active), frameSet.interval)
       timer.unref()
       return this
     },
     stop() {
       if (state >= STOPPED) return this
-
-      const wasSpinning = state === SPINNING
-      const activeCapabilities = capabilities
+      const previous = renderMode
       state = STOPPED
       capabilities = undefined
-      if (!wasSpinning) return this
-
       clearTimer()
-      if (activeCapabilities?.[1]) {
-        tryWrite(CLEAR_LINE)
-        tryWrite(SHOW_CURSOR)
-      }
+      renderMode = undefined
+      if (previous === 'interactive') stopInteractive()
       return this
+    },
+    log(message) {
+      const line = sanitizeSegment(requireString(message, 'message'))
+      writeCoordinatedLine(target, `${indent}${line}\n`)
+      return this
+    },
+    flush() {
+      return flushTarget(target)
+    },
+    [Symbol.dispose]() {
+      this.stop()
     },
     succeed(value) {
       terminal(0, value)
@@ -154,57 +165,93 @@ export function createSpinner(text = '', options: SpinnerOptions = {}): Spinner 
       return this
     },
   }
+  Object.defineProperty(spinner, Symbol.dispose, { enumerable: false })
+
+  const lease: InteractiveLease = {
+    prepareFrame: prepareInteractiveFrame,
+    currentFrame: () => renderSpinnerFrame(presentation, capabilities as Capabilities, frameIndex),
+    stopAfterRenderFailure: () => abortCycle(true),
+  }
 
   function terminal(action: TerminalAction, value?: string): void {
-    // Validation must precede terminal idempotency to preserve the input contract.
     const nextText = value === undefined ? undefined : requireString(value, 'text')
     if (state >= SUCCEEDED) return
     if (nextText !== undefined) spinner.text = nextText
 
-    const activeCapabilities = state === SPINNING && capabilities ? capabilities : getCapabilities()
-    state = STATUS[action][0]
+    const active = capabilities ?? resolveCapabilities()
+    const previous = renderMode
+    state = terminalState(action)
     capabilities = undefined
+    renderMode = undefined
     clearTimer()
-
-    const output = `${renderStatus(action, activeCapabilities)}\n`
-    if (activeCapabilities[1]) {
-      if (tryWrite(CLEAR_LINE)) tryWrite(output)
-      tryWrite(SHOW_CURSOR)
+    if (previous === 'interactive') {
+      releaseInteractiveLease(target, lease)
+      const output = `${renderSpinnerStatus(presentation, action, active)}\n`
+      if (!writeTarget(target, `${CLEAR_LINE}${output}${cursorShow()}`))
+        writeTarget(target, cursorShow())
     } else {
-      tryWrite(output)
+      const output = renderSpinnerStaticTerminal(presentation, action, active, staticMode)
+      if (output !== undefined) writeCoordinatedLine(target, `${output}\n`)
     }
   }
 
-  function tick(activeCapabilities: Capabilities): void {
-    if (!tryWrite(CLEAR_LINE)) {
-      abortCycle(true)
-      return
-    }
+  function tick(active: Capabilities): void {
     frameIndex += 1
-    if (!tryWrite(renderFrame(activeCapabilities))) abortCycle(true)
+    if (!prepareInteractiveFrame()) return
+    writeInteractiveFrame(
+      target,
+      lease,
+      `${CLEAR_LINE}${renderSpinnerFrame(presentation, active, frameIndex)}`,
+    )
   }
 
-  function renderFrame(activeCapabilities: Capabilities): string {
-    const [colorEnabled, , unicodeEnabled] = activeCapabilities
-    const symbol = selectFrame(spinnerName, unicodeEnabled, frameIndex)
-    return render(colorEnabled ? applyAnsiStyle(spinner.color, symbol) : symbol)
+  function prepareInteractiveFrame(): boolean {
+    const active = capabilities as Capabilities
+    if (canAnimate(active)) return true
+    demoteToStatic(active)
+    return false
   }
 
-  function renderStatus(action: TerminalAction, activeCapabilities: Capabilities): string {
-    const [colorEnabled, , unicodeEnabled] = activeCapabilities
-    const [symbol, color] = selectStatus(action, unicodeEnabled)
-    return render(colorEnabled ? applyAnsiStyle(color, symbol) : symbol)
+  function startStatic(active: Capabilities): void {
+    renderMode = 'static'
+    const output = renderSpinnerStaticStart(presentation, active, frameIndex, staticMode)
+    if (output !== undefined && !writeCoordinatedLine(target, `${output}\n`)) abortCycle(false)
   }
 
-  function render(symbol: string): string {
-    return [
-      sanitizeSegment(spinner.prefix),
-      symbol,
-      sanitizeSegment(spinner.text),
-      sanitizeSegment(spinner.suffix),
-    ]
-      .filter(Boolean)
-      .join(' ')
+  function stopInteractive(): void {
+    releaseInteractiveLease(target, lease)
+    if (!writeTarget(target, `${CLEAR_LINE}${cursorShow()}`) && hideCursor)
+      writeTarget(target, SHOW_CURSOR)
+  }
+
+  function demoteToStatic(active: Capabilities): void {
+    clearTimer()
+    releaseInteractiveLease(target, lease)
+    renderMode = 'static'
+    const output = renderSpinnerStaticStart(presentation, active, frameIndex, staticMode)
+    const staticLine = output === undefined ? '' : `${output}\n`
+    if (!writeTarget(target, `${CLEAR_LINE}${cursorShow()}${staticLine}`)) abortCycle(true)
+  }
+
+  function canAnimate(active: Capabilities): boolean {
+    return (
+      active.animation &&
+      hasAnimatedFrames(frameSet, active.unicode) &&
+      fitsSingleTerminalWidth(target, renderSpinnerFrameWidth(presentation, active, frameIndex))
+    )
+  }
+
+  function cursorHide(): string {
+    return hideCursor ? HIDE_CURSOR : ''
+  }
+
+  function cursorShow(): string {
+    return hideCursor ? SHOW_CURSOR : ''
+  }
+
+  function resolveCapabilities(): Capabilities {
+    const resolved = getCapabilities(target, terminalMode, unicodeMode)
+    return automaticColor ? resolved : { ...resolved, color: false }
   }
 
   function clearTimer(): void {
@@ -217,9 +264,24 @@ export function createSpinner(text = '', options: SpinnerOptions = {}): Spinner 
   function abortCycle(restoreCursor: boolean): void {
     clearTimer()
     capabilities = undefined
+    renderMode = undefined
     state = STOPPED
-    if (restoreCursor) tryWrite(SHOW_CURSOR)
+    releaseInteractiveLease(target, lease)
+    if (restoreCursor) writeTarget(target, cursorShow())
   }
 
   return spinner
+}
+
+function terminalState(action: TerminalAction): State {
+  switch (action) {
+    case 0:
+      return SUCCEEDED
+    case 1:
+      return FAILED
+    case 2:
+      return WARNED
+    case 3:
+      return INFORMED
+  }
 }

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'v
 
 import { sortCanonicalText } from '../scripts/canonical-order.mjs'
 import spinlog, * as moduleExports from '../src/index.js'
+import type { Spinner } from '../src/index.js'
 
 const STYLE_EXPORTS = [
   'reset',
@@ -67,11 +68,18 @@ describe('public runtime surface', () => {
       'suffix',
       'start',
       'stop',
+      'log',
+      'flush',
       'succeed',
       'fail',
       'warn',
       'info',
     ])
+    expect(typeof spinlog()[Symbol.dispose]).toBe('function')
+    expectTypeOf(spinlog()[Symbol.dispose]).returns.toBeVoid()
+    expectTypeOf(spinlog().log).parameter(0).toEqualTypeOf<string>()
+    expectTypeOf(spinlog().log).returns.toEqualTypeOf<Spinner>()
+    expectTypeOf(spinlog().flush).returns.toEqualTypeOf<Promise<void>>()
   })
 })
 
@@ -79,6 +87,7 @@ describe('intro and outro flow messages', () => {
   let write: ReturnType<typeof vi.spyOn>
   let stdoutWrite: ReturnType<typeof vi.spyOn>
   let ttyDescriptor: PropertyDescriptor | undefined
+  let columnsDescriptor: PropertyDescriptor | undefined
 
   beforeEach(() => {
     vi.useFakeTimers()
@@ -86,8 +95,11 @@ describe('intro and outro flow messages', () => {
     vi.stubEnv('CI', '1')
     vi.stubEnv('FORCE_COLOR', '0')
     vi.stubEnv('WT_SESSION', 'test-session')
+    vi.stubEnv('TERM', 'xterm-256color')
     ttyDescriptor = Object.getOwnPropertyDescriptor(stderr, 'isTTY')
+    columnsDescriptor = Object.getOwnPropertyDescriptor(stderr, 'columns')
     Object.defineProperty(stderr, 'isTTY', { configurable: true, value: true })
+    Object.defineProperty(stderr, 'columns', { configurable: true, value: 80 })
     write = vi.spyOn(stderr, 'write').mockImplementation(() => true)
     stdoutWrite = vi.spyOn(stdout, 'write').mockImplementation(() => true)
   })
@@ -98,6 +110,8 @@ describe('intro and outro flow messages', () => {
     vi.unstubAllEnvs()
     if (ttyDescriptor) Object.defineProperty(stderr, 'isTTY', ttyDescriptor)
     else delete (stderr as { isTTY?: boolean }).isTTY
+    if (columnsDescriptor) Object.defineProperty(stderr, 'columns', columnsDescriptor)
+    else delete (stderr as { columns?: number }).columns
   })
 
   it('writes Unicode, empty, and repeated messages exactly once per call', () => {
@@ -174,9 +188,10 @@ describe('intro and outro flow messages', () => {
     write.mockImplementationOnce(() => false)
     expect(() => spinlog.outro('Done')).not.toThrow()
     expect(write).toHaveBeenCalledTimes(2)
+    stderr.emit('drain')
   })
 
-  it('does not alter an active spinner or own process listeners', () => {
+  it('coordinates flow messages around an active spinner without process ownership', () => {
     vi.stubEnv('CI', '')
     const beforeSignals = {
       sigint: process.listenerCount('SIGINT'),
@@ -189,6 +204,11 @@ describe('intro and outro flow messages', () => {
     spinlog.outro('Done')
 
     expect(vi.getTimerCount()).toBe(1)
+    expect(write.mock.calls.map(([value]) => String(value))).toEqual([
+      '\x1b[?25l- work',
+      '\x1b[2K\r┌  Build\n- work',
+      '\x1b[2K\r└  Done\n- work',
+    ])
     expect(process.listenerCount('SIGINT')).toBe(beforeSignals.sigint)
     expect(process.listenerCount('SIGTERM')).toBe(beforeSignals.sigterm)
     spinner.succeed()
@@ -244,6 +264,41 @@ describe('promise wrapper', () => {
     expect(write).toHaveBeenLastCalledWith('p ✔ task\n')
   })
 
+  it('renders generic settlement text without changing fulfillment or rejection semantics', async () => {
+    await expect(
+      spinlog.promise(Promise.resolve('artifact'), {
+        text: 'build',
+        successText: 'built',
+      }),
+    ).resolves.toBe('artifact')
+    expect(write).toHaveBeenLastCalledWith('\u2714 built\n')
+
+    const fulfilled = await spinlog.promise(Promise.resolve({ artifact: 'dist/index.js' }), {
+      text: 'build',
+      successText: (value) => `built ${value.artifact}`,
+    })
+    expect(fulfilled).toEqual({ artifact: 'dist/index.js' })
+    expect(write).toHaveBeenLastCalledWith('\u2714 built dist/index.js\n')
+
+    const reason = new Error('network unavailable')
+    await expect(
+      spinlog.promise(Promise.reject(reason), {
+        text: 'publish',
+        failText: (error) => `publish failed: ${(error as Error).message}`,
+      }),
+    ).rejects.toBe(reason)
+    expect(write).toHaveBeenLastCalledWith('\u2716 publish failed: network unavailable\n')
+
+    await expect(
+      spinlog.promise(Promise.resolve('kept'), {
+        successText() {
+          throw new Error('cosmetic callback failure')
+        },
+      }),
+    ).resolves.toBe('kept')
+    expect(write).toHaveBeenLastCalledWith('\u2714\n')
+  })
+
   it('preserves rejection reasons and converts synchronous task throws', async () => {
     const reason = { reason: 'original' }
     await expect(spinlog.promise(Promise.reject(reason), { text: 'reject' })).rejects.toBe(reason)
@@ -272,6 +327,11 @@ describe('promise wrapper', () => {
     await expect(spinlog.promise(task, null as unknown as never)).rejects.toThrow(
       'options must be an object',
     )
+    expect(task).not.toHaveBeenCalled()
+
+    await expect(
+      spinlog.promise(task, { successText: 1 as unknown as (value: string) => string }),
+    ).rejects.toThrow('successText must be a string or function')
     expect(task).not.toHaveBeenCalled()
   })
 })

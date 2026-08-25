@@ -48,7 +48,9 @@ export function verifyPackedRuntime(argument = DEFAULT_ARTIFACT_DIRECTORY) {
     installPackedRuntime(workspace, tarball)
     verifyPackedRuntimeOutput(workspace)
     verifyDependencyFreeInstall(workspace)
-    console.log(`packed-runtime=pass node=${process.version} platform=${process.platform}`)
+    console.log(
+      `packed-runtime=pass node=${process.version} platform=${process.platform} targets=stderr,custom-tty`,
+    )
   } finally {
     rmSync(workspace, { force: true, recursive: true })
   }
@@ -100,14 +102,33 @@ function npmCliPath() {
 function verifyPackedRuntimeOutput(workspace) {
   writeFileSync(
     join(workspace, 'verify.mjs'),
-    `import spinlog from 'spinlog'
+    String.raw`import spinlog from 'spinlog'
 import { red } from 'spinlog/styles'
+import { PassThrough } from 'node:stream'
 process.env.FORCE_COLOR = '1'
 process.env.NO_COLOR = '1'
 if (red('value') !== 'value') throw new Error('NO_COLOR policy failed')
 spinlog.intro('Consumer')
 spinlog('Working', { spinner: 'line' }).start().succeed('Done')
 spinlog.outro('Complete')
+const target = new PassThrough()
+Object.defineProperties(target, {
+  isTTY: { configurable: true, value: true },
+  columns: { configurable: true, value: 80 },
+  rows: { configurable: true, value: 8 },
+})
+let targetOutput = ''
+target.on('data', (chunk) => { targetOutput += chunk })
+spinlog('Custom', {
+  stream: target,
+  spinner: 'line',
+  terminal: 'interactive',
+  color: false,
+  unicode: false,
+}).start().succeed('Done')
+if (targetOutput !== '\x1b[?25l- Custom\x1b[2K\r+ Done\n\x1b[?25h') {
+  throw new Error('custom TTY target policy failed: ' + JSON.stringify(targetOutput))
+}
 `,
   )
   const result = spawnSync(process.execPath, ['verify.mjs'], {

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 import { semanticTokensFromReport } from './api-report-policy.mjs'
@@ -34,7 +34,15 @@ for (const config of contractConfigurations) {
   )
 }
 
-if (!update) {
+if (update) {
+  // API Extractor stages changed reports; copy only those deterministic contract artifacts.
+  for (const [source, destination] of [
+    ['temp/api-extractor/root-contract/spinlog.api.md', 'etc/spinlog.api.md'],
+    ['temp/api-extractor/styles-contract/spinlog-styles.api.md', 'etc/spinlog-styles.api.md'],
+  ]) {
+    copyFileSync(source, destination)
+  }
+} else {
   for (const config of distributionConfigurations) {
     execFileSync(process.execPath, [extractor, 'run', '--config', config, '--local'], {
       stdio: 'inherit',

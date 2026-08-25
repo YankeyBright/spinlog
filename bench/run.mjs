@@ -139,6 +139,20 @@ const scenarios = [
       ),
     ),
   ),
+  await stableMeasurement('custom-spinner-settlement-ns', () =>
+    withSilentStderr(() =>
+      withEnvironment({ CI: '1', FORCE_COLOR: '0', NO_COLOR: '1', NODE_ENV: 'production' }, () =>
+        measureSync(() =>
+          rootModule
+            .default('benchmark', {
+              spinner: { frames: ['-', '+'], interval: 80 },
+            })
+            .start()
+            .succeed(),
+        ),
+      ),
+    ),
+  ),
   await stableMeasurement('resolved-promise-wrapper-ns', () =>
     withSilentStderr(() =>
       withEnvironment({ CI: '1', FORCE_COLOR: '0', NO_COLOR: '1', NODE_ENV: 'production' }, () =>
@@ -160,6 +174,40 @@ const scenarios = [
       ),
     ),
   ),
+  await stableMeasurement('instance-log-ns', () =>
+    withSilentStderr(() =>
+      withEnvironment({ CI: '1', FORCE_COLOR: '0', NO_COLOR: '1', NODE_ENV: 'production' }, () =>
+        measureSync(() => rootModule.default('benchmark', { static: 'silent' }).log('benchmark')),
+      ),
+    ),
+  ),
+  await stableMeasurement('group-static-settlement-ns', () =>
+    withSilentStderr(() =>
+      withEnvironment({ CI: '1', FORCE_COLOR: '0', NO_COLOR: '1', NODE_ENV: 'production' }, () =>
+        measureSync(() => {
+          const group = rootModule.default.group({ terminal: 'static' })
+          group.add('benchmark').start().succeed()
+          group.stop()
+        }),
+      ),
+    ),
+  ),
+  await stableMeasurement('progress-static-settlement-ns', () =>
+    withSilentStderr(() =>
+      withEnvironment({ CI: '1', FORCE_COLOR: '0', NO_COLOR: '1', NODE_ENV: 'production' }, () =>
+        measureSync(() =>
+          rootModule.default
+            .progress('benchmark', {
+              total: 1,
+              terminal: 'static',
+            })
+            .start()
+            .increment()
+            .succeed(),
+        ),
+      ),
+    ),
+  ),
 ]
 
 if (JSON.stringify(scenarios.map(({ name }) => name)) !== JSON.stringify(BENCHMARK_SCENARIOS)) {
@@ -175,7 +223,7 @@ writeFileSync(
       node: process.version,
       platform: process.platform,
       provenance: {
-        commit: process.env.GITHUB_SHA ?? null,
+        commit: process.env.BENCHMARK_SOURCE_COMMIT ?? process.env.GITHUB_SHA ?? null,
         githubRunAttempt: process.env.GITHUB_RUN_ATTEMPT ?? null,
         githubRunId: process.env.GITHUB_RUN_ID ?? null,
         slot: process.env.BENCHMARK_RUN_SLOT ?? null,

@@ -4,6 +4,10 @@
 
 ```ts
 
+/// <reference lib="esnext.disposable" />
+
+import type { Writable } from 'node:stream';
+
 // @public (undocumented)
 export const bgBlack: (text: string) => string;
 
@@ -76,11 +80,23 @@ export const cyanBright: (text: string) => string;
 // @public (undocumented)
 export const dim: (text: string) => string;
 
+// @public
+export interface FlowOptions
+extends Pick<RenderOptions, 'stream' | 'color' | 'unicode' | 'indent'> {}
+
+// @public
+export interface FlushOptions extends Pick<RenderOptions, 'stream'> {}
+
 // @public (undocumented)
 export const green: (text: string) => string;
 
 // @public (undocumented)
 export const greenBright: (text: string) => string;
+
+// @public
+export interface GroupOptions extends RenderOptions {
+    maxRows?: number
+}
 
 // @public (undocumented)
 export const italic: (text: string) => string;
@@ -92,16 +108,68 @@ export const magenta: (text: string) => string;
 export const magentaBright: (text: string) => string;
 
 // @public
-export interface PromiseOptions extends SpinnerOptions {
+export interface Progress
+extends Omit<Spinner, 'start' | 'stop' | 'succeed' | 'fail' | 'warn' | 'info' | 'log'> {
+    // (undocumented)
+    fail(text?: string): this
+    flush(): Promise<void>
+    increment(amount?: number): this
+    // (undocumented)
+    info(text?: string): this
+    // (undocumented)
+    log(message: string): this
+    // (undocumented)
+    start(): this
+    // (undocumented)
+    stop(): this
+    // (undocumented)
+    succeed(text?: string): this
+    // (undocumented)
+    readonly total: number
+    update(value: number): this
+    // (undocumented)
+    value: number
+    // (undocumented)
+    warn(text?: string): this
+}
+
+// @public
+export interface ProgressOptions extends Omit<SpinnerOptions, 'spinner'> {
+    style?: 'blocks' | 'ascii'
+    // (undocumented)
+    total: number
+    // (undocumented)
+    value?: number
+    width?: number
+}
+
+// @public
+export interface PromiseOptions<T = unknown> extends SpinnerOptions {
+    failText?: PromiseSettlementText<unknown>
+    successText?: PromiseSettlementText<T>
     // (undocumented)
     text?: string
 }
+
+// @public
+export type PromiseSettlementText<T> = string | ((value: T) => string)
 
 // @public (undocumented)
 export const red: (text: string) => string;
 
 // @public (undocumented)
 export const redBright: (text: string) => string;
+
+// @public
+export interface RenderOptions {
+    color?: SpinnerColor | false
+    hideCursor?: boolean
+    indent?: number
+    static?: 'symbol' | 'text' | 'silent'
+    stream?: Writable
+    terminal?: 'auto' | 'static' | 'interactive'
+    unicode?: UnicodeMode
+}
 
 // @public (undocumented)
 export const reset: (text: string) => string;
@@ -111,13 +179,19 @@ export interface Spinlog {
     // (undocumented)
     (text?: string, options?: SpinnerOptions): Spinner
     // (undocumented)
-    intro(message?: string): void
+    flush(options?: FlushOptions): Promise<void>
     // (undocumented)
-    outro(message?: string): void
+    group(options?: GroupOptions): SpinnerGroup
     // (undocumented)
-    promise<T>(input: PromiseLike<T>, options?: PromiseOptions): Promise<T>
+    intro(message?: string, options?: FlowOptions): void
     // (undocumented)
-    promise<T>(task: () => PromiseLike<T>, options?: PromiseOptions): Promise<T>
+    outro(message?: string, options?: FlowOptions): void
+    // (undocumented)
+    progress(text: string, options: ProgressOptions): Progress
+    // (undocumented)
+    promise<T>(input: PromiseLike<T>, options?: PromiseOptions<T>): Promise<T>
+    // (undocumented)
+    promise<T>(task: () => PromiseLike<T>, options?: PromiseOptions<T>): Promise<T>
 }
 
 // @public (undocumented)
@@ -126,10 +200,13 @@ export default spinlog;
 
 // @public
 export interface Spinner {
+    [Symbol.dispose](): void
     // (undocumented)
     color: SpinnerColor
     fail(text?: string): this
+    flush(): Promise<void>
     info(text?: string): this
+    log(message: string): this
     // (undocumented)
     prefix: string
     start(): this
@@ -162,16 +239,36 @@ export type SpinnerColor =
 | 'whiteBright'
 
 // @public
+export interface SpinnerDefinition {
+    // (undocumented)
+    readonly frames: readonly string[]
+    // (undocumented)
+    readonly interval?: number
+}
+
+// @public
+export interface SpinnerGroup {
+    [Symbol.dispose](): void
+    add(
+    text?: string,
+    options?: Omit<
+    SpinnerOptions,
+    'color' | 'hideCursor' | 'indent' | 'static' | 'stream' | 'terminal' | 'unicode'
+    > & { color?: SpinnerColor },
+    ): Spinner
+    flush(): Promise<void>
+    stop(): this
+}
+
+// @public
 export type SpinnerName = 'dots' | 'line'
 
 // @public
-export interface SpinnerOptions {
-    // (undocumented)
-    color?: SpinnerColor
+export interface SpinnerOptions extends RenderOptions {
     // (undocumented)
     prefix?: string
     // (undocumented)
-    spinner?: SpinnerName
+    spinner?: SpinnerName | SpinnerDefinition
     // (undocumented)
     suffix?: string
 }
@@ -181,6 +278,9 @@ export const strikethrough: (text: string) => string;
 
 // @public (undocumented)
 export const underline: (text: string) => string;
+
+// @public
+export type UnicodeMode = 'auto' | boolean
 
 // @public (undocumented)
 export const white: (text: string) => string;

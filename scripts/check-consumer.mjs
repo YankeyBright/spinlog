@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 
@@ -51,6 +51,16 @@ try {
     ],
     { cwd: consumer, env: npmEnvironment, stdio: 'inherit', windowsHide: true },
   )
+  // `stream?: Writable` is intentionally a Node API. Stage the same pinned
+  // compiler-only declarations used by this repository without making the
+  // packed consumer proof depend on registry access.
+  mkdirSync(join(consumer, 'node_modules', '@types'), { recursive: true })
+  cpSync(resolve('node_modules/@types/node'), join(consumer, 'node_modules/@types/node'), {
+    recursive: true,
+  })
+  cpSync(resolve('node_modules/undici-types'), join(consumer, 'node_modules/undici-types'), {
+    recursive: true,
+  })
 
   writeFileSync(
     join(consumer, 'smoke.mjs'),
@@ -79,7 +89,7 @@ try {
 
   writeFileSync(
     join(consumer, 'unref.mjs'),
-    `import spinlog from 'spinlog'\nObject.defineProperty(process.stderr, 'isTTY', { configurable: true, value: true })\nspinlog('active', { spinner: 'line' }).start()\n`,
+    `import spinlog from 'spinlog'\nObject.defineProperty(process.stderr, 'isTTY', { configurable: true, value: true })\nObject.defineProperty(process.stderr, 'columns', { configurable: true, value: 80 })\nspinlog('active', { spinner: 'line' }).start()\n`,
   )
   const unref = spawnSync(process.execPath, ['unref.mjs'], {
     cwd: consumer,
@@ -97,13 +107,14 @@ try {
 
   writeFileSync(
     join(consumer, 'consumer.ts'),
-    `import spinlog, { red, type Spinner } from 'spinlog'\nimport { blue } from 'spinlog/styles'\nconst spinner: Spinner = spinlog(red(blue('typed')))\nspinner.start().stop()\n`,
+    `import { PassThrough } from 'node:stream'\nimport spinlog, { red, type Spinner } from 'spinlog'\nimport { blue } from 'spinlog/styles'\nconst target = new PassThrough()\nconst spinner: Spinner = spinlog(red(blue('typed')), { stream: target })\nspinner.start().stop()\n`,
   )
   const baseCompilerOptions = {
     strict: true,
     noEmit: true,
     skipLibCheck: false,
     target: 'ES2022',
+    types: ['node'],
   }
   const resolutions = {
     node16: { module: 'Node16', moduleResolution: 'Node16' },

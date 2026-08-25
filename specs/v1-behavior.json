@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 13,
   "phase": 0,
   "identity": {
     "packageName": "spinlog",
@@ -19,22 +19,58 @@
     "artifact": "dist/index.js",
     "compression": "gzip",
     "level": 9,
-    "maximumBytes": 2560,
-    "singleStyleMaximumBytes": 600
+    "maximumBytes": 10240,
+    "singleStyleMaximumBytes": 768
   },
   "publicApi": {
     "declaration": "specs/v1-public-api.d.ts",
     "stylesDeclaration": "specs/v1-styles-api.d.ts",
     "stylesSubpath": "spinlog/styles",
     "defaultExport": "spinlog",
-    "callableMethods": ["promise", "intro", "outro"],
+    "callableMethods": ["promise", "intro", "outro", "flush", "group", "progress"],
+    "spinnerMethods": [
+      "start",
+      "stop",
+      "log",
+      "flush",
+      "Symbol.dispose",
+      "succeed",
+      "fail",
+      "warn",
+      "info"
+    ],
+    "groupMethods": ["add", "stop", "flush", "Symbol.dispose"],
+    "progressMethods": [
+      "start",
+      "stop",
+      "log",
+      "flush",
+      "Symbol.dispose",
+      "succeed",
+      "fail",
+      "warn",
+      "info",
+      "update",
+      "increment"
+    ],
+    "spinnerDisposal": "Symbol.dispose",
     "typeExports": [
+      "FlowOptions",
+      "FlushOptions",
+      "GroupOptions",
       "PromiseOptions",
+      "PromiseSettlementText",
+      "Progress",
+      "ProgressOptions",
+      "RenderOptions",
       "Spinlog",
       "Spinner",
       "SpinnerColor",
+      "SpinnerDefinition",
+      "SpinnerGroup",
       "SpinnerName",
-      "SpinnerOptions"
+      "SpinnerOptions",
+      "UnicodeMode"
     ],
     "styleExports": [
       "reset",
@@ -79,15 +115,27 @@
   },
   "defaults": {
     "text": "",
+    "stream": "process.stderr",
     "color": "cyan",
+    "unicode": "auto",
+    "hideCursor": true,
+    "indent": 0,
     "prefix": "",
     "suffix": "",
     "spinner": "dots",
-    "intervalMs": 80
+    "static": "symbol",
+    "terminal": "auto",
+    "intervalMs": 80,
+    "groupMaxRows": "min(10, target.rows - 1)",
+    "progressBarWidth": 20,
+    "progressStyle": "blocks"
   },
   "rendering": {
-    "stream": "stderr",
-    "stdoutWrites": false,
+    "defaultStream": "process.stderr",
+    "explicitWritableStreams": true,
+    "globalWritePatching": false,
+    "defaultStdoutWrites": false,
+    "stdinManagement": false,
     "segmentOrder": ["prefix", "symbol", "text", "suffix"],
     "segmentSeparator": " ",
     "dotsFrames": [
@@ -123,6 +171,10 @@
     },
     "frameColorApplication": "frame-only",
     "statusColorApplication": "symbol-only",
+    "colorFalse": "disable-automatic-surface-color",
+    "unicodeFalse": "ascii-built-ins-only",
+    "hideCursorFalse": "suppress-cursor-escapes",
+    "indentRange": [0, 40],
     "emptySegments": "omit",
     "timerReferenced": false,
     "interactive": {
@@ -142,8 +194,47 @@
       "stopSequence": [],
       "terminalSequence": ["render-status", "newline"]
     },
+    "staticModes": {
+      "default": "symbol",
+      "options": ["symbol", "text", "silent"],
+      "appliesFor": [
+        "non-interactive",
+        "lease-unavailable",
+        "terminal-static",
+        "width-demotion",
+        "height-demotion"
+      ],
+      "symbol": {
+        "startSequence": ["render-frame", "newline"],
+        "terminalSequence": ["render-status", "newline"]
+      },
+      "text": {
+        "startSequence": ["render-text", "newline"],
+        "terminalSequence": ["render-text", "newline"],
+        "color": "none",
+        "status": "none"
+      },
+      "silent": {
+        "startSequence": [],
+        "terminalSequence": [],
+        "cursorRestoreAfterDemotion": true
+      }
+    },
+    "log": {
+      "target": "surface-target",
+      "states": "all",
+      "return": "same-instance",
+      "validation": "string-before-output",
+      "sanitization": "render-boundary",
+      "output": "one-permanent-newline-terminated-line",
+      "activeFrameCoordination": "clear-write-redraw-target-local",
+      "changesState": false,
+      "changesTimer": false,
+      "backpressure": "permanent-ordered-cosmetic-coalesced",
+      "synchronousWriteFailure": "suppress"
+    },
     "flowMessages": {
-      "stream": "stderr",
+      "target": "explicit-writable-default-stderr",
       "writesPerCall": 1,
       "lineEnding": "\n",
       "separator": "  ",
@@ -155,14 +246,121 @@
       "stateless": true,
       "paired": false,
       "touchesSpinnerState": false,
+      "activeFrameCoordination": "clear-write-redraw-target-local",
       "createsTimer": false,
       "synchronousWriteFailure": "suppress",
-      "backpressure": "ignore",
+      "backpressure": "permanent-ordered-cosmetic-coalesced",
       "asynchronousErrors": "host-owned"
+    },
+    "interactiveLease": {
+      "scope": "writable-stream-identity",
+      "activeSurfaceLimit": 1,
+      "rootSpinnerLimit": 1,
+      "secondarySurface": "static-on-same-target",
+      "independentTargets": "independent",
+      "release": ["stop", "terminal", "dispose", "write-failure", "group-session-idle"]
+    },
+    "widthSafety": {
+      "source": "target.columns",
+      "minimumColumns": 3,
+      "measurement": "grapheme-cluster-wcwidth",
+      "asciiCellWidth": 1,
+      "combiningMarkWidth": 0,
+      "wideCellWidth": 2,
+      "emojiClusterWidth": 2,
+      "maximumWidth": "less-than-columns-minus-one",
+      "unavailable": "static",
+      "overflow": "static",
+      "resize": "demote-to-static",
+      "mutation": "demote-to-static"
+    },
+    "heightSafety": {
+      "source": "target.rows",
+      "groupsOnly": true,
+      "reserveRows": 1,
+      "unavailable": "static",
+      "overflow": "static",
+      "resize": "demote-to-static",
+      "mutation": "demote-to-static"
+    },
+    "writeBackpressure": {
+      "results": ["written", "backpressured", "failed"],
+      "permanentLines": "write-in-order",
+      "readyOversizedPermanentWrite": "attempt-immediately",
+      "cosmeticFrames": "coalesce-latest-until-drain",
+      "unboundedQueue": false,
+      "pendingLimits": { "tasks": 64, "bytes": 65536 },
+      "listenerEvents": ["drain", "finish", "close"],
+      "finishWithoutQueuedOutput": "resolve-flush",
+      "finishWithQueuedOutput": "reject-flush",
+      "closeBeforeDrain": "reject-flush",
+      "listenerLifecycle": "remove-on-drain-finish-close-or-failure",
+      "synchronousFailure": "stop-affected-surface-and-restore-owned-cursor"
+    },
+    "renderCache": {
+      "sanitization": "lazy-render-boundary",
+      "fields": ["text", "prefix", "suffix"],
+      "colorMutation": "reuse-text-snapshot",
+      "width": "cached-grapheme-cells"
+    },
+    "customFrames": {
+      "source": "spinner-name-or-snapshotted-definition",
+      "maximumFrames": 64,
+      "intervalRangeMs": [16, 60000],
+      "frameValidation": "string-and-visible-after-render-sanitization",
+      "singleFrame": "static-no-timer",
+      "customUnicodeFallback": "caller-owned",
+      "timer": "unreferenced"
+    },
+    "groups": {
+      "target": "explicit-writable-default-stderr",
+      "childCreation": "idle",
+      "scheduler": "one-unreferenced-target-surface-timer",
+      "interactiveSurface": "one-target-local-lease",
+      "rows": "single-line-sanitized-and-grapheme-width-and-height-checked",
+      "maxRows": "positive-safe-integer-or-dynamic-default",
+      "defaultMaxRows": "min(10, target.rows - 1)",
+      "contention": "static-on-same-target",
+      "widthDemotion": "atomic-static",
+      "heightDemotion": "atomic-static",
+      "flowCoordination": "clear-write-redraw-all-rows-target-local",
+      "persistedRows": "never-redrawn-by-later-session",
+      "staticRestart": "explicit-stop-and-restart-required",
+      "idleSession": "release-when-no-active-surface-rows",
+      "nestedGroups": false,
+      "dynamicReordering": false,
+      "processOwnership": false
+    },
+    "progress": {
+      "target": "explicit-writable-default-stderr",
+      "total": "positive-safe-integer",
+      "totalProperty": "immutable-runtime-getter",
+      "value": "safe-integer-between-zero-and-total",
+      "defaultBarWidth": 20,
+      "barWidthRange": [5, 40],
+      "styleDefault": "blocks",
+      "styles": ["blocks", "ascii"],
+      "unicodeFallback": "blocks-to-ascii",
+      "filledCells": "floor",
+      "increment": "positive-safe-integer",
+      "succeedValue": "total",
+      "interactive": "single-line-target-local-lease-no-timer",
+      "static": "initial-and-terminal-only",
+      "updates": "synchronous-coordinated-redraw",
+      "rateEtaFormatting": false
     }
   },
   "textSafety": {
-    "fields": ["text", "prefix", "suffix", "terminalText", "flowMessage"],
+    "fields": [
+      "text",
+      "prefix",
+      "suffix",
+      "terminalText",
+      "flowMessage",
+      "logMessage",
+      "customFrame",
+      "progressText"
+    ],
     "boundary": "render-only",
     "preserveAssignedValues": true,
     "stripVTControlCharacters": true,
@@ -179,6 +377,8 @@
     "embeddedAnsi": "strip"
   },
   "environment": {
+    "capabilityShape": ["sgr", "cursor", "color", "emphasis", "animation", "unicode"],
+    "capabilityResolution": "per-render-target",
     "colorPrecedenceDirection": "highest-to-lowest",
     "colorPrecedence": [
       "NO_COLOR",
@@ -187,33 +387,96 @@
       "CI",
       "TERM=dumb",
       "NODE_ENV=test",
-      "stderr.isTTY"
+      "target.isTTY",
+      "known-terminal-profile"
     ],
-    "noColor": "non-empty-disables",
+    "noColor": "non-empty-disables-colors-only",
     "noColorOverridesForceColor": true,
-    "nodeDisableColors": "non-empty-disables",
+    "nodeDisableColors": "non-empty-disables-colors-only",
     "nodeDisableColorsOverridesForceColor": true,
     "forceColorFalseValues": ["0", "false"],
     "forceColorOtherDefinedValues": "enable",
     "forceColorEnablesAnimation": false,
+    "forceColorEnablesEmphasis": true,
+    "interactiveEmphasisWhenColorDisabled": true,
+    "nonInteractiveEmphasis": "disabled",
     "ci": "non-empty-disables",
     "termDumb": "exact-disables",
     "nodeEnvTest": "exact-disables",
-    "unicodeWindowsHeuristic": "WT_SESSION-required"
+    "unicodeWindowsHeuristic": "WT_SESSION-required",
+    "cursorTerminalPrefixes": [
+      "xterm",
+      "screen",
+      "tmux",
+      "rxvt",
+      "linux",
+      "cygwin",
+      "st",
+      "alacritty",
+      "kitty",
+      "wezterm",
+      "foot",
+      "konsole",
+      "vte",
+      "eterm",
+      "putty"
+    ],
+    "terminalProfileMatch": "ascii-lowercase-exact-or-dash-suffix",
+    "unknownTerminalProfile": "auto-static-and-no-default-sgr",
+    "limitedTerminalProfiles": ["vt100", "vt220"],
+    "terminalModes": ["auto", "static", "interactive"],
+    "staticTerminalMode": "disables-animation",
+    "interactiveTerminalMode": "tty-and-not-dumb-overrides-profile-ci-test-only"
   },
   "inputValidation": {
     "factoryText": "string",
     "options": "non-null-non-array-object",
-    "textFields": ["text", "prefix", "suffix", "terminalText", "flowMessage"],
+    "stream": "Node-Writable-with-write-function",
+    "textFields": [
+      "text",
+      "prefix",
+      "suffix",
+      "terminalText",
+      "flowMessage",
+      "logMessage",
+      "customFrame",
+      "progressText"
+    ],
     "spinnerNames": ["dots", "line"],
     "colors": "publicApi.SpinnerColor",
     "mutableFields": ["text", "color", "prefix", "suffix"],
     "unknownOptionKeys": "ignore",
     "invalidFactoryInput": "throw-TypeError-before-output",
+    "invalidStream": "throw-TypeError-before-capability-or-output",
     "invalidMutation": "throw-TypeError-and-preserve-value",
     "invalidTerminalOverride": "throw-TypeError-before-idempotency-state-mutation-timer-or-output",
     "invalidFlowMessage": "throw-TypeError-before-capability-or-output",
+    "staticModes": ["symbol", "text", "silent"],
+    "terminalModes": ["auto", "static", "interactive"],
+    "unicodeModes": ["auto", true, false],
+    "invalidUnicodeMode": "throw-TypeError-before-output",
+    "invalidHideCursor": "throw-TypeError-before-output",
+    "indent": "safe-integer-zero-to-40",
+    "invalidIndent": "throw-TypeError-before-output",
+    "customFrames": "one-to-64-visible-strings-snapshotted-before-output",
+    "customInterval": "safe-integer-16-to-60000-before-output",
+    "invalidGroupOptions": "throw-TypeError-before-output",
+    "groupMaxRows": "positive-safe-integer",
+    "invalidGroupMaxRows": "throw-TypeError-before-output",
+    "invalidProgressTotal": "throw-TypeError-before-output",
+    "invalidProgressValue": "throw-TypeError-and-preserve-value",
+    "progressWidth": "safe-integer-five-to-40",
+    "progressStyles": ["blocks", "ascii"],
+    "invalidProgressWidth": "throw-TypeError-before-output",
+    "invalidProgressStyle": "throw-TypeError-before-output",
+    "incrementAmount": "positive-safe-integer",
+    "invalidIncrementAmount": "throw-TypeError-and-preserve-value",
+    "invalidStaticMode": "throw-TypeError-before-output",
+    "invalidTerminalMode": "throw-TypeError-before-output",
+    "invalidLogMessage": "throw-TypeError-before-output",
     "invalidPromiseOptions": "reject-TypeError-before-start-or-input",
+    "promiseSettlementText": "string-or-callback",
+    "invalidPromiseSettlementText": "reject-TypeError-before-start-or-input",
     "invalidStyleInput": "throw-TypeError-before-capability-detection"
   },
   "stateMachine": {
@@ -290,7 +553,9 @@
     "rejectionAction": "fail",
     "preserveFulfillmentValue": true,
     "preserveRejectionReason": true,
-    "cosmeticFailureMasksSettlement": false
+    "cosmeticFailureMasksSettlement": false,
+    "successText": "string-or-fulfillment-callback",
+    "failText": "string-or-rejection-callback"
   },
   "styles": {
     "input": "string",
@@ -301,6 +566,13 @@
     "nestedStylesRestoreParent": true,
     "resetBehavior": "hard-reset-boundary",
     "resetRestoresParent": false,
+    "metadata": {
+      "singleSourceOfTruth": true,
+      "colorClassification": ["foreground", "background"],
+      "emphasisClassification": ["reset", "modifiers"],
+      "spinnerColorValidation": "foreground-only",
+      "nestedRestore": "metadata-driven"
+    },
     "capabilityStream": "stderr",
     "escapePrefix": "\u001b[",
     "escapeSuffix": "m",
@@ -350,8 +622,10 @@
     "exitCalls": false,
     "killCalls": false,
     "globalStreamErrorListeners": false,
+    "temporaryBackpressureListeners": ["drain", "finish", "close"],
     "applicationOwnsShutdown": true,
-    "explicitMethodsRestoreCursor": true
+    "explicitMethodsRestoreCursor": true,
+    "disposalRestoresCursor": true
   },
   "writeFailures": {
     "catchSynchronousWrites": true,
@@ -362,21 +636,15 @@
     "futureStartRetries": true,
     "cleanupFailuresSuppressed": true,
     "backpressureIsFailure": false,
+    "backpressure": "coalesce-cosmetic-frames-until-drain",
+    "permanentLinesPreserveOrder": true,
+    "unboundedWriteQueue": false,
+    "failureScope": "affected-target-surface-only",
     "cosmeticMethodsThrow": false,
     "promiseSettlementPreserved": true,
     "asynchronousStreamErrorsOwnedByHost": true
   },
   "deferred": [
-    {
-      "id": "task-groups",
-      "api": "spinlog.group()",
-      "reason": "Concurrent task orchestration requires a separate state and rendering contract."
-    },
-    {
-      "id": "progress-bars",
-      "api": "spinlog.progress()",
-      "reason": "Determinate progress needs independent update, throttling, and non-TTY semantics."
-    },
     {
       "id": "prompts",
       "api": "spinlog.confirm() and spinlog.text()",
@@ -388,19 +656,14 @@
       "reason": "Machine output requires a separately versioned stdout schema."
     },
     {
-      "id": "custom-spinners",
-      "api": "custom frames and intervals",
-      "reason": "Arbitrary animation data expands validation, timing, and size requirements."
+      "id": "global-write-interception",
+      "api": "patching console or arbitrary Writable.write()",
+      "reason": "Applications own non-Spinlog output; interception would make ordering, error ownership, and shutdown behavior implicit."
     },
     {
-      "id": "custom-streams",
-      "api": "custom writable streams",
-      "reason": "The v1 stderr-only contract intentionally avoids stream ownership and error-listener complexity."
-    },
-    {
-      "id": "concurrent-spinners",
-      "api": "multiple active spinners",
-      "reason": "Shared-line coordination belongs with the deferred task-group renderer."
+      "id": "stdin-ownership",
+      "api": "stdin raw-mode, prompts, or input cancellation",
+      "reason": "Spinlog deliberately leaves stdin and process input policy under application control."
     },
     {
       "id": "advanced-colors",
