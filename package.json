@@ -112,19 +112,19 @@
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",
     "@babel/parser": "7.29.8",
-    "@biomejs/biome": "2.5.8",
-    "@microsoft/api-extractor": "7.58.12",
+    "@biomejs/biome": "2.5.10",
+    "@microsoft/api-extractor": "7.59.0",
     "@size-limit/preset-small-lib": "13.0.3",
     "@types/node": "22.20.1",
-    "@vitest/coverage-v8": "4.1.10",
+    "@vitest/coverage-v8": "4.1.11",
     "@xterm/headless": "6.0.0",
     "esbuild": "0.28.2",
     "marked": "18.0.10",
-    "publint": "0.3.23",
+    "publint": "0.3.24",
     "size-limit": "13.0.3",
     "typescript": "7.0.2",
-    "vite": "8.2.1",
-    "vitest": "4.1.10",
+    "vite": "8.2.2",
+    "vitest": "4.1.11",
     "yaml": "2.9.0"
   }
 }
