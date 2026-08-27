@@ -72,6 +72,6 @@ Intro and outro calls are stateless and coordinate with an active Spinlog surfac
 
 ## Stream and process differences
 
-The default cosmetic target is `stderr`; an explicit stream is always application supplied and application owned. Style helpers return strings and never write. The package does not install signal handlers, terminate the process, patch global output, or own asynchronous stream errors. Applications remain responsible for shutdown policy and should call `stop()` on active spinners and groups during graceful shutdown.
+The default cosmetic target is `stderr`; an explicit stream is always application supplied and application owned. Style helpers return strings and never write. The package does not install signal handlers, terminate the process, or patch global output. Applications own shutdown policy and unrelated stream errors; while Spinlog has pending permanent output, it temporarily observes the target error so `flush()` rejects and its affected surface is cleaned up. Applications should call `stop()` on active spinners and groups during graceful shutdown.
 
 For deterministic non-interactive output, use `static: 'symbol'`, `'text'`, or `'silent'`; use `terminal: 'static'` to force that path. `terminal: 'interactive'` is an informed override only for a non-dumb TTY. It does not waive conservative width checks or a group’s required height capacity.

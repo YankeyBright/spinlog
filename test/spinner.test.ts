@@ -11,6 +11,7 @@ import {
   terminalCellWidth,
   terminalTextWidth,
 } from '../src/text.js'
+import { acceptWrite } from './write-callback.js'
 
 const ENV_KEYS = [
   'CI',
@@ -52,7 +53,8 @@ describe('spinner lifecycle and rendering', () => {
     columnsDescriptor = Object.getOwnPropertyDescriptor(stderr, 'columns')
     setTTY(true)
     setColumns(80)
-    write = vi.spyOn(stderr, 'write').mockImplementation(() => true)
+    write = vi.spyOn(stderr, 'write')
+    write.mockImplementation(acceptWrite(write) as never)
   })
 
   afterEach(() => {
@@ -418,7 +420,7 @@ describe('spinner lifecycle and rendering', () => {
     expect(vi.getTimerCount()).toBe(0)
     // A false write is accepted by Node; complete its backpressure cycle so
     // this test leaves the shared stderr target idle for the next case.
-    write.mockImplementation(() => true)
+    write.mockImplementation(acceptWrite(write) as never)
     stderr.emit('drain')
   })
 
@@ -437,7 +439,7 @@ describe('spinner lifecycle and rendering', () => {
     expect(vi.getTimerCount()).toBe(0)
     expect(output().at(-1)).toBe('\x1b[?25h')
 
-    write.mockImplementation(() => true)
+    write.mockImplementation(acceptWrite(write) as never)
     write.mockClear()
     spinner.start()
     expect(output()).toEqual(['\x1b[?25l- work'])
@@ -464,7 +466,7 @@ describe('spinner lifecycle and rendering', () => {
 
     spinner.stop()
     expect(vi.getTimerCount()).toBe(0)
-    write.mockImplementation(() => true)
+    write.mockImplementation(acceptWrite(write) as never)
     spinner.start()
     expect(vi.getTimerCount()).toBe(1)
     spinner.stop()
@@ -494,7 +496,7 @@ describe('spinner lifecycle and rendering', () => {
     spinner.start()
     expect(output()).toEqual(['⠋ work\n'])
 
-    write.mockImplementation(() => true)
+    write.mockImplementation(acceptWrite(write) as never)
     spinner.start()
     expect(output().at(-1)).toBe('⠋ work\n')
     write.mockImplementationOnce(() => {

@@ -27,13 +27,13 @@ src/
 
 `text.ts` resolves a `RenderTarget` around a caller-supplied `Writable` or `process.stderr`. It does not modify the target. TTY state, width, and height are read live so resize safety requires no process-global listener. It returns typed synchronous write outcomes: `written`, `backpressured`, or `failed`.
 
-`renderer-queue.ts` owns a `WeakMap<Writable, TargetState>` behind the `renderer.ts` facade. Each identity has at most one interactive surface. A group owns multiple rows through one lease; roots on independent streams do not contend. Ready permanent output is attempted immediately. During backpressure, only the latest cosmetic frame is retained while pending permanent output is capped at 64 tasks or 64 KiB. Temporary `drain`, `finish`, and `close` listeners resume, resolve, or reject target-local work without owning asynchronous stream errors.
+`renderer-queue.ts` owns a `WeakMap<Writable, TargetState>` behind the `renderer.ts` facade. Each identity has at most one interactive surface. A group owns multiple rows through one lease; roots on independent streams do not contend. Ready permanent output is attempted immediately and receives a sequence watermark that completes on Node’s write callback. During backpressure, only the latest cosmetic frame is retained while pending permanent output is capped at 64 tasks or 64 KiB. Temporary `drain`, `finish`, `close`, and `error` listeners resume, resolve, or reject target-local work; target errors are observed only while Spinlog output is pending.
 
 ## Surface boundaries
 
 `spinner-data.ts` is the sole source of truth for dots/line frames, ANSI-16 status colors, status glyphs, default interval, and built-in Unicode fallback. `spinner.ts`, `group-rendering.ts`, and `progress.ts` consume that data rather than duplicating tables.
 
-`spinner.ts` owns one mutable spinner’s lifecycle, unreferenced timer, cursor policy, static degradation, and explicit cleanup. `spinner-options.ts` centralizes shared validation, while `spinner-rendering.ts` owns lazy sanitized snapshots and grapheme-aware formatting. Failures remain scoped to the affected target surface.
+`spinner.ts` owns one mutable spinner’s lifecycle, unreferenced timer, cursor policy, static degradation, and explicit cleanup. `spinner-options.ts` centralizes shared validation, while `spinner-rendering.ts` owns lazy sanitized text snapshots and grapheme-aware formatting. Caller-defined frames are sanitized and frozen by `spinner-data.ts` when their definition is accepted. Failures remain scoped to the affected target surface.
 
 `group.ts` owns the multi-row session lifecycle. It distinguishes live rows, permanently persisted rows, and explicitly stopped children eligible for a fresh session. It requires width and height capacity before lease acquisition and atomically demotes all active rows on constraint loss. `group-rendering.ts` contains pure row formatting and cached measurements.
 
@@ -43,8 +43,8 @@ src/
 
 ## Ownership rules
 
-- The library owns only timers, cursor state, leases, and temporary drain/finish/close listeners created for one target.
-- The host application owns direct stream writes, stdin, signals, process termination, and asynchronous stream errors.
+- The library owns only timers, cursor state, leases, and temporary drain/finish/close/error listeners created for one target while its output is pending.
+- The host application owns direct stream writes, stdin, signals, process termination, and asynchronous stream errors unrelated to pending Spinlog output.
 - Explicit lifecycle methods and `Symbol.dispose` release a surface’s resources.
 - The implementation uses Node built-ins and local modules only.
 - Emitted declarations and runtime exports must match the Phase 0 contract; the root implementation stays within the 10,240-byte gzip ceiling.

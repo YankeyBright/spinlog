@@ -11,6 +11,7 @@ import {
   selectFrame,
   selectStatus,
 } from '../src/spinner-data.js'
+import { acceptWrite } from './write-callback.js'
 
 describe('custom spinner definitions', () => {
   let write: ReturnType<typeof vi.spyOn>
@@ -28,7 +29,8 @@ describe('custom spinner definitions', () => {
     columnsDescriptor = Object.getOwnPropertyDescriptor(stderr, 'columns')
     Object.defineProperty(stderr, 'isTTY', { configurable: true, value: true })
     Object.defineProperty(stderr, 'columns', { configurable: true, value: 80 })
-    write = vi.spyOn(stderr, 'write').mockImplementation(() => true)
+    write = vi.spyOn(stderr, 'write')
+    write.mockImplementation(acceptWrite(write) as never)
   })
 
   afterEach(() => {
@@ -61,6 +63,16 @@ describe('custom spinner definitions', () => {
 
     expect(write.mock.calls.map(([value]) => String(value))).toEqual(['A work\n', '\u2714 work\n'])
     expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('sanitizes and freezes caller-defined frames when the definition is accepted', () => {
+    const frames = ['\x1b[31mA\x1b[0m', 'B']
+    const frameSet = createFrameSet({ frames, interval: 16 })
+    frames[0] = 'changed after validation'
+
+    expect(frameSet.frames).toEqual(['A', 'B'])
+    expect(Object.isFrozen(frameSet.frames)).toBe(true)
+    expect(Object.isFrozen(frameSet)).toBe(true)
   })
 
   it('measures every grapheme in a multi-character custom frame', () => {

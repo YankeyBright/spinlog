@@ -8,7 +8,6 @@ import { createProgress } from './progress.js'
 import { flushTarget } from './renderer.js'
 import { createSpinner } from './spinner.js'
 import { requireOptions } from './spinner-options.js'
-import * as styles from './styles.js'
 import { requireString, resolveRenderTarget } from './text.js'
 
 /** Built-in spinner animation names. */
@@ -178,46 +177,46 @@ export interface Spinlog {
   progress(text: string, options: ProgressOptions): Progress
 }
 
-export const reset: (text: string) => string = styles.reset
-export const bold: (text: string) => string = styles.bold
-export const dim: (text: string) => string = styles.dim
-export const italic: (text: string) => string = styles.italic
-export const underline: (text: string) => string = styles.underline
-export const strikethrough: (text: string) => string = styles.strikethrough
-
-export const black: (text: string) => string = styles.black
-export const red: (text: string) => string = styles.red
-export const green: (text: string) => string = styles.green
-export const yellow: (text: string) => string = styles.yellow
-export const blue: (text: string) => string = styles.blue
-export const magenta: (text: string) => string = styles.magenta
-export const cyan: (text: string) => string = styles.cyan
-export const white: (text: string) => string = styles.white
-export const blackBright: (text: string) => string = styles.blackBright
-export const redBright: (text: string) => string = styles.redBright
-export const greenBright: (text: string) => string = styles.greenBright
-export const yellowBright: (text: string) => string = styles.yellowBright
-export const blueBright: (text: string) => string = styles.blueBright
-export const magentaBright: (text: string) => string = styles.magentaBright
-export const cyanBright: (text: string) => string = styles.cyanBright
-export const whiteBright: (text: string) => string = styles.whiteBright
-
-export const bgBlack: (text: string) => string = styles.bgBlack
-export const bgRed: (text: string) => string = styles.bgRed
-export const bgGreen: (text: string) => string = styles.bgGreen
-export const bgYellow: (text: string) => string = styles.bgYellow
-export const bgBlue: (text: string) => string = styles.bgBlue
-export const bgMagenta: (text: string) => string = styles.bgMagenta
-export const bgCyan: (text: string) => string = styles.bgCyan
-export const bgWhite: (text: string) => string = styles.bgWhite
-export const bgBlackBright: (text: string) => string = styles.bgBlackBright
-export const bgRedBright: (text: string) => string = styles.bgRedBright
-export const bgGreenBright: (text: string) => string = styles.bgGreenBright
-export const bgYellowBright: (text: string) => string = styles.bgYellowBright
-export const bgBlueBright: (text: string) => string = styles.bgBlueBright
-export const bgMagentaBright: (text: string) => string = styles.bgMagentaBright
-export const bgCyanBright: (text: string) => string = styles.bgCyanBright
-export const bgWhiteBright: (text: string) => string = styles.bgWhiteBright
+export {
+  bgBlack,
+  bgBlackBright,
+  bgBlue,
+  bgBlueBright,
+  bgCyan,
+  bgCyanBright,
+  bgGreen,
+  bgGreenBright,
+  bgMagenta,
+  bgMagentaBright,
+  bgRed,
+  bgRedBright,
+  bgWhite,
+  bgWhiteBright,
+  bgYellow,
+  bgYellowBright,
+  black,
+  blackBright,
+  blue,
+  blueBright,
+  bold,
+  cyan,
+  cyanBright,
+  dim,
+  green,
+  greenBright,
+  italic,
+  magenta,
+  magentaBright,
+  red,
+  redBright,
+  reset,
+  strikethrough,
+  underline,
+  white,
+  whiteBright,
+  yellow,
+  yellowBright,
+} from './styles.js'
 
 const factory = (text = '', options: SpinnerOptions = {}): Spinner => createSpinner(text, options)
 const group: Spinlog['group'] = (options = {}) => createGroup(options)
@@ -236,13 +235,30 @@ const promise: Spinlog['promise'] = async <T>(
   const failText = requirePromiseSettlementText<unknown>(safeOptions.failText, 'failText')
   const spinner = factory(safeOptions.text, safeOptions).start()
   try {
-    const value = await (typeof input === 'function' ? input() : input)
+    const candidate = typeof input === 'function' ? input() : input
+    const value = await requirePromiseLike<T>(candidate)
     spinner.succeed(resolvePromiseSettlementText(successText, value, 'successText'))
     return value
   } catch (error) {
     spinner.fail(resolvePromiseSettlementText(failText, error, 'failText'))
     throw error
   }
+}
+
+function requirePromiseLike<T>(candidate: unknown): Promise<T> {
+  if (candidate === null || (typeof candidate !== 'object' && typeof candidate !== 'function')) {
+    throw new TypeError('input must be a PromiseLike or a task returning one')
+  }
+
+  // Read `then` once after the spinner starts, then assimilate it with the original receiver.
+  const then = (candidate as { then?: unknown }).then
+  if (typeof then !== 'function') {
+    throw new TypeError('input must be a PromiseLike or a task returning one')
+  }
+
+  return new Promise((resolve, reject) => {
+    Reflect.apply(then, candidate, [resolve, reject])
+  })
 }
 
 function requirePromiseSettlementText<T>(

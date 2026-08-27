@@ -65,7 +65,7 @@ describe('Phase 0 contract policy', () => {
     const fixture = loadFixture()
     fixture.contract.schemaVersion = 4
 
-    expect(validatePhase0Contract(fixture)).toContain('contract version and phase must be 12 and 0')
+    expect(validatePhase0Contract(fixture)).toContain('contract version and phase must be 14 and 0')
   })
 
   it('rejects changed promise overload semantics', () => {

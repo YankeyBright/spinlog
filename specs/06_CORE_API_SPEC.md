@@ -28,7 +28,7 @@ The callable has exactly five methods: `promise`, `intro`, `outro`, `group`, and
 
 `spinner.log(message)` validates and sanitizes its string before effects, writes one permanent newline-terminated line on the spinner’s target, and does not change lifecycle state, timers, or cursor ownership. On an active target it clears, writes, and redraws the owned frame as one coordinated transaction.
 
-Spinner names are `dots` and `line`. A `SpinnerDefinition` has one to 64 visible frames and an optional safe-integer interval from 16 through 60,000ms. Definitions are snapshotted before output. A one-frame definition stays static and owns no timer.
+Spinner names are `dots` and `line`. A `SpinnerDefinition` has one to 64 visible frames and an optional safe-integer interval from 16 through 60,000ms. Caller-defined frames are sanitized, validated for visibility, and frozen when the definition is snapshotted before output. A one-frame definition stays static and owns no timer.
 
 ## Groups
 
@@ -54,4 +54,4 @@ Progress width is a safe integer from 5 through 40, default 20. Style is `'block
 
 The lifecycle states are `idle`, `spinning`, `stopped`, `succeeded`, `failed`, `warned`, and `informed`. `start()` is idempotent while spinning; any terminal state can begin a fresh cycle. The first terminal result in a cycle wins. Input validation occurs before output and before idempotency can suppress it. Mutable-property failures preserve the previous value.
 
-Spinlog never owns stdin, signals, process exit, arbitrary stream writes, or asynchronous stream errors. The exact deferred rationale appears in `specs/16_POST_MVP_FEATURES.md`. CommonJS and browser-first runtime remain permanent non-goals.
+Spinlog never owns stdin, signals, process exit, or arbitrary stream writes. It leaves unrelated asynchronous stream errors to the host, but temporarily observes an error for its own pending permanent output to reject `flush()` and clean only target-local state. The exact deferred rationale appears in `specs/16_POST_MVP_FEATURES.md`. CommonJS and browser-first runtime remain permanent non-goals.

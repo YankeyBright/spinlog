@@ -62,6 +62,7 @@ for (const [path, type] of [
   ['tsconfig.json', 'file'],
   ['tsconfig.specs.json', 'file'],
   ['scripts/build-js.mjs', 'file'],
+  ['scripts/build-output.mjs', 'file'],
   ['vitest.config.ts', 'file'],
   ['biome.json', 'file'],
   ['.size-limit.json', 'file'],
@@ -189,7 +190,7 @@ for (const value of [
   'treeShaking: true',
   "platform: 'node'",
   "target: 'node22.13'",
-  'outdir: outputDirectory',
+  'outdir: stagingDirectory',
   "external: ['node:*']",
 ]) {
   require(buildConfig.includes(value), `scripts/build-js.mjs must contain ${value}`)

@@ -199,7 +199,7 @@ const EXPECTED_RENDERING = Object.freeze({
     createsTimer: false,
     synchronousWriteFailure: 'suppress',
     backpressure: 'permanent-ordered-cosmetic-coalesced',
-    asynchronousErrors: 'host-owned',
+    asynchronousErrors: 'host-owned-when-idle',
   },
   interactiveLease: {
     scope: 'writable-stream-identity',
@@ -239,11 +239,15 @@ const EXPECTED_RENDERING = Object.freeze({
     cosmeticFrames: 'coalesce-latest-until-drain',
     unboundedQueue: false,
     pendingLimits: { tasks: 64, bytes: 65536 },
-    listenerEvents: ['drain', 'finish', 'close'],
+    permanentWriteCompletion: 'node-write-callback-sequence-watermark',
+    flushBoundary: 'accepted-permanent-sequence-watermark',
+    targetError: 'pending-output-rejects-flush-stops-lease-clears-queue',
+    targetErrorReplay: 'next-flush-rejects-once-then-retry',
+    listenerEvents: ['drain', 'finish', 'close', 'error'],
     finishWithoutQueuedOutput: 'resolve-flush',
     finishWithQueuedOutput: 'reject-flush',
     closeBeforeDrain: 'reject-flush',
-    listenerLifecycle: 'remove-on-drain-finish-close-or-failure',
+    listenerLifecycle: 'remove-on-quiescence-finish-close-error-or-failure',
     synchronousFailure: 'stop-affected-surface-and-restore-owned-cursor',
   },
   renderCache: {
@@ -253,10 +257,12 @@ const EXPECTED_RENDERING = Object.freeze({
     width: 'cached-grapheme-cells',
   },
   customFrames: {
-    source: 'spinner-name-or-snapshotted-definition',
+    source: 'spinner-name-or-definition-time-sanitized-frozen-snapshot',
     maximumFrames: 64,
     intervalRangeMs: [16, 60000],
-    frameValidation: 'string-and-visible-after-render-sanitization',
+    sanitization: 'definition-time',
+    frameValidation: 'string-and-visible-after-definition-sanitization',
+    snapshot: 'immutable-sanitized',
     singleFrame: 'static-no-timer',
     customUnicodeFallback: 'caller-owned',
     timer: 'unreferenced',
@@ -301,16 +307,7 @@ const EXPECTED_RENDERING = Object.freeze({
 })
 
 const EXPECTED_TEXT_SAFETY = Object.freeze({
-  fields: [
-    'text',
-    'prefix',
-    'suffix',
-    'terminalText',
-    'flowMessage',
-    'logMessage',
-    'customFrame',
-    'progressText',
-  ],
+  fields: ['text', 'prefix', 'suffix', 'terminalText', 'flowMessage', 'logMessage', 'progressText'],
   boundary: 'render-only',
   preserveAssignedValues: true,
   stripVTControlCharacters: true,
@@ -410,7 +407,7 @@ const EXPECTED_INPUT_VALIDATION = Object.freeze({
   invalidHideCursor: 'throw-TypeError-before-output',
   indent: 'safe-integer-zero-to-40',
   invalidIndent: 'throw-TypeError-before-output',
-  customFrames: 'one-to-64-visible-strings-snapshotted-before-output',
+  customFrames: 'one-to-64-visible-strings-definition-time-sanitized-and-snapshotted-before-output',
   customInterval: 'safe-integer-16-to-60000-before-output',
   invalidGroupOptions: 'throw-TypeError-before-output',
   groupMaxRows: 'positive-safe-integer',
@@ -738,7 +735,7 @@ function validateDocuments(documents, contract, failures) {
       'SGR, cursor control, color, emphasis, animation, and Unicode are separate named capability decisions.',
       'explicit `reset`, `bold`, `dim`, `italic`, `underline`, and `strikethrough` remain available when color is disabled',
       'An immutable sanitized snapshot and grapheme-aware terminal-cell width are created lazily',
-      'Temporary `drain`, `finish`, and `close` listeners',
+      'Temporary `drain`, `finish`, `close`, and `error` listeners',
     ],
     'specs/09_PHASE_0_PRODUCT_SPEC_LOCK.md': [
       'Node 22, Node 24, and Node 26',
@@ -801,8 +798,8 @@ export function validatePhase0Contract({
     'contract',
     failures,
   )
-  require(contract.schemaVersion === 13 &&
-    contract.phase === 0, 'contract version and phase must be 12 and 0', failures)
+  require(contract.schemaVersion === 14 &&
+    contract.phase === 0, 'contract version and phase must be 14 and 0', failures)
   requireExact(
     contract.identity,
     {
@@ -939,7 +936,7 @@ export function validatePhase0Contract({
       exitCalls: false,
       killCalls: false,
       globalStreamErrorListeners: false,
-      temporaryBackpressureListeners: ['drain', 'finish', 'close'],
+      temporaryBackpressureListeners: ['drain', 'finish', 'close', 'error'],
       applicationOwnsShutdown: true,
       explicitMethodsRestoreCursor: true,
       disposalRestoresCursor: true,
@@ -964,7 +961,10 @@ export function validatePhase0Contract({
       failureScope: 'affected-target-surface-only',
       cosmeticMethodsThrow: false,
       promiseSettlementPreserved: true,
-      asynchronousStreamErrorsOwnedByHost: true,
+      asynchronousStreamErrors: 'host-owned-when-no-spinlog-output-is-pending',
+      pendingTargetError: 'SpinlogTargetError-with-original-cause',
+      pendingTargetErrorEffect: 'reject-flush-stop-affected-lease-clear-queued-output',
+      pendingTargetErrorReplay: 'next-flush-rejects-once-then-retry',
     },
     'writeFailures',
     failures,

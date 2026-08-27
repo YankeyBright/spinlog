@@ -36,7 +36,7 @@ function readObject(path) {
 const contract = readObject('specs/v1-behavior.json')
 const packageJson = readObject('package.json')
 const coverage = readObject('coverage/coverage-final.json')
-require(contract.schemaVersion === 13, 'Phase 2 requires behavior schema version 13')
+require(contract.schemaVersion === 14, 'Phase 2 requires behavior schema version 14')
 require(JSON.stringify(contract.environment?.capabilityShape) ===
   JSON.stringify([
     'sgr',
@@ -112,6 +112,8 @@ require(JSON.stringify(contract.publicApi?.progressMethods) ===
 require(contract.rendering?.customFrames?.maximumFrames === 64 &&
   JSON.stringify(contract.rendering?.customFrames?.intervalRangeMs) ===
     JSON.stringify([16, 60_000]) &&
+  contract.rendering?.customFrames?.sanitization === 'definition-time' &&
+  contract.rendering?.customFrames?.snapshot === 'immutable-sanitized' &&
   contract.rendering?.groups?.interactiveSurface === 'one-target-local-lease' &&
   contract.rendering?.groups?.defaultMaxRows === 'min(10, target.rows - 1)' &&
   contract.rendering?.progress?.defaultBarWidth === 20 &&
@@ -124,8 +126,13 @@ require(contract.rendering?.staticModes?.default === 'symbol' &&
     JSON.stringify(['symbol', 'text', 'silent']) &&
   contract.rendering?.log?.activeFrameCoordination === 'clear-write-redraw-target-local' &&
   contract.rendering?.interactiveLease?.scope === 'writable-stream-identity' &&
-  contract.rendering?.writeBackpressure?.cosmeticFrames ===
-    'coalesce-latest-until-drain', 'Phase 2 requires the frozen static-mode and coordinated-log policy')
+  contract.rendering?.writeBackpressure?.cosmeticFrames === 'coalesce-latest-until-drain' &&
+  contract.rendering?.writeBackpressure?.permanentWriteCompletion ===
+    'node-write-callback-sequence-watermark' &&
+  contract.rendering?.writeBackpressure?.flushBoundary ===
+    'accepted-permanent-sequence-watermark' &&
+  contract.rendering?.writeBackpressure?.targetError ===
+    'pending-output-rejects-flush-stops-lease-clears-queue', 'Phase 2 requires the frozen static-mode, coordinated-log, and write-completion policy')
 require(JSON.stringify(contract.environment?.terminalModes) ===
   JSON.stringify(['auto', 'static', 'interactive']) &&
   contract.environment?.unknownTerminalProfile ===

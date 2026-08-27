@@ -3,6 +3,7 @@ import { stderr, stdout } from 'node:process'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import spinlog, { type SpinnerGroup } from '../src/index.js'
+import { acceptWrite } from './write-callback.js'
 
 describe('spinner groups', () => {
   let write: ReturnType<typeof vi.spyOn>
@@ -29,8 +30,10 @@ describe('spinner groups', () => {
     Object.defineProperty(stderr, 'isTTY', { configurable: true, value: true })
     Object.defineProperty(stderr, 'columns', { configurable: true, value: 80 })
     Object.defineProperty(stderr, 'rows', { configurable: true, value: 24 })
-    write = vi.spyOn(stderr, 'write').mockImplementation(() => true)
-    stdoutWrite = vi.spyOn(stdout, 'write').mockImplementation(() => true)
+    write = vi.spyOn(stderr, 'write')
+    write.mockImplementation(acceptWrite(write) as never)
+    stdoutWrite = vi.spyOn(stdout, 'write')
+    stdoutWrite.mockImplementation(acceptWrite(stdoutWrite) as never)
     groups = []
   })
 
@@ -440,7 +443,7 @@ describe('spinner groups', () => {
     const retry = group.add('retry', { spinner: 'line' }).start()
 
     expect(vi.getTimerCount()).toBe(0)
-    write.mockImplementation(() => true)
+    write.mockImplementation(acceptWrite(write) as never)
     retry.start()
     expect(vi.getTimerCount()).toBe(1)
   })
@@ -460,7 +463,7 @@ describe('spinner groups', () => {
     child.start()
 
     expect(vi.getTimerCount()).toBe(0)
-    write.mockImplementation(() => true)
+    write.mockImplementation(acceptWrite(write) as never)
     child.start()
     expect(vi.getTimerCount()).toBe(1)
   })

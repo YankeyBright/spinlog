@@ -3,6 +3,7 @@ import { stderr } from 'node:process'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import spinlog, { type Spinner } from '../src/index.js'
+import { acceptWrite } from './write-callback.js'
 
 describe('static policies and coordinated logging', () => {
   let write: ReturnType<typeof vi.spyOn>
@@ -26,7 +27,8 @@ describe('static policies and coordinated logging', () => {
     columnsDescriptor = Object.getOwnPropertyDescriptor(stderr, 'columns')
     Object.defineProperty(stderr, 'isTTY', { configurable: true, value: true })
     Object.defineProperty(stderr, 'columns', { configurable: true, value: 80 })
-    write = vi.spyOn(stderr, 'write').mockImplementation(() => true)
+    write = vi.spyOn(stderr, 'write')
+    write.mockImplementation(acceptWrite(write) as never)
   })
 
   afterEach(() => {

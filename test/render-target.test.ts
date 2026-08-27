@@ -21,6 +21,7 @@ class FakeTarget extends EventEmitter {
   columns: number | undefined
   rows: number | undefined
   #outcomes: WriteOutcome[] = []
+  #pendingCallbacks: Array<(error?: Error | null) => void> = []
 
   constructor(columns = 80, rows = 24) {
     super()
@@ -32,11 +33,24 @@ class FakeTarget extends EventEmitter {
     this.#outcomes.push(...outcomes)
   }
 
-  write(value: string): boolean {
+  write(value: string, callback?: (error?: Error | null) => void): boolean {
     this.writes.push(String(value))
     const outcome = this.#outcomes.shift() ?? 'written'
     if (outcome === 'failed') throw new Error('synthetic write failure')
+    if (outcome === 'backpressured' && callback !== undefined) {
+      this.#pendingCallbacks.push(callback)
+    } else {
+      callback?.()
+    }
     return outcome !== 'backpressured'
+  }
+
+  emit(event: string | symbol, ...arguments_: unknown[]): boolean {
+    const emitted = super.emit(event, ...arguments_)
+    if (event === 'drain') {
+      for (const callback of this.#pendingCallbacks.splice(0)) callback()
+    }
+    return emitted
   }
 
   asWritable(): Writable {
