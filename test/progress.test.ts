@@ -1,15 +1,16 @@
-import { stderr, stdout } from 'node:process'
+import { stderr } from 'node:process'
 import { PassThrough } from 'node:stream'
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import spinlog from '../src/index.js'
+import { setupTerminalFixture, type TerminalFixture } from './terminal-fixture.js'
+import { acceptWrite } from './write-callback.js'
 
 describe('progress indicators', () => {
   let write: ReturnType<typeof vi.spyOn>
   let stdoutWrite: ReturnType<typeof vi.spyOn>
-  let ttyDescriptor: PropertyDescriptor | undefined
-  let columnsDescriptor: PropertyDescriptor | undefined
+  let terminal: TerminalFixture
 
   function output(): string[] {
     return write.mock.calls.map(([value]) => String(value))
@@ -23,26 +24,13 @@ describe('progress indicators', () => {
   }
 
   beforeEach(() => {
-    vi.stubEnv('CI', '')
-    vi.stubEnv('FORCE_COLOR', '0')
-    vi.stubEnv('NODE_ENV', 'production')
-    vi.stubEnv('TERM', 'xterm-256color')
-    vi.stubEnv('WT_SESSION', 'test-session')
-    ttyDescriptor = Object.getOwnPropertyDescriptor(stderr, 'isTTY')
-    columnsDescriptor = Object.getOwnPropertyDescriptor(stderr, 'columns')
-    Object.defineProperty(stderr, 'isTTY', { configurable: true, value: true })
-    Object.defineProperty(stderr, 'columns', { configurable: true, value: 80 })
-    write = vi.spyOn(stderr, 'write').mockImplementation(() => true)
-    stdoutWrite = vi.spyOn(stdout, 'write').mockImplementation(() => true)
+    terminal = setupTerminalFixture({ captureStdout: true })
+    write = terminal.write
+    stdoutWrite = terminal.stdoutWrite as ReturnType<typeof vi.spyOn>
   })
 
   afterEach(() => {
-    vi.restoreAllMocks()
-    vi.unstubAllEnvs()
-    if (ttyDescriptor) Object.defineProperty(stderr, 'isTTY', ttyDescriptor)
-    else delete (stderr as { isTTY?: boolean }).isTTY
-    if (columnsDescriptor) Object.defineProperty(stderr, 'columns', columnsDescriptor)
-    else delete (stderr as { columns?: number }).columns
+    terminal.restore()
   })
 
   it('renders, updates, logs, and settles a determinate interactive line', () => {
@@ -142,7 +130,8 @@ describe('progress indicators', () => {
   it('keeps progress target-local and honors color, Unicode, cursor, and indent overrides', () => {
     vi.stubEnv('FORCE_COLOR', '1')
     const target = createTTYTarget()
-    const targetWrite = vi.spyOn(target, 'write').mockImplementation(() => true)
+    const targetWrite = vi.spyOn(target, 'write')
+    targetWrite.mockImplementation(acceptWrite(targetWrite) as never)
     const progress = spinlog
       .progress('custom', {
         total: 4,
@@ -172,8 +161,10 @@ describe('progress indicators', () => {
   it('allows independent interactive progress surfaces and logs per writable stream', () => {
     const firstTarget = createTTYTarget()
     const secondTarget = createTTYTarget()
-    const firstWrite = vi.spyOn(firstTarget, 'write').mockImplementation(() => true)
-    const secondWrite = vi.spyOn(secondTarget, 'write').mockImplementation(() => true)
+    const firstWrite = vi.spyOn(firstTarget, 'write')
+    firstWrite.mockImplementation(acceptWrite(firstWrite) as never)
+    const secondWrite = vi.spyOn(secondTarget, 'write')
+    secondWrite.mockImplementation(acceptWrite(secondWrite) as never)
 
     const first = spinlog
       .progress('first', { total: 1, stream: firstTarget, terminal: 'interactive' })
@@ -196,7 +187,8 @@ describe('progress indicators', () => {
 
   it('includes indentation in the interactive width budget', () => {
     const target = createTTYTarget(37)
-    const targetWrite = vi.spyOn(target, 'write').mockImplementation(() => true)
+    const targetWrite = vi.spyOn(target, 'write')
+    targetWrite.mockImplementation(acceptWrite(targetWrite) as never)
 
     spinlog
       .progress('width', { total: 1, stream: target, indent: 5, terminal: 'interactive' })
@@ -323,7 +315,8 @@ describe('progress indicators', () => {
     expect(() => terminal.fail()).not.toThrow()
 
     vi.restoreAllMocks()
-    write = vi.spyOn(stderr, 'write').mockImplementation(() => true)
+    write = vi.spyOn(stderr, 'write')
+    write.mockImplementation(acceptWrite(write) as never)
     const silent = spinlog.progress('wide', { total: 1, static: 'silent' }).start()
     Object.defineProperty(stderr, 'columns', { configurable: true, value: 8 })
     silent.update(1)

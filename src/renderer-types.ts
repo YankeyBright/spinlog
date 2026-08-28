@@ -18,6 +18,8 @@ export interface InteractiveLease {
 export interface OutputTask {
   readonly kind: 'permanent' | 'cosmetic'
   readonly bytes: number
+  /** Assigned internally when a permanent task enters a target queue. */
+  readonly sequence?: number
   readonly render: (state: TargetState) => string | undefined
   /** Returns false when accepted-frame bookkeeping has failed. */
   readonly didWrite?: () => boolean
@@ -31,23 +33,33 @@ export interface OutputTask {
 }
 
 export interface FlushWaiter {
+  /** The last permanent task accepted before this flush call. */
+  readonly watermark: number
   readonly resolve: () => void
   readonly reject: (reason: Error) => void
 }
+
+export type TargetEvent = 'drain' | 'finish' | 'close' | 'error'
+export type TargetListener = (...args: never[]) => void
 
 export interface TargetState {
   readonly target: RenderTarget
   lease: InteractiveLease | undefined
   blocked: boolean
-  drainListener: (() => void) | undefined
-  finishListener: (() => void) | undefined
-  closeListener: (() => void) | undefined
+  listeners: Partial<Record<TargetEvent, TargetListener>>
   permanent: OutputTask[]
-  permanentBytes: number
-  inFlightPermanent: OutputTask | undefined
+  queuedBytes: number
+  inFlight: OutputTask | undefined
+  /** Last monotonic sequence accepted for this target. */
+  sequence: number
+  /** Accepted permanent tasks whose Node write callback has not run. */
+  pending: Set<OutputTask>
+  /** Keeps an error listener through Node's callback-then-error ordering. */
+  awaitingError: boolean
   cosmetic: OutputTask | undefined
   waiters: FlushWaiter[]
-  overflow: Error | undefined
+  /** An overflow or target error delivered once to the next flush when no waiter saw it. */
+  failure: Error | undefined
   draining: boolean
-  rejectingWrites: boolean
+  rejecting: boolean
 }

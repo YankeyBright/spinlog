@@ -72,7 +72,9 @@ describe('terminal capabilities', () => {
     [{ ...XTERM, NODE_DISABLE_COLORS: '1', FORCE_COLOR: '1' }, false],
     [{ ...XTERM, NO_COLOR: '1', NODE_DISABLE_COLORS: '1', FORCE_COLOR: '1' }, false],
     [{ ...XTERM, NO_COLOR: '', NODE_DISABLE_COLORS: '', FORCE_COLOR: '1' }, true],
-  ])('applies explicit color precedence for %j', (env, expected) => {
+    [{ ...XTERM, NO_COLOR: '0', FORCE_COLOR: '1' }, false],
+    [{ ...XTERM, NODE_DISABLE_COLORS: '0', FORCE_COLOR: '1' }, false],
+  ])('applies the frozen Spinlog color precedence for %j', (env, expected) => {
     expect(capabilities(env).color).toBe(expected)
   })
 
@@ -81,7 +83,8 @@ describe('terminal capabilities', () => {
     [{ ...XTERM, FORCE_COLOR: 'false' }, false],
     [{ ...XTERM, FORCE_COLOR: '' }, true],
     [{ ...XTERM, FORCE_COLOR: '1' }, true],
-  ])('interprets FORCE_COLOR=%j below explicit disable variables', (env, expected) => {
+    [{ ...XTERM, FORCE_COLOR: 'banana' }, true],
+  ])('applies the frozen Spinlog FORCE_COLOR value policy for %j', (env, expected) => {
     expect(capabilities(env).color).toBe(expected)
   })
 
@@ -157,6 +160,14 @@ describe('terminal capabilities', () => {
       sgr: true,
       cursor: false,
       color: false,
+      emphasis: true,
+      animation: false,
+      unicode: true,
+    })
+    expect(capabilities({ TERM: 'dumb', FORCE_COLOR: '1' }, false)).toEqual({
+      sgr: true,
+      cursor: false,
+      color: true,
       emphasis: true,
       animation: false,
       unicode: true,

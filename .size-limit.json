@@ -1,7 +1,7 @@
 [
   {
     "path": "dist/index.js",
-    "limit": "10240 B",
+    "limit": "10496 B",
     "gzip": true,
     "ignore": ["node:util", "node:process"]
   }

@@ -1,10 +1,11 @@
-import { stderr, stdout } from 'node:process'
+import { stderr } from 'node:process'
 
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 
 import { sortCanonicalText } from '../scripts/canonical-order.mjs'
 import spinlog, * as moduleExports from '../src/index.js'
 import type { Spinner } from '../src/index.js'
+import { setupTerminalFixture, type TerminalFixture } from './terminal-fixture.js'
 
 const STYLE_EXPORTS = [
   'reset',
@@ -86,32 +87,17 @@ describe('public runtime surface', () => {
 describe('intro and outro flow messages', () => {
   let write: ReturnType<typeof vi.spyOn>
   let stdoutWrite: ReturnType<typeof vi.spyOn>
-  let ttyDescriptor: PropertyDescriptor | undefined
-  let columnsDescriptor: PropertyDescriptor | undefined
+  let terminal: TerminalFixture
 
   beforeEach(() => {
-    vi.useFakeTimers()
-    vi.stubEnv('NODE_ENV', 'production')
+    terminal = setupTerminalFixture({ captureStdout: true })
     vi.stubEnv('CI', '1')
-    vi.stubEnv('FORCE_COLOR', '0')
-    vi.stubEnv('WT_SESSION', 'test-session')
-    vi.stubEnv('TERM', 'xterm-256color')
-    ttyDescriptor = Object.getOwnPropertyDescriptor(stderr, 'isTTY')
-    columnsDescriptor = Object.getOwnPropertyDescriptor(stderr, 'columns')
-    Object.defineProperty(stderr, 'isTTY', { configurable: true, value: true })
-    Object.defineProperty(stderr, 'columns', { configurable: true, value: 80 })
-    write = vi.spyOn(stderr, 'write').mockImplementation(() => true)
-    stdoutWrite = vi.spyOn(stdout, 'write').mockImplementation(() => true)
+    write = terminal.write
+    stdoutWrite = terminal.stdoutWrite as ReturnType<typeof vi.spyOn>
   })
 
   afterEach(() => {
-    vi.useRealTimers()
-    vi.restoreAllMocks()
-    vi.unstubAllEnvs()
-    if (ttyDescriptor) Object.defineProperty(stderr, 'isTTY', ttyDescriptor)
-    else delete (stderr as { isTTY?: boolean }).isTTY
-    if (columnsDescriptor) Object.defineProperty(stderr, 'columns', columnsDescriptor)
-    else delete (stderr as { columns?: number }).columns
+    terminal.restore()
   })
 
   it('writes Unicode, empty, and repeated messages exactly once per call', () => {
@@ -219,23 +205,23 @@ describe('intro and outro flow messages', () => {
 describe('promise wrapper', () => {
   let write: ReturnType<typeof vi.spyOn>
   let stdoutWrite: ReturnType<typeof vi.spyOn>
+  let terminal: TerminalFixture
 
   beforeEach(() => {
-    vi.stubEnv('NODE_ENV', 'production')
+    terminal = setupTerminalFixture({ captureStdout: true })
     vi.stubEnv('CI', '1')
-    vi.stubEnv('FORCE_COLOR', '0')
-    vi.stubEnv('WT_SESSION', 'test-session')
-    write = vi.spyOn(stderr, 'write').mockImplementation(() => true)
-    stdoutWrite = vi.spyOn(stdout, 'write').mockImplementation(() => true)
+    write = terminal.write
+    stdoutWrite = terminal.stdoutWrite as ReturnType<typeof vi.spyOn>
   })
 
   afterEach(() => {
-    vi.restoreAllMocks()
-    vi.unstubAllEnvs()
+    terminal.restore()
   })
 
-  it('starts before observing and assimilating a direct thenable', async () => {
+  it('starts before observing and assimilating a direct thenable exactly once', async () => {
     const order: string[] = []
+    let thenGetterReads = 0
+    let thenCalls = 0
     write.mockImplementation((value: unknown) => {
       order.push(String(value))
       return true
@@ -243,8 +229,12 @@ describe('promise wrapper', () => {
     const thenable = Object.defineProperty({}, 'then', {
       configurable: true,
       get() {
+        thenGetterReads += 1
         order.push('then-observed')
-        return (resolve: (value: number) => void) => resolve(42)
+        return (resolve: (value: number) => void) => {
+          thenCalls += 1
+          resolve(42)
+        }
       },
     }) as PromiseLike<number>
 
@@ -252,6 +242,30 @@ describe('promise wrapper', () => {
     expect(order[0]).toBe('- direct\n')
     expect(order[1]).toBe('then-observed')
     expect(order.at(-1)).toBe('✔ direct\n')
+    expect(thenGetterReads).toBe(1)
+    expect(thenCalls).toBe(1)
+  })
+
+  it('defers direct thenable invocation to the Promise job queue', async () => {
+    const order: string[] = []
+    let receiver: unknown
+    const thenable = {
+      // biome-ignore lint/suspicious/noThenProperty: Intentionally tests thenable assimilation.
+      then(resolve: (value: string) => void) {
+        receiver = this
+        order.push('then-called')
+        resolve('done')
+      },
+    } as PromiseLike<string>
+
+    const pending = spinlog.promise(thenable, { text: 'deferred', spinner: 'line' })
+    order.push('after-call')
+    expect(order).toEqual(['after-call'])
+
+    await Promise.resolve()
+    expect(order).toEqual(['after-call', 'then-called'])
+    expect(receiver).toBe(thenable)
+    await expect(pending).resolves.toBe('done')
   })
 
   it('starts before invoking a task exactly once and preserves fulfillment', async () => {
@@ -262,6 +276,57 @@ describe('promise wrapper', () => {
     expect(task).toHaveBeenCalledTimes(1)
     await expect(promise).resolves.toEqual({ value: 7 })
     expect(write).toHaveBeenLastCalledWith('p ✔ task\n')
+  })
+
+  it('assimilates callable thenables directly without invoking them as tasks', async () => {
+    let thenReads = 0
+    const callableThenable = vi.fn(() => {
+      throw new Error('callable thenable must not be invoked as a task')
+    })
+    Object.defineProperty(callableThenable, 'then', {
+      configurable: true,
+      get() {
+        thenReads += 1
+        return (resolve: (value: string) => void) => resolve('resolved directly')
+      },
+    })
+
+    await expect(
+      spinlog.promise(callableThenable as unknown as PromiseLike<string>, { text: 'callable' }),
+    ).resolves.toBe('resolved directly')
+    expect(callableThenable).not.toHaveBeenCalled()
+    expect(thenReads).toBe(1)
+
+    const reason = new Error('callable thenable rejected')
+    const rejectingThenable = vi.fn(() => {
+      throw new Error('rejecting callable thenable must not be invoked as a task')
+    })
+    Object.defineProperty(rejectingThenable, 'then', {
+      configurable: true,
+      value: (_resolve: (value: never) => void, reject: (error: Error) => void) => reject(reason),
+    })
+
+    await expect(
+      spinlog.promise(rejectingThenable as unknown as PromiseLike<never>, {
+        text: 'rejecting callable',
+      }),
+    ).rejects.toBe(reason)
+    expect(rejectingThenable).not.toHaveBeenCalled()
+  })
+
+  it('accepts a callable thenable returned by a task', async () => {
+    const then = vi.fn((resolve: (value: string) => void) => resolve('callable result'))
+    const callableThenable = Object.defineProperty(() => undefined, 'then', {
+      configurable: true,
+      value: then,
+    }) as unknown as PromiseLike<string>
+    const task = vi.fn(() => callableThenable)
+
+    await expect(spinlog.promise(task, { text: 'callable', spinner: 'line' })).resolves.toBe(
+      'callable result',
+    )
+    expect(task).toHaveBeenCalledTimes(1)
+    expect(then).toHaveBeenCalledTimes(1)
   })
 
   it('renders generic settlement text without changing fulfillment or rejection semantics', async () => {
@@ -311,6 +376,25 @@ describe('promise wrapper', () => {
     await expect(rejected).rejects.toBe(thrown)
   })
 
+  it('preserves a throwing then getter as the rejection reason', async () => {
+    const reason = new Error('then getter failed')
+    let reads = 0
+    const thenable = Object.defineProperty({}, 'then', {
+      configurable: true,
+      get() {
+        reads += 1
+        throw reason
+      },
+    }) as PromiseLike<never>
+
+    await expect(spinlog.promise(thenable, { text: 'getter', spinner: 'line' })).rejects.toBe(
+      reason,
+    )
+    expect(reads).toBe(1)
+    expect(write).toHaveBeenNthCalledWith(1, '- getter\n')
+    expect(write).toHaveBeenLastCalledWith('✖ getter\n')
+  })
+
   it('never lets cosmetic write failure replace action settlement', async () => {
     write.mockImplementation(() => {
       throw new Error('stderr unavailable')
@@ -334,4 +418,45 @@ describe('promise wrapper', () => {
     ).rejects.toThrow('successText must be a string or function')
     expect(task).not.toHaveBeenCalled()
   })
+
+  const nonCallableThen = Object.defineProperty({}, 'then', { value: true })
+
+  it.each([
+    ['null', null],
+    ['undefined', undefined],
+    ['number', 42],
+    ['string', 'not a promise'],
+    ['plain object', {}],
+    ['object with a non-callable then', nonCallableThen],
+  ])(
+    'rejects invalid direct input (%s) through failure settlement after starting',
+    async (_label, input) => {
+      await expect(
+        spinlog.promise(input as never, { text: 'invalid direct', spinner: 'line' }),
+      ).rejects.toThrow('input must be a PromiseLike or a task returning one')
+      expect(write).toHaveBeenNthCalledWith(1, '- invalid direct\n')
+      expect(write).toHaveBeenLastCalledWith('✖ invalid direct\n')
+    },
+  )
+
+  it.each([
+    ['null', null],
+    ['number', 42],
+    ['plain object', {}],
+    ['object with a non-callable then', nonCallableThen],
+  ])(
+    'rejects an invalid task result (%s) through failure settlement after starting',
+    async (_label, value) => {
+      const task = vi.fn(() => value)
+      const result = spinlog.promise(task as never, { text: 'invalid task', spinner: 'line' })
+      const rejection = expect(result).rejects.toThrow(
+        'input must be a PromiseLike or a task returning one',
+      )
+
+      expect(write).toHaveBeenNthCalledWith(1, '- invalid task\n')
+      expect(task).toHaveBeenCalledTimes(1)
+      await rejection
+      expect(write).toHaveBeenLastCalledWith('✖ invalid task\n')
+    },
+  )
 })

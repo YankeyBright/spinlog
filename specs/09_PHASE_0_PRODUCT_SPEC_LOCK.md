@@ -19,12 +19,12 @@ Freeze the exact pre-1.0 `spinlog@0.2.0` product surface and behavior that every
 - Progress exposes immutable total, defaults to a 20-cell block bar, accepts width 5–40 and ASCII style, uses floor fill, rejects non-positive increments, and completes to 100% on success.
 - The package is ESM-only, supports Node 22, Node 24, and Node 26, and has zero runtime, optional, and peer dependencies.
 - Explicit streams are application-owned. Spinlog never patches global output, never manages stdin, installs no process signal or exit listener, and never terminates the host process.
-- User text is sanitized only at the render boundary. Synchronous cosmetic failures remain target-local; backpressure coalesces cosmetic frames without an unbounded queue.
-- `dist/index.js` may not exceed 10,240 bytes after gzip level 9; a single style import remains limited to 768 gzip bytes.
+- User text is sanitized only at the render boundary, except caller-defined frames that are sanitized and frozen at definition time. Synchronous cosmetic failures remain target-local; backpressure coalesces cosmetic frames without an unbounded queue, and permanent flushes wait for write callbacks.
+- `dist/index.js` may not exceed 10,496 bytes after gzip level 9; a single style import remains limited to 768 gzip bytes.
 
 ## Size budget decision
 
-The 10,240-byte ceiling is a versioned product constraint, not a checker bypass. Target-local lease coordination, grapheme-aware width and conservative height safety, custom frame validation, groups, progress, bounded backpressure handling, and the explicit flush boundary must fit within it. Every expansion requires a contract revision, fresh package evidence, and release review.
+The 10,496-byte ceiling is a versioned product constraint, not a checker bypass. Target-local lease coordination, grapheme-aware width and conservative height safety, custom frame validation, groups, progress, bounded backpressure handling, and the explicit flush boundary must fit within it. Every expansion requires a contract revision, fresh package evidence, and release review.
 
 ## Explicit non-goals
 

@@ -19,8 +19,9 @@ Implement and prove the frozen pre-1.0 0.2 contract. Runtime behavior and determ
    - Contain synchronous write failure without owning host signals or stream errors.
 5. `src/spinner-data.ts`
    - Validate and snapshot built-in or caller-defined frames, select Unicode fallbacks, and define fixed terminal status metadata.
-6. `src/group.ts`
+6. `src/group.ts`, `src/group-session.ts`, and `src/group-scheduler.ts`
    - Coordinate multiple child spinner rows under one target-local lease and one unreferenced scheduler, including row persistence and height safety.
+   - Keep session identity/live-row selection and interval advancement separate from the public group facade.
 7. `src/progress.ts`
    - Implement determinate, timer-free progress rendering and validated monotonic caller updates.
 8. `src/text.ts`

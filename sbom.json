@@ -12,7 +12,7 @@
     "component": {
       "author": "spinlog contributors",
       "bom-ref": "spinlog@0.2.0",
-      "description": "A zero-runtime-dependency, ESM-only terminal feedback library with target-local rendering capped at 10,240 bytes gzipped.",
+      "description": "A zero-runtime-dependency, ESM-only terminal feedback library with target-local rendering capped at 10,496 bytes gzipped.",
       "externalReferences": [
         {
           "type": "issue-tracker",

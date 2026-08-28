@@ -2,28 +2,28 @@
   "node": "v24.19.0",
   "platform": "linux",
   "provenance": {
-    "commit": "f441f25d72f73c2ebf3d5e88c37b8d0730369f0b",
+    "commit": "094e29dc7a8650f2b4b33ff1c41e18943fd88f6e",
     "githubRunAttempt": "1",
-    "githubRunId": "32876502378",
+    "githubRunId": "33202115112",
     "inputs": [
       {
-        "sha256": "b47fa96f31880cd015f165708c1ebceaf13b0023a365eee5143ab210f831fec8",
+        "sha256": "3db2b0de4251e2dabc08bb384b36a2cbde65ebe06a24da6bbe5bf64cda6c4538",
         "slot": 1
       },
       {
-        "sha256": "60a8383792abe605fd77d55e878a22977586ce2544e3fcc17592c26837068594",
+        "sha256": "f1eff1e8a4738519782d76873d576168fab354e92231e29566abbd482e899435",
         "slot": 2
       },
       {
-        "sha256": "04948d733bf112d83375314e4cb028477635abe06f66cb31af13b090039940fa",
+        "sha256": "3c1c3535372e926e3e34d7feac41f696ff87c601cbcdcd79e4eac572a9bc8eab",
         "slot": 3
       },
       {
-        "sha256": "77d78ef0818c46a972ece9e808c4a48603b6a2687e324f6bceb60e549f3309fc",
+        "sha256": "0b6a4d3c92bd84e6c34e5db9d9956b2f338ad590f09b834acd8c136945392789",
         "slot": 4
       },
       {
-        "sha256": "68f786bcf62f704ad5edeac8a3dabcda47f29d656534546766b893d7a130e792",
+        "sha256": "c502b50d087266e9b68589d61d1c16bf2c9a3119231bfad50f17d6a9f3b0ca68",
         "slot": 5
       }
     ]
@@ -32,87 +32,87 @@
   "scenarios": {
     "root-cold-import-ns": {
       "confidenceInterval": {
-        "lower": 33466471,
-        "upper": 43950804
+        "lower": 39170017,
+        "upper": 46544575
       },
-      "median": 36104117
+      "median": 41182994
     },
     "styles-cold-import-ns": {
       "confidenceInterval": {
-        "lower": 19763537,
-        "upper": 25859252
+        "lower": 23589591,
+        "upper": 28174634
       },
-      "median": 21348895
+      "median": 23893048
     },
     "enabled-style-ns": {
       "confidenceInterval": {
-        "lower": 2573.37109375,
-        "upper": 3422.3359375
+        "lower": 2769.3505859375,
+        "upper": 3154.364501953125
       },
-      "median": 2640.260498046875
+      "median": 2946.4052734375
     },
     "disabled-style-ns": {
       "confidenceInterval": {
-        "lower": 1593.378662109375,
-        "upper": 2058.6661376953125
+        "lower": 1511.7972412109375,
+        "upper": 1802.5772705078125
       },
-      "median": 1613.3201904296875
+      "median": 1702.6591796875
     },
     "static-spinner-settlement-ns": {
       "confidenceInterval": {
-        "lower": 7884.65087890625,
-        "upper": 17879.3125
+        "lower": 13919.89453125,
+        "upper": 15053.19140625
       },
-      "median": 12873.72265625
+      "median": 14491.703125
     },
     "custom-spinner-settlement-ns": {
       "confidenceInterval": {
-        "lower": 11292.095703125,
-        "upper": 15871.1396484375
+        "lower": 16753.705078125,
+        "upper": 20168.748046875
       },
-      "median": 12495.22265625
+      "median": 17294.7421875
     },
     "resolved-promise-wrapper-ns": {
       "confidenceInterval": {
-        "lower": 5757.99,
-        "upper": 7904.26
+        "lower": 9977.06,
+        "upper": 12326.95
       },
-      "median": 6506.1
+      "median": 10635.99
     },
     "intro-flow-message-ns": {
       "confidenceInterval": {
-        "lower": 3176.63037109375,
-        "upper": 4138.465576171875
+        "lower": 5336.37353515625,
+        "upper": 6022.0693359375
       },
-      "median": 3415.856201171875
+      "median": 5471.40625
     },
     "outro-flow-message-ns": {
       "confidenceInterval": {
-        "lower": 3216.479248046875,
-        "upper": 4144.397216796875
+        "lower": 5251.0771484375,
+        "upper": 6088.69677734375
       },
-      "median": 3464.25537109375
+      "median": 5350.400390625
     },
     "instance-log-ns": {
       "confidenceInterval": {
-        "lower": 2712.482421875,
-        "upper": 3572.39697265625
+        "lower": 4636.5078125,
+        "upper": 5376.34228515625
       },
-      "median": 3466.3369140625
+      "median": 4801.31884765625
     },
     "group-static-settlement-ns": {
       "confidenceInterval": {
-        "lower": 10778.58203125,
-        "upper": 15804.1796875
+        "lower": 16379.1220703125,
+        "upper": 20096.97265625
       },
-      "median": 12130.83984375
+      "median": 16754.173828125
     },
     "progress-static-settlement-ns": {
       "confidenceInterval": {
-        "lower": 8538.72412109375,
-        "upper": 12220.9599609375
+        "lower": 12867.8076171875,
+        "upper": 15639.193359375
       },
-      "median": 9679.19140625
+      "median": 13814.5654296875
     }
   },
   "schemaVersion": 5

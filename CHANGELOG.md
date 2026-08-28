@@ -22,7 +22,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - `NO_COLOR` and `NODE_DISABLE_COLORS` now suppress colors without suppressing explicit interactive emphasis.
 - ANSI metadata and lazy render snapshots harden nested styling, spinner color validation, and repeated frame rendering.
 - Phase 3 benchmark, reproducibility, SBOM, consumer, and release-policy evidence must be regenerated before publication.
-- The root gzip contract is 10,240 bytes; the single-style tree-shaking budget is 768 bytes.
+- The root gzip contract is 10,496 bytes; the single-style tree-shaking budget is 768 bytes.
 
 ### Security
 

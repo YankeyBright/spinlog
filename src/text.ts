@@ -25,6 +25,9 @@ export type WriteResult =
   | Readonly<{ readonly status: 'backpressured'; readonly accepted: true }>
   | Readonly<{ readonly status: 'failed'; readonly accepted: false }>
 
+/** Called by Node once one accepted write has been handled or failed. */
+export type WriteCallback = (error?: Error | null) => void
+
 interface TerminalWritable extends Writable {
   readonly columns?: number
   readonly isTTY?: boolean
@@ -156,10 +159,35 @@ function isFullWidth(codePoint: number): boolean {
   )
 }
 
-/** Contain synchronous cosmetic write failures and report Node backpressure. */
-export function writeToTarget(target: RenderTarget, value: string): WriteResult {
+/**
+ * Contain synchronous write failures and report Node backpressure.
+ *
+ * A `true` return means only that the stream can accept more data. Permanent
+ * output supplies `onComplete` so its caller can separately await completion.
+ */
+export function writeToTarget(
+  target: RenderTarget,
+  value: string,
+  onComplete?: WriteCallback,
+): WriteResult {
   try {
-    return target.stream.write(value) === false ? BACKPRESSURED : WRITTEN
+    let completed = false
+    const complete =
+      onComplete === undefined
+        ? undefined
+        : (error?: Error | null) => {
+            completed = true
+            onComplete(error)
+          }
+    const accepted = target.stream.write(value, complete) !== false
+
+    // Node Writable implementations accept a completion callback. A
+    // one-argument writable-like target cannot report later completion, so a
+    // successful write is necessarily synchronous for queue accounting.
+    if (accepted && complete !== undefined && !completed && target.stream.write.length < 2) {
+      complete()
+    }
+    return accepted ? WRITTEN : BACKPRESSURED
   } catch {
     return FAILED
   }

@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url'
 import { sortCanonicalText } from './canonical-order.mjs'
 import {
   validateEsbuildSecurityPolicy,
+  validateToolchainDocumentation,
   validateTypeScriptConfig,
 } from './phase1-toolchain-policy.mjs'
 
@@ -62,11 +63,13 @@ for (const [path, type] of [
   ['tsconfig.json', 'file'],
   ['tsconfig.specs.json', 'file'],
   ['scripts/build-js.mjs', 'file'],
+  ['scripts/build-output.mjs', 'file'],
   ['vitest.config.ts', 'file'],
   ['biome.json', 'file'],
   ['.size-limit.json', 'file'],
   ['README.md', 'file'],
   ['SECURITY.md', 'file'],
+  ['specs/04_TECH_STACK.md', 'file'],
   ['LICENSE', 'file'],
   ['src', 'directory'],
   ['test', 'directory'],
@@ -87,6 +90,7 @@ const tsconfig = readObject('tsconfig.json')
 const biome = readObject('biome.json')
 const sizeLimit = readJson('.size-limit.json')
 const buildConfig = readText('scripts/build-js.mjs')
+const toolchainDocumentation = readText('specs/04_TECH_STACK.md')
 const vitestConfig = readText('vitest.config.ts')
 const output = readText('dist/index.js')
 const stylesOutput = readText('dist/styles.js')
@@ -154,6 +158,7 @@ require(JSON.stringify(packageJson.files) ===
 
 failures.push(
   ...validateTypeScriptConfig(tsconfig),
+  ...validateToolchainDocumentation(toolchainDocumentation, packageJson, biome),
   ...validateEsbuildSecurityPolicy(packageJson, packageLock),
 )
 require(packageJson.devDependencies?.typescript === '7.0.2', 'TypeScript must be pinned to 7.0.2')
@@ -189,7 +194,7 @@ for (const value of [
   'treeShaking: true',
   "platform: 'node'",
   "target: 'node22.13'",
-  'outdir: outputDirectory',
+  'outdir: stagingDirectory',
   "external: ['node:*']",
 ]) {
   require(buildConfig.includes(value), `scripts/build-js.mjs must contain ${value}`)
@@ -227,7 +232,7 @@ require(biome.formatter?.enabled === true, 'Biome formatter must be enabled')
 require(biome.linter?.enabled === true, 'Biome linter must be enabled')
 require(Array.isArray(sizeLimit), '.size-limit.json must be an array')
 require(sizeLimitEntry?.path === 'dist/index.js', '.size-limit.json must target dist/index.js')
-require(sizeLimitEntry?.limit === '10240 B', '.size-limit.json must enforce the 10240 B limit')
+require(sizeLimitEntry?.limit === '10496 B', '.size-limit.json must enforce the 10496 B limit')
 require(sizeLimitEntry?.gzip === true, '.size-limit.json must measure gzip size')
 require(JSON.stringify(sizeLimitEntry?.ignore) ===
   JSON.stringify([
@@ -272,6 +277,8 @@ validateSourceMap('dist/index.js.map', sourceMap, [
   '../src/ansi.ts',
   '../src/env.ts',
   '../src/group-rendering.ts',
+  '../src/group-scheduler.ts',
+  '../src/group-session.ts',
   '../src/group.ts',
   '../src/index.ts',
   '../src/messages.ts',

@@ -11,34 +11,19 @@ import {
   selectFrame,
   selectStatus,
 } from '../src/spinner-data.js'
+import { setupTerminalFixture, type TerminalFixture } from './terminal-fixture.js'
 
 describe('custom spinner definitions', () => {
   let write: ReturnType<typeof vi.spyOn>
-  let ttyDescriptor: PropertyDescriptor | undefined
-  let columnsDescriptor: PropertyDescriptor | undefined
+  let terminal: TerminalFixture
 
   beforeEach(() => {
-    vi.useFakeTimers()
-    vi.stubEnv('CI', '')
-    vi.stubEnv('FORCE_COLOR', '0')
-    vi.stubEnv('NODE_ENV', 'production')
-    vi.stubEnv('TERM', 'xterm-256color')
-    vi.stubEnv('WT_SESSION', 'test-session')
-    ttyDescriptor = Object.getOwnPropertyDescriptor(stderr, 'isTTY')
-    columnsDescriptor = Object.getOwnPropertyDescriptor(stderr, 'columns')
-    Object.defineProperty(stderr, 'isTTY', { configurable: true, value: true })
-    Object.defineProperty(stderr, 'columns', { configurable: true, value: 80 })
-    write = vi.spyOn(stderr, 'write').mockImplementation(() => true)
+    terminal = setupTerminalFixture()
+    write = terminal.write
   })
 
   afterEach(() => {
-    vi.useRealTimers()
-    vi.restoreAllMocks()
-    vi.unstubAllEnvs()
-    if (ttyDescriptor) Object.defineProperty(stderr, 'isTTY', ttyDescriptor)
-    else delete (stderr as { isTTY?: boolean }).isTTY
-    if (columnsDescriptor) Object.defineProperty(stderr, 'columns', columnsDescriptor)
-    else delete (stderr as { columns?: number }).columns
+    terminal.restore()
   })
 
   it('copies validated frames and advances at the caller-selected interval', () => {
@@ -61,6 +46,16 @@ describe('custom spinner definitions', () => {
 
     expect(write.mock.calls.map(([value]) => String(value))).toEqual(['A work\n', '\u2714 work\n'])
     expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('sanitizes and freezes caller-defined frames when the definition is accepted', () => {
+    const frames = ['\x1b[31mA\x1b[0m', 'B']
+    const frameSet = createFrameSet({ frames, interval: 16 })
+    frames[0] = 'changed after validation'
+
+    expect(frameSet.frames).toEqual(['A', 'B'])
+    expect(Object.isFrozen(frameSet.frames)).toBe(true)
+    expect(Object.isFrozen(frameSet)).toBe(true)
   })
 
   it('measures every grapheme in a multi-character custom frame', () => {

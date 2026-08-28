@@ -8,7 +8,7 @@ Publish tested, source-controlled guidance for the frozen pre-1.0 0.2 behavior w
 
 - `README.md` documents the callable factory, explicit writable targets, target-local leases, rendering controls, group height policy, progress semantics, promise settlement text, process ownership, package evidence, and verification commands.
 - Canonical runnable files under `examples/` are the source of every README code block. `npm run docs:update` synchronizes them; `npm run docs:check` fails on snippet drift, API claims, measured gzip size, SBOM claims, unsupported Node ranges, or broken relative links.
-- The measured root artifact size is derived from `dist/index.js` with gzip level 9. Documentation may not substitute the 10,240-byte ceiling for the measured value.
+- The measured root artifact size is derived from `dist/index.js` with gzip level 9. Documentation may not substitute the 10,496-byte ceiling for the measured value.
 - Public wording must state that publication is currently blocked, must never imply a completed stable release, SLSA level, or absence of all vulnerabilities, and must reserve any future npm publication for a reviewed policy.
 
 ## Migration

@@ -3,40 +3,23 @@ import { stderr } from 'node:process'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import spinlog, { type Spinner } from '../src/index.js'
+import { setupTerminalFixture, type TerminalFixture } from './terminal-fixture.js'
 
 describe('static policies and coordinated logging', () => {
   let write: ReturnType<typeof vi.spyOn>
-  let ttyDescriptor: PropertyDescriptor | undefined
-  let columnsDescriptor: PropertyDescriptor | undefined
+  let terminal: TerminalFixture
 
   function output(): string[] {
     return write.mock.calls.map(([value]) => String(value))
   }
 
   beforeEach(() => {
-    vi.useFakeTimers()
-    vi.stubEnv('CI', '')
-    vi.stubEnv('FORCE_COLOR', '0')
-    vi.stubEnv('NODE_ENV', 'production')
-    vi.stubEnv('NO_COLOR', '')
-    vi.stubEnv('NODE_DISABLE_COLORS', '')
-    vi.stubEnv('TERM', 'xterm-256color')
-    vi.stubEnv('WT_SESSION', 'test-session')
-    ttyDescriptor = Object.getOwnPropertyDescriptor(stderr, 'isTTY')
-    columnsDescriptor = Object.getOwnPropertyDescriptor(stderr, 'columns')
-    Object.defineProperty(stderr, 'isTTY', { configurable: true, value: true })
-    Object.defineProperty(stderr, 'columns', { configurable: true, value: 80 })
-    write = vi.spyOn(stderr, 'write').mockImplementation(() => true)
+    terminal = setupTerminalFixture()
+    write = terminal.write
   })
 
   afterEach(() => {
-    vi.useRealTimers()
-    vi.restoreAllMocks()
-    vi.unstubAllEnvs()
-    if (ttyDescriptor) Object.defineProperty(stderr, 'isTTY', ttyDescriptor)
-    else delete (stderr as { isTTY?: boolean }).isTTY
-    if (columnsDescriptor) Object.defineProperty(stderr, 'columns', columnsDescriptor)
-    else delete (stderr as { columns?: number }).columns
+    terminal.restore()
   })
 
   it('preserves symbolic output and provides text and silent static policies', () => {

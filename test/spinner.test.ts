@@ -11,6 +11,8 @@ import {
   terminalCellWidth,
   terminalTextWidth,
 } from '../src/text.js'
+import { setupTerminalStreams, type TerminalFixture } from './terminal-fixture.js'
+import { acceptWrite } from './write-callback.js'
 
 const ENV_KEYS = [
   'CI',
@@ -24,9 +26,8 @@ const ENV_KEYS = [
 
 describe('spinner lifecycle and rendering', () => {
   let environment: Record<string, string | undefined>
-  let ttyDescriptor: PropertyDescriptor | undefined
-  let columnsDescriptor: PropertyDescriptor | undefined
   let write: ReturnType<typeof vi.spyOn>
+  let terminal: TerminalFixture
 
   function setTTY(value: boolean) {
     Object.defineProperty(stderr, 'isTTY', { configurable: true, value })
@@ -48,25 +49,18 @@ describe('spinner lifecycle and rendering', () => {
     process.env.FORCE_COLOR = '0'
     process.env.TERM = 'xterm-256color'
     process.env.WT_SESSION = 'test-session'
-    ttyDescriptor = Object.getOwnPropertyDescriptor(stderr, 'isTTY')
-    columnsDescriptor = Object.getOwnPropertyDescriptor(stderr, 'columns')
-    setTTY(true)
-    setColumns(80)
-    write = vi.spyOn(stderr, 'write').mockImplementation(() => true)
+    terminal = setupTerminalStreams()
+    write = terminal.write
   })
 
   afterEach(() => {
     vi.useRealTimers()
-    vi.restoreAllMocks()
+    terminal.restore()
     for (const key of ENV_KEYS) {
       const value = environment[key]
       if (value === undefined) delete process.env[key]
       else process.env[key] = value
     }
-    if (ttyDescriptor) Object.defineProperty(stderr, 'isTTY', ttyDescriptor)
-    else delete (stderr as { isTTY?: boolean }).isTTY
-    if (columnsDescriptor) Object.defineProperty(stderr, 'columns', columnsDescriptor)
-    else delete (stderr as { columns?: number }).columns
   })
 
   it('selects every frozen frame and Unicode fallback', () => {
@@ -418,7 +412,7 @@ describe('spinner lifecycle and rendering', () => {
     expect(vi.getTimerCount()).toBe(0)
     // A false write is accepted by Node; complete its backpressure cycle so
     // this test leaves the shared stderr target idle for the next case.
-    write.mockImplementation(() => true)
+    write.mockImplementation(acceptWrite(write) as never)
     stderr.emit('drain')
   })
 
@@ -437,7 +431,7 @@ describe('spinner lifecycle and rendering', () => {
     expect(vi.getTimerCount()).toBe(0)
     expect(output().at(-1)).toBe('\x1b[?25h')
 
-    write.mockImplementation(() => true)
+    write.mockImplementation(acceptWrite(write) as never)
     write.mockClear()
     spinner.start()
     expect(output()).toEqual(['\x1b[?25l- work'])
@@ -464,7 +458,7 @@ describe('spinner lifecycle and rendering', () => {
 
     spinner.stop()
     expect(vi.getTimerCount()).toBe(0)
-    write.mockImplementation(() => true)
+    write.mockImplementation(acceptWrite(write) as never)
     spinner.start()
     expect(vi.getTimerCount()).toBe(1)
     spinner.stop()
@@ -494,7 +488,7 @@ describe('spinner lifecycle and rendering', () => {
     spinner.start()
     expect(output()).toEqual(['⠋ work\n'])
 
-    write.mockImplementation(() => true)
+    write.mockImplementation(acceptWrite(write) as never)
     spinner.start()
     expect(output().at(-1)).toBe('⠋ work\n')
     write.mockImplementationOnce(() => {

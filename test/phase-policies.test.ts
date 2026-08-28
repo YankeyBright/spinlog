@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest'
 import { AUTHORITATIVE_PHASE_FILES, validatePhaseMap } from '../scripts/check-phase-map.mjs'
 import {
   validateEsbuildSecurityPolicy,
+  validateToolchainDocumentation,
   validateTypeScriptConfig,
 } from '../scripts/phase1-toolchain-policy.mjs'
 import { APPROVED_PACKAGE_FILES, validatePackOutput } from '../scripts/pack-policy.mjs'
@@ -59,6 +60,10 @@ const validPackageLock = {
     'node_modules/vite/node_modules/esbuild': { version: '0.25.12' },
   },
 }
+
+const toolchainDocumentation = readFileSync('specs/04_TECH_STACK.md', 'utf8')
+const toolchainPackageJson = JSON.parse(readFileSync('package.json', 'utf8'))
+const toolchainBiome = JSON.parse(readFileSync('biome.json', 'utf8'))
 
 describe('phase-map policy', () => {
   it('accepts the canonical phase documents', () => {
@@ -153,6 +158,40 @@ describe('Phase 1 esbuild security policy', () => {
       expect.arrayContaining([
         'tsup must not remain after direct esbuild migration',
         'package.json overrides must be absent after direct esbuild migration',
+      ]),
+    )
+  })
+})
+
+describe('Phase 1 toolchain documentation policy', () => {
+  it('accepts documentation and schema aligned with executable toolchain configuration', () => {
+    expect(
+      validateToolchainDocumentation(toolchainDocumentation, toolchainPackageJson, toolchainBiome),
+    ).toEqual([])
+  })
+
+  it('rejects Node support, ANSI implementation, Biome version, and schema drift', () => {
+    const biomeVersion = toolchainPackageJson.devDependencies['@biomejs/biome']
+    const driftedDocumentation = toolchainDocumentation
+      .replace(/Runtime support: [^\r\n]+/u, 'Runtime support: Node.js unsupported.')
+      .replace("Spinlog's internal metadata-driven SGR composer", "Node's built-in `styleText`")
+      .replace(
+        `Biome \`${biomeVersion}\` owns formatting and linting.`,
+        'Biome `unsupported` owns formatting and linting.',
+      )
+    const driftedBiome = {
+      ...toolchainBiome,
+      $schema: toolchainBiome.$schema.replace(biomeVersion, 'unsupported'),
+    }
+
+    expect(
+      validateToolchainDocumentation(driftedDocumentation, toolchainPackageJson, driftedBiome),
+    ).toEqual(
+      expect.arrayContaining([
+        'toolchain documentation must state the manifest-supported Node majors',
+        'toolchain documentation must describe the internal SGR composer and VT sanitization',
+        'toolchain documentation must state the manifest-pinned Biome version',
+        'biome.json schema must match the manifest-pinned Biome version',
       ]),
     )
   })

@@ -2,7 +2,7 @@
 
 ## Language And Runtime
 
-- Runtime support: Node.js 22 and 24 LTS.
+- Runtime support: Node.js 22, 24, and 26.
 - TypeScript: exact pin `7.0.2`.
 - Node declarations: direct exact pin `@types/node@22.20.1`.
 - Compiler: `target: "ES2023"`, `lib: ["ES2023"]`, `module: "Node20"`, `moduleResolution: "Node16"`, and `types: ["node"]`.
@@ -25,13 +25,13 @@
 - 100% statements, branches, functions, and lines globally and per source file.
 - Phase 0 policy tests mutate the machine contract and prove that drift is rejected.
 - Phase 2 behavior tests use fake timers and controlled stderr writes without network access.
-- Phase 2 uses Node's built-in `styleText` and `stripVTControlCharacters` for stable SGR composition and VT removal without adding a runtime dependency.
+- Phase 2 uses Spinlog's internal metadata-driven SGR composer and Node's `stripVTControlCharacters` for deterministic ANSI nesting and VT removal without adding a runtime dependency.
 - API Extractor `7.58.12` compares the frozen and emitted root/styles declarations through tracked semantic API reports; TSDoc wording alone does not create a public signature diff.
 - publint and Are The Types Wrong validate the packed manifest and ESM-only resolution profiles.
 - A clean packed-consumer test covers package-name imports, Node16/NodeNext/Bundler resolution, stderr behavior, and unreferenced timer exit.
 - An in-memory esbuild proof enforces the schema-v8 768-byte single-style tree-shaking budget.
 - Size Limit `13.0.3` independently checks the gzip byte budget with Node built-ins explicitly externalized.
-- Biome `2.5.7` owns formatting and linting.
+- Biome `2.5.8` owns formatting and linting.
 - YAML `2.9.0` parses GitHub Actions structurally for trigger, permission, job, cache, and immutable-action policy checks.
 
 ## Security Tooling

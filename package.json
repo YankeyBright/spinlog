@@ -1,7 +1,7 @@
 {
   "name": "spinlog",
   "version": "0.2.0",
-  "description": "A zero-runtime-dependency, ESM-only terminal feedback library with target-local rendering capped at 10,240 bytes gzipped.",
+  "description": "A zero-runtime-dependency, ESM-only terminal feedback library with target-local rendering capped at 10,496 bytes gzipped.",
   "type": "module",
   "sideEffects": false,
   "exports": {

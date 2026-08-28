@@ -39,6 +39,7 @@ const REQUIRED_README_CLAIMS = Object.freeze([
   '`Math.floor()`',
   '`succeed()` completes the value to 100%',
   '`min(10, stream.rows - 1)`',
+  "intentionally differs from Node's CLI color policy",
   'Exactly eleven files in the npm tarball',
   'zero runtime components',
   'Publication is temporarily blocked',
@@ -164,8 +165,8 @@ function validateDocumentationContract(packageJson, contract, runtimeSbom, failu
   ) {
     failures.push('documentation requires the exact callable default-export methods')
   }
-  if (contract?.schemaVersion !== 13) {
-    failures.push('documentation requires behavior contract schema version 12')
+  if (contract?.schemaVersion !== 14) {
+    failures.push('documentation requires behavior contract schema version 14')
   }
   if (
     JSON.stringify(contract?.environment?.capabilityShape) !==
@@ -195,6 +196,8 @@ function validateDocumentationContract(packageJson, contract, runtimeSbom, failu
   }
   if (
     contract?.rendering?.customFrames?.maximumFrames !== 64 ||
+    contract?.rendering?.customFrames?.sanitization !== 'definition-time' ||
+    contract?.rendering?.customFrames?.snapshot !== 'immutable-sanitized' ||
     contract?.rendering?.groups?.interactiveSurface !== 'one-target-local-lease' ||
     contract?.rendering?.groups?.defaultMaxRows !== 'min(10, target.rows - 1)' ||
     contract?.rendering?.progress?.defaultBarWidth !== 20 ||
@@ -210,6 +213,12 @@ function validateDocumentationContract(packageJson, contract, runtimeSbom, failu
     contract?.rendering?.staticModes?.default !== 'symbol' ||
     contract?.rendering?.log?.activeFrameCoordination !== 'clear-write-redraw-target-local' ||
     contract?.rendering?.writeBackpressure?.cosmeticFrames !== 'coalesce-latest-until-drain' ||
+    contract?.rendering?.writeBackpressure?.permanentWriteCompletion !==
+      'node-write-callback-sequence-watermark' ||
+    contract?.rendering?.writeBackpressure?.flushBoundary !==
+      'accepted-permanent-sequence-watermark' ||
+    contract?.rendering?.writeBackpressure?.targetError !==
+      'pending-output-rejects-flush-stops-lease-clears-queue' ||
     JSON.stringify(contract?.environment?.terminalModes) !==
       JSON.stringify(['auto', 'static', 'interactive'])
   ) {

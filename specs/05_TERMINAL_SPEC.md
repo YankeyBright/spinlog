@@ -19,25 +19,25 @@ Use Select Graphic Rendition sequences in the form `\x1b[<code>m`. Foreground co
 
 SGR, cursor control, color, emphasis, animation, and Unicode are separate named capability decisions. Style helpers read default-stderr capability only, return strings, and never write. On a recognized interactive terminal, explicit `reset`, `bold`, `dim`, `italic`, `underline`, and `strikethrough` remain available when color is disabled.
 
-User-controlled `text`, `prefix`, `suffix`, terminal text overrides, custom frames, group child fields, progress text, flow messages, and logs are sanitized only when rendered. Node’s `stripVTControlCharacters` is applied, remaining C0/C1, bidi, and line-separator controls are replaced with spaces, and segment boundaries are trimmed. Assigned values remain unchanged. An immutable sanitized snapshot and grapheme-aware terminal-cell width are created lazily at the rendering boundary and are invalidated only by text, prefix, or suffix mutation.
+User-controlled `text`, `prefix`, `suffix`, terminal text overrides, group child fields, progress text, flow messages, and logs are sanitized only when rendered. Node’s `stripVTControlCharacters` is applied, remaining C0/C1, bidi, and line-separator controls are replaced with spaces, and segment boundaries are trimmed. Assigned values remain unchanged. An immutable sanitized snapshot and grapheme-aware terminal-cell width are created lazily at the rendering boundary and are invalidated only by text, prefix, or suffix mutation. Caller-defined custom frames are the explicit exception: they are sanitized, validated for visibility, and frozen when the definition is accepted.
 
 Combining marks and formatting code points consume no independent cell, ordinary and ambiguous-width graphemes consume one, and East Asian wide/full-width or emoji grapheme clusters consume two. Multi-code-point and multi-character custom frames are measured in full.
 
 ## Built-ins and render controls
 
-The default dots frames are `\u280b`, `\u2819`, `\u2839`, `\u2838`, `\u283c`, `\u2834`, `\u2826`, `\u2827`, `\u2807`, and `\u280f`; line frames are `-`, `\\`, `|`, and `/`. A caller-defined spinner snapshots one to 64 visible sanitized frames at 16–60,000ms. One-frame definitions are static and create no timer.
+The default dots frames are `\u280b`, `\u2819`, `\u2839`, `\u2838`, `\u283c`, `\u2834`, `\u2826`, `\u2827`, `\u2807`, and `\u280f`; line frames are `-`, `\\`, `|`, and `/`. A caller-defined spinner snapshots one to 64 visible definition-time-sanitized frames at 16–60,000ms. One-frame definitions are static and create no timer.
 
-Status symbols are `\u2714`, `\u2716`, `\u26a0`, and `\u2139`, with ASCII fallbacks `+`, `x`, `!`, and `i`. Frame color applies only to active symbols and status color only to status symbols. `color: false` disables every automatic color for that surface. `unicode: false` forces ASCII built-ins and progress bars, while custom frames remain caller-supplied sanitized text. `hideCursor: false` suppresses cursor hide/show escapes. `indent` is a safe integer from 0 through 40 and prefixes every generated line.
+Status symbols are `\u2714`, `\u2716`, `\u26a0`, and `\u2139`, with ASCII fallbacks `+`, `x`, `!`, and `i`. Frame color applies only to active symbols and status color only to status symbols. `color: false` disables every automatic color for that surface. `unicode: false` forces ASCII built-ins and progress bars, while custom frames remain caller-supplied definition-time-sanitized snapshots. `hideCursor: false` suppresses cursor hide/show escapes. `indent` is a safe integer from 0 through 40 and prefixes every generated line.
 
 ## Interactive, static, and capability policy
 
 Interactive rendering writes its first frame synchronously and uses unreferenced timers. Automatic animation requires a target TTY, usable target width, and a conservative recognized terminal profile. `terminal: 'interactive'` is an informed override for a non-dumb TTY but never enables color itself. `terminal: 'static'` disables animation and cursor control.
 
-Precedence is highest to lowest:
+Spinlog intentionally preserves a v1 color-environment compatibility policy that differs from [Node's CLI color policy](https://nodejs.org/api/cli.html#force_color1-2-3). Precedence is highest to lowest:
 
 1. A non-empty `NO_COLOR` disables automatic foreground/background color.
 2. A non-empty `NODE_DISABLE_COLORS` disables automatic foreground/background color.
-3. `FORCE_COLOR=0` or `FORCE_COLOR=false` disables color; any other defined value enables ANSI-16 color.
+3. `FORCE_COLOR=0` or `FORCE_COLOR=false` disables color; any other defined value, including an empty or Node-unsupported value, enables ANSI-16 color and emphasis.
 4. Otherwise CI, `TERM=dumb`, `NODE_ENV=test`, non-TTY targets, unknown profiles, and empty `TERM` conservatively disable automatic features.
 
 Known automatic cursor profiles are `xterm`, `screen`, `tmux`, `rxvt`, `linux`, `cygwin`, `st`, `alacritty`, `kitty`, `wezterm`, `foot`, `konsole`, `vte`, `eterm`, and `putty`, matched as an ASCII-lowercase exact name or dash suffix. `vt100` and `vt220` are static by default. Windows Unicode auto-detection requires `WT_SESSION`.
@@ -54,6 +54,6 @@ Progress is a timer-free single-row surface. `total` is a positive safe integer 
 
 ## Writes and recovery
 
-Write outcomes are `written`, `backpressured`, or `failed`. Permanent lines write in call order. A ready target attempts its first permanent write immediately, regardless of its size. Once backpressured or re-entrant, Spinlog caps pending permanent output at 64 tasks or 64 KiB and coalesces only the latest cosmetic frame. Temporary `drain`, `finish`, and `close` listeners remain even when an interactive lease ends. `drain` resumes queued output; normal `finish` resolves a flush only when no unwritten permanent task remains; premature `finish` or `close` rejects it. Every completion path removes all temporary listeners, and no unbounded library-owned queue is created.
+Write outcomes are `written`, `backpressured`, or `failed`. Permanent lines write in call order. Each accepted permanent write receives a monotonic sequence and completes only when Node invokes its write callback; `flush()` snapshots that sequence watermark, so later writes do not extend it. A ready target attempts its first permanent write immediately, regardless of its size. Once backpressured or re-entrant, Spinlog caps pending permanent output at 64 tasks or 64 KiB and coalesces only the latest cosmetic frame. Temporary `drain`, `finish`, `close`, and `error` listeners remain even when an interactive lease ends. `drain` resumes queued output; normal `finish` resolves a flush only when no unwritten permanent task remains; premature `finish`, `close`, or a target `error` rejects it. Every completion path removes all temporary listeners, and no unbounded library-owned queue is created.
 
-A synchronous write failure stops only the affected target surface, clears its timer, and restores a cursor it owns. Terminal state and promise settlement remain logical outcomes. Cleanup failures are suppressed; asynchronous stream errors remain host-owned.
+A synchronous write failure stops only the affected target surface, clears its timer, and restores a cursor it owns. Terminal state and promise settlement remain logical outcomes. Cleanup failures are suppressed. Asynchronous stream errors remain host-owned when Spinlog has no pending output; while it does, Spinlog rejects affected flushes with `SpinlogTargetError`, preserves the original error as its cause, and clears only target-local work.
