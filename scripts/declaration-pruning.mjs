@@ -1,3 +1,5 @@
+import { compareCanonicalText } from './canonical-order.mjs'
+
 /** Replace a root style re-export with the frozen, structurally equivalent declarations. */
 export function inlineRootStyleDeclarations(declaration, styleExports) {
   const reexport = /export \{\s*([\s\S]*?)\s*\} from '\.\/styles\.js';?\r?\n?/g
@@ -13,7 +15,8 @@ export function inlineRootStyleDeclarations(declaration, styleExports) {
     .filter(Boolean)
   const expectedNames = [...styleExports]
   if (
-    JSON.stringify(exportedNames.toSorted()) !== JSON.stringify(expectedNames.toSorted()) ||
+    JSON.stringify(exportedNames.toSorted(compareCanonicalText)) !==
+      JSON.stringify(expectedNames.toSorted(compareCanonicalText)) ||
     new Set(exportedNames).size !== exportedNames.length
   ) {
     throw new Error('root styles re-export must match the frozen public style catalog')

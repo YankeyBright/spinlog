@@ -259,8 +259,9 @@ function requirePromiseLike<T>(candidate: unknown): Promise<T> {
   // Let the native Promise resolution procedure schedule thenable invocation.
   // The wrapper keeps the validated `then` and its original receiver intact.
   return Promise.resolve({
+    // Node's Promise resolution assimilates this thenable asynchronously with its original receiver.
     // biome-ignore lint/suspicious/noThenProperty: Promise resolution requires this deliberate thenable.
-    then(resolve, reject) {
+    then /* NOSONAR: Deliberate thenable required for Promise assimilation. */(resolve, reject) {
       Reflect.apply(then, candidate, [resolve, reject])
     },
   })
