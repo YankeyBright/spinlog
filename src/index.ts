@@ -235,8 +235,7 @@ const promise: Spinlog['promise'] = async <T>(
   const failText = requirePromiseSettlementText<unknown>(safeOptions.failText, 'failText')
   const spinner = factory(safeOptions.text, safeOptions).start()
   try {
-    const candidate = typeof input === 'function' ? input() : input
-    const value = await requirePromiseLike<T>(candidate)
+    const value = await normalizePromiseInput(input)
     spinner.succeed(resolvePromiseSettlementText(successText, value, 'successText'))
     return value
   } catch (error) {
@@ -245,13 +244,23 @@ const promise: Spinlog['promise'] = async <T>(
   }
 }
 
-function requirePromiseLike<T>(candidate: unknown): Promise<T> {
+function normalizePromiseInput<T>(input: PromiseLike<T> | (() => PromiseLike<T>)): Promise<T> {
+  if (typeof input !== 'function') return requirePromiseLike<T>(input)
+
+  // A callable thenable is direct input, not a task. Read `then` once before
+  // deciding whether to invoke an ordinary function.
+  const then = (input as { then?: unknown }).then
+  if (typeof then === 'function') return requirePromiseLike<T>(input, then)
+  return requirePromiseLike<T>(input())
+}
+
+function requirePromiseLike<T>(candidate: unknown, observedThen?: unknown): Promise<T> {
   if (candidate === null || (typeof candidate !== 'object' && typeof candidate !== 'function')) {
     throw new TypeError('input must be a PromiseLike or a task returning one')
   }
 
   // Read `then` once after the spinner starts, then assimilate it with the original receiver.
-  const then = (candidate as { then?: unknown }).then
+  const then = observedThen ?? (candidate as { then?: unknown }).then
   if (typeof then !== 'function') {
     throw new TypeError('input must be a PromiseLike or a task returning one')
   }

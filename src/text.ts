@@ -171,7 +171,23 @@ export function writeToTarget(
   onComplete?: WriteCallback,
 ): WriteResult {
   try {
-    return target.stream.write(value, onComplete) === false ? BACKPRESSURED : WRITTEN
+    let completed = false
+    const complete =
+      onComplete === undefined
+        ? undefined
+        : (error?: Error | null) => {
+            completed = true
+            onComplete(error)
+          }
+    const accepted = target.stream.write(value, complete) !== false
+
+    // Node Writable implementations accept a completion callback. A
+    // one-argument writable-like target cannot report later completion, so a
+    // successful write is necessarily synchronous for queue accounting.
+    if (accepted && complete !== undefined && !completed && target.stream.write.length < 2) {
+      complete()
+    }
+    return accepted ? WRITTEN : BACKPRESSURED
   } catch {
     return FAILED
   }

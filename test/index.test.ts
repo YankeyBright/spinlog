@@ -278,6 +278,42 @@ describe('promise wrapper', () => {
     expect(write).toHaveBeenLastCalledWith('p ✔ task\n')
   })
 
+  it('assimilates callable thenables directly without invoking them as tasks', async () => {
+    let thenReads = 0
+    const callableThenable = vi.fn(() => {
+      throw new Error('callable thenable must not be invoked as a task')
+    })
+    Object.defineProperty(callableThenable, 'then', {
+      configurable: true,
+      get() {
+        thenReads += 1
+        return (resolve: (value: string) => void) => resolve('resolved directly')
+      },
+    })
+
+    await expect(
+      spinlog.promise(callableThenable as unknown as PromiseLike<string>, { text: 'callable' }),
+    ).resolves.toBe('resolved directly')
+    expect(callableThenable).not.toHaveBeenCalled()
+    expect(thenReads).toBe(1)
+
+    const reason = new Error('callable thenable rejected')
+    const rejectingThenable = vi.fn(() => {
+      throw new Error('rejecting callable thenable must not be invoked as a task')
+    })
+    Object.defineProperty(rejectingThenable, 'then', {
+      configurable: true,
+      value: (_resolve: (value: never) => void, reject: (error: Error) => void) => reject(reason),
+    })
+
+    await expect(
+      spinlog.promise(rejectingThenable as unknown as PromiseLike<never>, {
+        text: 'rejecting callable',
+      }),
+    ).rejects.toBe(reason)
+    expect(rejectingThenable).not.toHaveBeenCalled()
+  })
+
   it('accepts a callable thenable returned by a task', async () => {
     const then = vi.fn((resolve: (value: string) => void) => resolve('callable result'))
     const callableThenable = Object.defineProperty(() => undefined, 'then', {

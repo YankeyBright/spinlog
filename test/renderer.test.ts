@@ -482,6 +482,15 @@ describe('interactive terminal lease', () => {
     expect(stream.listenerCount('error')).toBe(0)
   })
 
+  it('settles callback-less synchronous writable-like targets after an accepted write', async () => {
+    const write = vi.fn((_value: string) => true)
+    const target = resolveRenderTarget({ write } as unknown as Writable)
+
+    expect(writeTarget(target, 'accepted\n')).toBe(true)
+    await expect(flushTarget(target)).resolves.toBeUndefined()
+    expect(write).toHaveBeenCalledOnce()
+  })
+
   it('settles a flush watermark without waiting for permanent output accepted afterward', async () => {
     const callbacks: Array<() => void> = []
     const stream = new Writable({
