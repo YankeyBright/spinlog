@@ -1,16 +1,15 @@
-import { stderr, stdout } from 'node:process'
+import { stderr } from 'node:process'
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import spinlog, { type SpinnerGroup } from '../src/index.js'
+import { setupTerminalFixture, type TerminalFixture } from './terminal-fixture.js'
 import { acceptWrite } from './write-callback.js'
 
 describe('spinner groups', () => {
   let write: ReturnType<typeof vi.spyOn>
   let stdoutWrite: ReturnType<typeof vi.spyOn>
-  let ttyDescriptor: PropertyDescriptor | undefined
-  let columnsDescriptor: PropertyDescriptor | undefined
-  let rowsDescriptor: PropertyDescriptor | undefined
+  let terminal: TerminalFixture
   let groups: SpinnerGroup[]
 
   function output(): string[] {
@@ -18,36 +17,15 @@ describe('spinner groups', () => {
   }
 
   beforeEach(() => {
-    vi.useFakeTimers()
-    vi.stubEnv('CI', '')
-    vi.stubEnv('FORCE_COLOR', '0')
-    vi.stubEnv('NODE_ENV', 'production')
-    vi.stubEnv('TERM', 'xterm-256color')
-    vi.stubEnv('WT_SESSION', 'test-session')
-    ttyDescriptor = Object.getOwnPropertyDescriptor(stderr, 'isTTY')
-    columnsDescriptor = Object.getOwnPropertyDescriptor(stderr, 'columns')
-    rowsDescriptor = Object.getOwnPropertyDescriptor(stderr, 'rows')
-    Object.defineProperty(stderr, 'isTTY', { configurable: true, value: true })
-    Object.defineProperty(stderr, 'columns', { configurable: true, value: 80 })
-    Object.defineProperty(stderr, 'rows', { configurable: true, value: 24 })
-    write = vi.spyOn(stderr, 'write')
-    write.mockImplementation(acceptWrite(write) as never)
-    stdoutWrite = vi.spyOn(stdout, 'write')
-    stdoutWrite.mockImplementation(acceptWrite(stdoutWrite) as never)
+    terminal = setupTerminalFixture({ captureStdout: true, rows: 24 })
+    write = terminal.write
+    stdoutWrite = terminal.stdoutWrite as ReturnType<typeof vi.spyOn>
     groups = []
   })
 
   afterEach(() => {
     for (const group of groups) group.stop()
-    vi.useRealTimers()
-    vi.restoreAllMocks()
-    vi.unstubAllEnvs()
-    if (ttyDescriptor) Object.defineProperty(stderr, 'isTTY', ttyDescriptor)
-    else delete (stderr as { isTTY?: boolean }).isTTY
-    if (columnsDescriptor) Object.defineProperty(stderr, 'columns', columnsDescriptor)
-    else delete (stderr as { columns?: number }).columns
-    if (rowsDescriptor) Object.defineProperty(stderr, 'rows', rowsDescriptor)
-    else delete (stderr as { rows?: number }).rows
+    terminal.restore()
   })
 
   function createGroup(...args: Parameters<typeof spinlog.group>): SpinnerGroup {

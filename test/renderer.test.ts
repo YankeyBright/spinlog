@@ -34,6 +34,11 @@ function createTarget(write: (value: string) => boolean) {
   return resolveRenderTarget(stream as unknown as Writable)
 }
 
+function createWritableTarget() {
+  const write = vi.fn(() => true)
+  return { write, target: createTarget(write) }
+}
+
 describe('interactive terminal lease', () => {
   const owners: Array<readonly [RenderTarget, InteractiveLease]> = []
 
@@ -43,8 +48,7 @@ describe('interactive terminal lease', () => {
   })
 
   it('permits one owner and redraws it after coordinated permanent output', () => {
-    const write = vi.fn(() => true)
-    const target = createTarget(write)
+    const { write, target } = createWritableTarget()
     const first = lease()
     const second = lease('- secondary')
     owners.push([target, first], [target, second])
@@ -66,8 +70,7 @@ describe('interactive terminal lease', () => {
   })
 
   it('passes a non-owner frame through without taking the active surface', () => {
-    const write = vi.fn(() => true)
-    const target = createTarget(write)
+    const { write, target } = createWritableTarget()
     const owner = lease()
     const nonOwner = lease('- fallback')
     owners.push([target, owner], [target, nonOwner])
@@ -80,8 +83,7 @@ describe('interactive terminal lease', () => {
   })
 
   it('preflights owned frames and records an accepted physical frame', () => {
-    const write = vi.fn(() => true)
-    const target = createTarget(write)
+    const { write, target } = createWritableTarget()
     const prepareFrame = vi.fn(() => true)
     const didWriteFrame = vi.fn()
     const owner = lease('- active', { didWriteFrame, prepareFrame })
@@ -100,8 +102,7 @@ describe('interactive terminal lease', () => {
   })
 
   it('writes a direct permanent line when preflight rejects without releasing the lease', () => {
-    const write = vi.fn(() => true)
-    const target = createTarget(write)
+    const { write, target } = createWritableTarget()
     const owner = lease('- active', { prepareFrame: () => false })
     owners.push([target, owner])
 
@@ -111,8 +112,7 @@ describe('interactive terminal lease', () => {
   })
 
   it('writes a direct permanent line when preflight releases its lease', () => {
-    const write = vi.fn(() => true)
-    const target = createTarget(write)
+    const { write, target } = createWritableTarget()
     let owner: InteractiveLease
     owner = lease('- active', {
       prepareFrame: () => {
@@ -128,8 +128,7 @@ describe('interactive terminal lease', () => {
   })
 
   it('contains a frame-reconstruction exception while preserving the permanent line', () => {
-    const write = vi.fn(() => true)
-    const target = createTarget(write)
+    const { write, target } = createWritableTarget()
     const owner = lease('- active', {
       currentFrame: () => {
         throw new Error('frame unavailable')
@@ -144,8 +143,7 @@ describe('interactive terminal lease', () => {
   })
 
   it('preserves a permanent line when failed frame reconstruction already released its lease', () => {
-    const write = vi.fn(() => true)
-    const target = createTarget(write)
+    const { write, target } = createWritableTarget()
     let owner: InteractiveLease
     owner = lease('- active', {
       currentFrame: () => {
@@ -161,8 +159,7 @@ describe('interactive terminal lease', () => {
   })
 
   it('drops an outdated cosmetic frame when preflight demotes and writes a direct line', () => {
-    const write = vi.fn(() => true)
-    const target = createTarget(write)
+    const { write, target } = createWritableTarget()
     const currentFrame = vi.fn(() => '- active')
     let owner: InteractiveLease
     const prepareFrame = vi.fn(() => {
@@ -184,8 +181,7 @@ describe('interactive terminal lease', () => {
   })
 
   it('writes a permanent line directly when frame reconstruction releases its lease', () => {
-    const write = vi.fn(() => true)
-    const target = createTarget(write)
+    const { write, target } = createWritableTarget()
     let owner: InteractiveLease
     owner = {
       currentFrame: () => {
@@ -302,8 +298,7 @@ describe('interactive terminal lease', () => {
   })
 
   it('contains geometry and frame-notification hook failures', () => {
-    const write = vi.fn(() => true)
-    const target = createTarget(write)
+    const { write, target } = createWritableTarget()
     const preflightFailure = lease('- active', {
       prepareFrame: () => {
         throw new Error('geometry unavailable')
@@ -451,8 +446,7 @@ describe('interactive terminal lease', () => {
   })
 
   it('writes a permanent task larger than the backlog byte limit when the target is ready', async () => {
-    const write = vi.fn(() => true)
-    const target = createTarget(write)
+    const { write, target } = createWritableTarget()
     const output = 'x'.repeat(64 * 1024 + 1)
 
     expect(writeTarget(target, output)).toBe(true)
@@ -754,8 +748,7 @@ describe('interactive terminal lease', () => {
   })
 
   it('resolves flush immediately for a live target without queued permanent output', async () => {
-    const write = vi.fn(() => true)
-    const target = createTarget(write)
+    const { target } = createWritableTarget()
     const owner = lease()
     owners.push([target, owner])
 
@@ -764,8 +757,7 @@ describe('interactive terminal lease', () => {
   })
 
   it('settles an internal permanent task that deliberately renders no output', async () => {
-    const write = vi.fn(() => true)
-    const target = createTarget(write)
+    const { write, target } = createWritableTarget()
 
     expect(
       enqueuePermanentTask(targetState(target), {

@@ -11,36 +11,19 @@ import {
   selectFrame,
   selectStatus,
 } from '../src/spinner-data.js'
-import { acceptWrite } from './write-callback.js'
+import { setupTerminalFixture, type TerminalFixture } from './terminal-fixture.js'
 
 describe('custom spinner definitions', () => {
   let write: ReturnType<typeof vi.spyOn>
-  let ttyDescriptor: PropertyDescriptor | undefined
-  let columnsDescriptor: PropertyDescriptor | undefined
+  let terminal: TerminalFixture
 
   beforeEach(() => {
-    vi.useFakeTimers()
-    vi.stubEnv('CI', '')
-    vi.stubEnv('FORCE_COLOR', '0')
-    vi.stubEnv('NODE_ENV', 'production')
-    vi.stubEnv('TERM', 'xterm-256color')
-    vi.stubEnv('WT_SESSION', 'test-session')
-    ttyDescriptor = Object.getOwnPropertyDescriptor(stderr, 'isTTY')
-    columnsDescriptor = Object.getOwnPropertyDescriptor(stderr, 'columns')
-    Object.defineProperty(stderr, 'isTTY', { configurable: true, value: true })
-    Object.defineProperty(stderr, 'columns', { configurable: true, value: 80 })
-    write = vi.spyOn(stderr, 'write')
-    write.mockImplementation(acceptWrite(write) as never)
+    terminal = setupTerminalFixture()
+    write = terminal.write
   })
 
   afterEach(() => {
-    vi.useRealTimers()
-    vi.restoreAllMocks()
-    vi.unstubAllEnvs()
-    if (ttyDescriptor) Object.defineProperty(stderr, 'isTTY', ttyDescriptor)
-    else delete (stderr as { isTTY?: boolean }).isTTY
-    if (columnsDescriptor) Object.defineProperty(stderr, 'columns', columnsDescriptor)
-    else delete (stderr as { columns?: number }).columns
+    terminal.restore()
   })
 
   it('copies validated frames and advances at the caller-selected interval', () => {

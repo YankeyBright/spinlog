@@ -11,6 +11,7 @@ import {
   terminalCellWidth,
   terminalTextWidth,
 } from '../src/text.js'
+import { setupTerminalStreams, type TerminalFixture } from './terminal-fixture.js'
 import { acceptWrite } from './write-callback.js'
 
 const ENV_KEYS = [
@@ -25,9 +26,8 @@ const ENV_KEYS = [
 
 describe('spinner lifecycle and rendering', () => {
   let environment: Record<string, string | undefined>
-  let ttyDescriptor: PropertyDescriptor | undefined
-  let columnsDescriptor: PropertyDescriptor | undefined
   let write: ReturnType<typeof vi.spyOn>
+  let terminal: TerminalFixture
 
   function setTTY(value: boolean) {
     Object.defineProperty(stderr, 'isTTY', { configurable: true, value })
@@ -49,26 +49,18 @@ describe('spinner lifecycle and rendering', () => {
     process.env.FORCE_COLOR = '0'
     process.env.TERM = 'xterm-256color'
     process.env.WT_SESSION = 'test-session'
-    ttyDescriptor = Object.getOwnPropertyDescriptor(stderr, 'isTTY')
-    columnsDescriptor = Object.getOwnPropertyDescriptor(stderr, 'columns')
-    setTTY(true)
-    setColumns(80)
-    write = vi.spyOn(stderr, 'write')
-    write.mockImplementation(acceptWrite(write) as never)
+    terminal = setupTerminalStreams()
+    write = terminal.write
   })
 
   afterEach(() => {
     vi.useRealTimers()
-    vi.restoreAllMocks()
+    terminal.restore()
     for (const key of ENV_KEYS) {
       const value = environment[key]
       if (value === undefined) delete process.env[key]
       else process.env[key] = value
     }
-    if (ttyDescriptor) Object.defineProperty(stderr, 'isTTY', ttyDescriptor)
-    else delete (stderr as { isTTY?: boolean }).isTTY
-    if (columnsDescriptor) Object.defineProperty(stderr, 'columns', columnsDescriptor)
-    else delete (stderr as { columns?: number }).columns
   })
 
   it('selects every frozen frame and Unicode fallback', () => {

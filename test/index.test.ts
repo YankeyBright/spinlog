@@ -1,11 +1,11 @@
-import { stderr, stdout } from 'node:process'
+import { stderr } from 'node:process'
 
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 
 import { sortCanonicalText } from '../scripts/canonical-order.mjs'
 import spinlog, * as moduleExports from '../src/index.js'
 import type { Spinner } from '../src/index.js'
-import { acceptWrite } from './write-callback.js'
+import { setupTerminalFixture, type TerminalFixture } from './terminal-fixture.js'
 
 const STYLE_EXPORTS = [
   'reset',
@@ -87,34 +87,17 @@ describe('public runtime surface', () => {
 describe('intro and outro flow messages', () => {
   let write: ReturnType<typeof vi.spyOn>
   let stdoutWrite: ReturnType<typeof vi.spyOn>
-  let ttyDescriptor: PropertyDescriptor | undefined
-  let columnsDescriptor: PropertyDescriptor | undefined
+  let terminal: TerminalFixture
 
   beforeEach(() => {
-    vi.useFakeTimers()
-    vi.stubEnv('NODE_ENV', 'production')
+    terminal = setupTerminalFixture({ captureStdout: true })
     vi.stubEnv('CI', '1')
-    vi.stubEnv('FORCE_COLOR', '0')
-    vi.stubEnv('WT_SESSION', 'test-session')
-    vi.stubEnv('TERM', 'xterm-256color')
-    ttyDescriptor = Object.getOwnPropertyDescriptor(stderr, 'isTTY')
-    columnsDescriptor = Object.getOwnPropertyDescriptor(stderr, 'columns')
-    Object.defineProperty(stderr, 'isTTY', { configurable: true, value: true })
-    Object.defineProperty(stderr, 'columns', { configurable: true, value: 80 })
-    write = vi.spyOn(stderr, 'write')
-    write.mockImplementation(acceptWrite(write) as never)
-    stdoutWrite = vi.spyOn(stdout, 'write')
-    stdoutWrite.mockImplementation(acceptWrite(stdoutWrite) as never)
+    write = terminal.write
+    stdoutWrite = terminal.stdoutWrite as ReturnType<typeof vi.spyOn>
   })
 
   afterEach(() => {
-    vi.useRealTimers()
-    vi.restoreAllMocks()
-    vi.unstubAllEnvs()
-    if (ttyDescriptor) Object.defineProperty(stderr, 'isTTY', ttyDescriptor)
-    else delete (stderr as { isTTY?: boolean }).isTTY
-    if (columnsDescriptor) Object.defineProperty(stderr, 'columns', columnsDescriptor)
-    else delete (stderr as { columns?: number }).columns
+    terminal.restore()
   })
 
   it('writes Unicode, empty, and repeated messages exactly once per call', () => {
@@ -222,21 +205,17 @@ describe('intro and outro flow messages', () => {
 describe('promise wrapper', () => {
   let write: ReturnType<typeof vi.spyOn>
   let stdoutWrite: ReturnType<typeof vi.spyOn>
+  let terminal: TerminalFixture
 
   beforeEach(() => {
-    vi.stubEnv('NODE_ENV', 'production')
+    terminal = setupTerminalFixture({ captureStdout: true })
     vi.stubEnv('CI', '1')
-    vi.stubEnv('FORCE_COLOR', '0')
-    vi.stubEnv('WT_SESSION', 'test-session')
-    write = vi.spyOn(stderr, 'write')
-    write.mockImplementation(acceptWrite(write) as never)
-    stdoutWrite = vi.spyOn(stdout, 'write')
-    stdoutWrite.mockImplementation(acceptWrite(stdoutWrite) as never)
+    write = terminal.write
+    stdoutWrite = terminal.stdoutWrite as ReturnType<typeof vi.spyOn>
   })
 
   afterEach(() => {
-    vi.restoreAllMocks()
-    vi.unstubAllEnvs()
+    terminal.restore()
   })
 
   it('starts before observing and assimilating a direct thenable exactly once', async () => {

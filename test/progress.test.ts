@@ -1,16 +1,16 @@
-import { stderr, stdout } from 'node:process'
+import { stderr } from 'node:process'
 import { PassThrough } from 'node:stream'
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import spinlog from '../src/index.js'
+import { setupTerminalFixture, type TerminalFixture } from './terminal-fixture.js'
 import { acceptWrite } from './write-callback.js'
 
 describe('progress indicators', () => {
   let write: ReturnType<typeof vi.spyOn>
   let stdoutWrite: ReturnType<typeof vi.spyOn>
-  let ttyDescriptor: PropertyDescriptor | undefined
-  let columnsDescriptor: PropertyDescriptor | undefined
+  let terminal: TerminalFixture
 
   function output(): string[] {
     return write.mock.calls.map(([value]) => String(value))
@@ -24,28 +24,13 @@ describe('progress indicators', () => {
   }
 
   beforeEach(() => {
-    vi.stubEnv('CI', '')
-    vi.stubEnv('FORCE_COLOR', '0')
-    vi.stubEnv('NODE_ENV', 'production')
-    vi.stubEnv('TERM', 'xterm-256color')
-    vi.stubEnv('WT_SESSION', 'test-session')
-    ttyDescriptor = Object.getOwnPropertyDescriptor(stderr, 'isTTY')
-    columnsDescriptor = Object.getOwnPropertyDescriptor(stderr, 'columns')
-    Object.defineProperty(stderr, 'isTTY', { configurable: true, value: true })
-    Object.defineProperty(stderr, 'columns', { configurable: true, value: 80 })
-    write = vi.spyOn(stderr, 'write')
-    write.mockImplementation(acceptWrite(write) as never)
-    stdoutWrite = vi.spyOn(stdout, 'write')
-    stdoutWrite.mockImplementation(acceptWrite(stdoutWrite) as never)
+    terminal = setupTerminalFixture({ captureStdout: true })
+    write = terminal.write
+    stdoutWrite = terminal.stdoutWrite as ReturnType<typeof vi.spyOn>
   })
 
   afterEach(() => {
-    vi.restoreAllMocks()
-    vi.unstubAllEnvs()
-    if (ttyDescriptor) Object.defineProperty(stderr, 'isTTY', ttyDescriptor)
-    else delete (stderr as { isTTY?: boolean }).isTTY
-    if (columnsDescriptor) Object.defineProperty(stderr, 'columns', columnsDescriptor)
-    else delete (stderr as { columns?: number }).columns
+    terminal.restore()
   })
 
   it('renders, updates, logs, and settles a determinate interactive line', () => {
