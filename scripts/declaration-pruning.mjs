@@ -2,7 +2,7 @@ import { compareCanonicalText } from './canonical-order.mjs'
 
 /** Replace a root style re-export with the frozen, structurally equivalent declarations. */
 export function inlineRootStyleDeclarations(declaration, styleExports) {
-  const reexport = /export \{\s*([\s\S]*?)\s*\} from '\.\/styles\.js';?\r?\n?/g
+  const reexport = /export \{([^}]*)\} from '\.\/styles\.js';?\r?\n?/g
   const matches = [...declaration.matchAll(reexport)]
   if (matches.length !== 1) {
     throw new Error('dist/index.d.ts must contain one root styles re-export')
