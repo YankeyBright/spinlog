@@ -215,7 +215,7 @@ See [MIGRATION.md](MIGRATION.md) for migration from 0.1.x, Chalk, Ora, and Clack
 - Zero runtime, optional, and peer dependencies.
 - No npm lifecycle scripts.
 - Exactly eleven files in the npm tarball.
-- `dist/index.js` currently measures 10,430 bytes using gzip level 9, below the 10,496-byte hard ceiling.
+- `dist/index.js` currently measures 10,490 bytes using gzip level 9, below the 10,496-byte hard ceiling.
 - A one-style `spinlog/styles` consumer remains constrained by a 768-byte tree-shaking ceiling.
 - A canonical CycloneDX 1.5 runtime SBOM with zero runtime components is included in the tarball.
 - Publication is temporarily blocked pending refreshed runtime, terminal, package, SBOM, benchmark, and documentation evidence for the `0.2.0` pre-1.0 contract.
