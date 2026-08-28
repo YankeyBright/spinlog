@@ -2,6 +2,18 @@ const ESBUILD_VERSION = '0.28.2'
 const AFFECTED_ESBUILD_MINIMUM = [0, 27, 3]
 const PATCHED_ESBUILD_MINIMUM = [0, 28, 1]
 
+function humanList(values) {
+  if (values.length === 0) return ''
+  if (values.length === 1) return values[0]
+  if (values.length === 2) return values.join(' and ')
+  return `${values.slice(0, -1).join(', ')}, and ${values.at(-1)}`
+}
+
+function supportedNodeMajors(engine) {
+  if (typeof engine !== 'string') return []
+  return [...engine.matchAll(/\^(\d+)\.\d+\.\d+/gu)].map((match) => match[1])
+}
+
 function parseVersion(version) {
   const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(version)
   return match?.slice(1).map(Number)
@@ -64,6 +76,45 @@ export function validateTypeScriptConfig(tsconfig) {
   }
   if (JSON.stringify(compilerOptions?.types) !== JSON.stringify(['node'])) {
     failures.push('tsconfig types must explicitly include only node')
+  }
+
+  return failures
+}
+
+/** Keep the human-maintained toolchain specification aligned with executable configuration. */
+export function validateToolchainDocumentation(document, packageJson, biome) {
+  const failures = []
+  const dependencies = packageJson?.devDependencies ?? {}
+  const nodeMajors = supportedNodeMajors(packageJson?.engines?.node)
+  const biomeVersion = dependencies['@biomejs/biome']
+  const expectedSchema =
+    typeof biomeVersion === 'string'
+      ? `https://biomejs.dev/schemas/${biomeVersion}/schema.json`
+      : undefined
+
+  if (typeof document !== 'string') return ['specs/04_TECH_STACK.md must be readable text']
+
+  const expectedRuntime = `Runtime support: Node.js ${humanList(nodeMajors)}.`
+  if (nodeMajors.length === 0 || !document.includes(expectedRuntime)) {
+    failures.push('toolchain documentation must state the manifest-supported Node majors')
+  }
+  if (
+    !document.includes("Spinlog's internal metadata-driven SGR composer") ||
+    !document.includes("Node's `stripVTControlCharacters`") ||
+    document.includes('styleText')
+  ) {
+    failures.push(
+      'toolchain documentation must describe the internal SGR composer and VT sanitization',
+    )
+  }
+  if (
+    typeof biomeVersion !== 'string' ||
+    !document.includes(`Biome \`${biomeVersion}\` owns formatting and linting.`)
+  ) {
+    failures.push('toolchain documentation must state the manifest-pinned Biome version')
+  }
+  if (biome?.$schema !== expectedSchema) {
+    failures.push('biome.json schema must match the manifest-pinned Biome version')
   }
 
   return failures

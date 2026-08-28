@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url'
 import { sortCanonicalText } from './canonical-order.mjs'
 import {
   validateEsbuildSecurityPolicy,
+  validateToolchainDocumentation,
   validateTypeScriptConfig,
 } from './phase1-toolchain-policy.mjs'
 
@@ -68,6 +69,7 @@ for (const [path, type] of [
   ['.size-limit.json', 'file'],
   ['README.md', 'file'],
   ['SECURITY.md', 'file'],
+  ['specs/04_TECH_STACK.md', 'file'],
   ['LICENSE', 'file'],
   ['src', 'directory'],
   ['test', 'directory'],
@@ -88,6 +90,7 @@ const tsconfig = readObject('tsconfig.json')
 const biome = readObject('biome.json')
 const sizeLimit = readJson('.size-limit.json')
 const buildConfig = readText('scripts/build-js.mjs')
+const toolchainDocumentation = readText('specs/04_TECH_STACK.md')
 const vitestConfig = readText('vitest.config.ts')
 const output = readText('dist/index.js')
 const stylesOutput = readText('dist/styles.js')
@@ -155,6 +158,7 @@ require(JSON.stringify(packageJson.files) ===
 
 failures.push(
   ...validateTypeScriptConfig(tsconfig),
+  ...validateToolchainDocumentation(toolchainDocumentation, packageJson, biome),
   ...validateEsbuildSecurityPolicy(packageJson, packageLock),
 )
 require(packageJson.devDependencies?.typescript === '7.0.2', 'TypeScript must be pinned to 7.0.2')
