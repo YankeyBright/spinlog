@@ -35,22 +35,23 @@ function disablesAutomaticFeatures(env: NodeJS.ProcessEnv, isTTY: boolean): bool
   return Boolean(env.CI) || isDumbTerminal(env) || env.NODE_ENV === 'test' || !isTTY
 }
 
-function explicitlyDisablesColor(env: NodeJS.ProcessEnv): boolean {
+/** Spinlog v1 compatibility policy; see the documented Node CLI divergence. */
+function spinlogDisablesColor(env: NodeJS.ProcessEnv): boolean {
   return Boolean(env.NO_COLOR || env.NODE_DISABLE_COLORS)
 }
 
-function enablesForcedColor(env: NodeJS.ProcessEnv): boolean {
+function spinlogForcesColor(env: NodeJS.ProcessEnv): boolean {
   return env.FORCE_COLOR !== undefined && env.FORCE_COLOR !== '0' && env.FORCE_COLOR !== 'false'
 }
 
 /** SGR and cursor support are related but independent terminal capabilities. */
 function hasSgrSupport(env: NodeJS.ProcessEnv, isTTY: boolean): boolean {
-  return !isDumbTerminal(env) && (hasKnownCursorProfile(env, isTTY) || enablesForcedColor(env))
+  return spinlogForcesColor(env) || (!isDumbTerminal(env) && hasKnownCursorProfile(env, isTTY))
 }
 
 function resolveColor(env: NodeJS.ProcessEnv, sgr: boolean, automaticDisabled: boolean): boolean {
-  if (explicitlyDisablesColor(env)) return false
-  if (env.FORCE_COLOR !== undefined) return enablesForcedColor(env)
+  if (spinlogDisablesColor(env)) return false
+  if (env.FORCE_COLOR !== undefined) return spinlogForcesColor(env)
   return sgr && !automaticDisabled
 }
 
@@ -69,8 +70,7 @@ function resolveStyleCapabilities(env: NodeJS.ProcessEnv, isTTY: boolean): numbe
   const sgr = hasSgrSupport(env, isTTY)
   const color = resolveColor(env, sgr, automaticDisabled)
   const emphasis =
-    sgr &&
-    (enablesForcedColor(env) || (isTTY && (!automaticDisabled || explicitlyDisablesColor(env))))
+    sgr && (spinlogForcesColor(env) || (isTTY && (!automaticDisabled || spinlogDisablesColor(env))))
 
   return (color ? COLOR_CAPABILITY : 0) | (emphasis ? EMPHASIS_CAPABILITY : 0)
 }

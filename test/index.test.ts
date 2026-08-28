@@ -267,6 +267,28 @@ describe('promise wrapper', () => {
     expect(thenCalls).toBe(1)
   })
 
+  it('defers direct thenable invocation to the Promise job queue', async () => {
+    const order: string[] = []
+    let receiver: unknown
+    const thenable = {
+      // biome-ignore lint/suspicious/noThenProperty: Intentionally tests thenable assimilation.
+      then(resolve: (value: string) => void) {
+        receiver = this
+        order.push('then-called')
+        resolve('done')
+      },
+    } as PromiseLike<string>
+
+    const pending = spinlog.promise(thenable, { text: 'deferred', spinner: 'line' })
+    order.push('after-call')
+    expect(order).toEqual(['after-call'])
+
+    await Promise.resolve()
+    expect(order).toEqual(['after-call', 'then-called'])
+    expect(receiver).toBe(thenable)
+    await expect(pending).resolves.toBe('done')
+  })
+
   it('starts before invoking a task exactly once and preserves fulfillment', async () => {
     const task = vi.fn(() => Promise.resolve({ value: 7 }))
     const promise = spinlog.promise(task, { text: 'task', prefix: 'p' })

@@ -17,7 +17,9 @@ src/
   spinner-rendering.ts pure spinner formatting, snapshots, and width calculation
   spinner.ts          single-surface lifecycle and scheduling
   group-rendering.ts  group row data, snapshots, width, and formatting
-  group.ts            group sessions, persisted rows, height safety, and scheduling
+  group-session.ts    group session identity and live/persisted row selection
+  group-scheduler.ts  group unreferenced interval lifecycle and frame advancement
+  group.ts            group facade, terminal lease coordination, and height safety
   progress.ts         determinate rendering and immutable total/value state
   messages.ts         target-local intro/outro composition
   styles.ts           tree-shakeable ANSI-16 style entrypoint
@@ -35,7 +37,7 @@ src/
 
 `spinner.ts` owns one mutable spinner’s lifecycle, unreferenced timer, cursor policy, static degradation, and explicit cleanup. `spinner-options.ts` centralizes shared validation, while `spinner-rendering.ts` owns lazy sanitized text snapshots and grapheme-aware formatting. Caller-defined frames are sanitized and frozen by `spinner-data.ts` when their definition is accepted. Failures remain scoped to the affected target surface.
 
-`group.ts` owns the multi-row session lifecycle. It distinguishes live rows, permanently persisted rows, and explicitly stopped children eligible for a fresh session. It requires width and height capacity before lease acquisition and atomically demotes all active rows on constraint loss. `group-rendering.ts` contains pure row formatting and cached measurements.
+`group.ts` coordinates the multi-row surface lifecycle and one target-local lease. `group-session.ts` distinguishes live rows, permanently persisted rows, and explicitly stopped children eligible for a fresh session. `group-scheduler.ts` owns the one unreferenced interval and advances active-row frames. The facade requires width and height capacity before lease acquisition and atomically demotes all active rows on constraint loss. `group-rendering.ts` contains pure row formatting and cached measurements.
 
 `progress.ts` owns a timer-free determinate surface. It keeps total private and exposes it through a getter, validates exact value bounds and positive increments, uses floor-based fill, and completes to total on success. It shares target-local rendering primitives with spinner and group.
 
@@ -47,4 +49,4 @@ src/
 - The host application owns direct stream writes, stdin, signals, process termination, and asynchronous stream errors unrelated to pending Spinlog output.
 - Explicit lifecycle methods and `Symbol.dispose` release a surface’s resources.
 - The implementation uses Node built-ins and local modules only.
-- Emitted declarations and runtime exports must match the Phase 0 contract; the root implementation stays within the 10,240-byte gzip ceiling.
+- Emitted declarations and runtime exports must match the Phase 0 contract; the root implementation stays within the 10,496-byte gzip ceiling.

@@ -33,11 +33,11 @@ Status symbols are `\u2714`, `\u2716`, `\u26a0`, and `\u2139`, with ASCII fallba
 
 Interactive rendering writes its first frame synchronously and uses unreferenced timers. Automatic animation requires a target TTY, usable target width, and a conservative recognized terminal profile. `terminal: 'interactive'` is an informed override for a non-dumb TTY but never enables color itself. `terminal: 'static'` disables animation and cursor control.
 
-Precedence is highest to lowest:
+Spinlog intentionally preserves a v1 color-environment compatibility policy that differs from [Node's CLI color policy](https://nodejs.org/api/cli.html#force_color1-2-3). Precedence is highest to lowest:
 
 1. A non-empty `NO_COLOR` disables automatic foreground/background color.
 2. A non-empty `NODE_DISABLE_COLORS` disables automatic foreground/background color.
-3. `FORCE_COLOR=0` or `FORCE_COLOR=false` disables color; any other defined value enables ANSI-16 color.
+3. `FORCE_COLOR=0` or `FORCE_COLOR=false` disables color; any other defined value, including an empty or Node-unsupported value, enables ANSI-16 color and emphasis.
 4. Otherwise CI, `TERM=dumb`, `NODE_ENV=test`, non-TTY targets, unknown profiles, and empty `TERM` conservatively disable automatic features.
 
 Known automatic cursor profiles are `xterm`, `screen`, `tmux`, `rxvt`, `linux`, `cygwin`, `st`, `alacritty`, `kitty`, `wezterm`, `foot`, `konsole`, `vte`, `eterm`, and `putty`, matched as an ASCII-lowercase exact name or dash suffix. `vt100` and `vt220` are static by default. Windows Unicode auto-detection requires `WT_SESSION`.

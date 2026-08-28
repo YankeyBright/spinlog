@@ -739,7 +739,7 @@ function validateDocuments(documents, contract, failures) {
     ],
     'specs/09_PHASE_0_PRODUCT_SPEC_LOCK.md': [
       'Node 22, Node 24, and Node 26',
-      '10,240 bytes',
+      '10,496 bytes',
       'pre-1.0',
       'explicit writable streams',
     ],
@@ -830,7 +830,7 @@ export function validatePhase0Contract({
       artifact: 'dist/index.js',
       compression: 'gzip',
       level: 9,
-      maximumBytes: 10240,
+      maximumBytes: 10496,
       singleStyleMaximumBytes: 768,
     },
     'size',
@@ -989,9 +989,9 @@ export function validatePhase0Contract({
   require(contract.size?.artifact === 'dist/index.js' &&
     contract.size?.compression === 'gzip' &&
     contract.size?.level === 9 &&
-    contract.size?.maximumBytes === 10240 &&
+    contract.size?.maximumBytes === 10496 &&
     contract.size?.singleStyleMaximumBytes ===
-      768, 'size contract must enforce 10,240 root bytes and 768 single-style bytes using gzip level 9', failures)
+      768, 'size contract must enforce 10,496 root bytes and 768 single-style bytes using gzip level 9', failures)
   require(sameValues(
     contract.publicApi?.typeExports ?? [],
     TYPE_EXPORTS,

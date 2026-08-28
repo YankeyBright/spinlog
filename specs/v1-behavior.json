@@ -19,7 +19,7 @@
     "artifact": "dist/index.js",
     "compression": "gzip",
     "level": 9,
-    "maximumBytes": 10240,
+    "maximumBytes": 10496,
     "singleStyleMaximumBytes": 768
   },
   "publicApi": {

@@ -74,6 +74,36 @@ describe('spinner groups', () => {
     expect(stdoutWrite).not.toHaveBeenCalled()
   })
 
+  it('rearms the scheduler when a faster child settles', () => {
+    const group = createGroup()
+    const fast = group.add('fast', { spinner: { frames: ['a', 'b'], interval: 16 } }).start()
+    const slow = group.add('slow', { spinner: { frames: ['A', 'B'], interval: 60_000 } }).start()
+
+    fast.succeed()
+    const settledWriteCount = output().length
+    vi.advanceTimersByTime(90)
+    expect(output()).toHaveLength(settledWriteCount)
+
+    vi.advanceTimersByTime(59_910)
+    expect(output()).toHaveLength(settledWriteCount + 1)
+    slow.stop()
+  })
+
+  it('rearms the scheduler when a faster child stops', () => {
+    const group = createGroup()
+    const fast = group.add('fast', { spinner: { frames: ['a', 'b'], interval: 16 } }).start()
+    const slow = group.add('slow', { spinner: { frames: ['A', 'B'], interval: 60_000 } }).start()
+
+    fast.stop()
+    const stoppedWriteCount = output().length
+    vi.advanceTimersByTime(90)
+    expect(output()).toHaveLength(stoppedWriteCount)
+
+    vi.advanceTimersByTime(59_910)
+    expect(output()).toHaveLength(stoppedWriteCount + 1)
+    slow.stop()
+  })
+
   it('coordinates logs and flow messages without changing child ownership', () => {
     const child = createGroup().add('work', { spinner: 'line' }).start()
     child.log('checkpoint\r\nnow')

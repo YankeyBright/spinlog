@@ -463,7 +463,6 @@ function settleFlushWaiters(state: TargetState): void {
 }
 
 function hasPendingPermanentBefore(state: TargetState, watermark: number): boolean {
-  if (state.blocked) return true
   const inFlight = state.inFlight
   if ((inFlight?.sequence ?? Infinity) <= watermark) {
     return true

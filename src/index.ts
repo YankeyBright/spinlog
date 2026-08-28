@@ -256,8 +256,13 @@ function requirePromiseLike<T>(candidate: unknown): Promise<T> {
     throw new TypeError('input must be a PromiseLike or a task returning one')
   }
 
-  return new Promise((resolve, reject) => {
-    Reflect.apply(then, candidate, [resolve, reject])
+  // Let the native Promise resolution procedure schedule thenable invocation.
+  // The wrapper keeps the validated `then` and its original receiver intact.
+  return Promise.resolve({
+    // biome-ignore lint/suspicious/noThenProperty: Promise resolution requires this deliberate thenable.
+    then(resolve, reject) {
+      Reflect.apply(then, candidate, [resolve, reject])
+    },
   })
 }
 

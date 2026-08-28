@@ -1,4 +1,4 @@
-import { EventEmitter } from 'node:events'
+import { EventEmitter, once } from 'node:events'
 import { Writable } from 'node:stream'
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -258,6 +258,25 @@ describe('interactive terminal lease', () => {
     expect(acquireInteractiveLease(target, owner)).toBe(true)
     expect(writeInteractiveFrame(target, owner, 'frame')).toBe(true)
     expect(didWriteFrame).toHaveBeenCalledOnce()
+    expect(drainListener).toEqual(expect.any(Function))
+  })
+
+  it('does not make flush wait for cosmetic-only backpressure', async () => {
+    let drainListener: (() => void) | undefined
+    const stream = {
+      on: vi.fn((event: string, listener: () => void) => {
+        if (event === 'drain') drainListener = listener
+      }),
+      removeListener: vi.fn(),
+      write: vi.fn(() => false),
+    }
+    const target = resolveRenderTarget(stream as unknown as Writable)
+    const owner = lease()
+    owners.push([target, owner])
+
+    expect(acquireInteractiveLease(target, owner)).toBe(true)
+    expect(writeInteractiveFrame(target, owner, 'frame')).toBe(true)
+    await expect(flushTarget(target)).resolves.toBeUndefined()
     expect(drainListener).toEqual(expect.any(Function))
   })
 
@@ -680,9 +699,11 @@ describe('interactive terminal lease', () => {
 
     expect(writeTarget(target, 'accepted\n')).toBe(true)
     const pending = flushTarget(target)
+    const finished = once(stream, 'finish')
     stream.end()
 
     await expect(pending).resolves.toBeUndefined()
+    await finished
     expect(stream.listenerCount('drain')).toBe(0)
     expect(stream.listenerCount('finish')).toBe(0)
     expect(stream.listenerCount('close')).toBe(0)

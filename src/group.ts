@@ -8,7 +8,6 @@ import {
   GROUP_WARNED,
   createGroupItem,
   isGroupSpinning,
-  isGroupVisible,
   renderGroupFrame,
   renderGroupStaticLine,
   renderGroupStaticStart,
@@ -19,6 +18,8 @@ import {
   type GroupItem,
   type GroupState,
 } from './group-rendering.js'
+import { createGroupScheduler } from './group-scheduler.js'
+import { createGroupSession } from './group-session.js'
 import type { GroupOptions, Spinner, SpinnerGroup } from './index.js'
 import {
   acquireInteractiveLease,
@@ -49,7 +50,6 @@ import {
   sanitizeSegment,
 } from './text.js'
 
-const NO_SESSION = Symbol('spinlog.group.none')
 type RenderMode = 'interactive' | 'static' | undefined
 
 /** Create a multi-row task surface with one shared interactive terminal lease. */
@@ -67,15 +67,14 @@ export function createGroup(options: GroupOptions = {}): SpinnerGroup {
     safeOptions.maxRows === undefined ? undefined : requireMaxRows(safeOptions.maxRows)
   const defaultColor = configuredColor === false ? DEFAULT_SPINNER_COLOR : configuredColor
   const items: GroupItem[] = []
+  const session = createGroupSession(items)
+  const scheduler = createGroupScheduler(() => session.activeItems(), redraw)
   let capabilities: Capabilities | undefined
   let mode: RenderMode
-  let timer: NodeJS.Timeout | undefined
-  let timerInterval = 0
   /** Rows in the last frame accepted by the target; these are safe to clear. */
   let renderedRows = 0
   /** Rows requested by the most recent frame construction, possibly still queued. */
   let requestedRows = 0
-  let activeSession = NO_SESSION
 
   const lease: InteractiveLease = {
     currentFrame: renderCurrentFrame,
@@ -90,7 +89,7 @@ export function createGroup(options: GroupOptions = {}): SpinnerGroup {
       return createItem(text, itemOptions)
     },
     stop() {
-      const active = activeItems()
+      const active = session.activeItems()
       if (active.length === 0) return this
 
       for (const item of active) {
@@ -190,7 +189,7 @@ export function createGroup(options: GroupOptions = {}): SpinnerGroup {
 
   function startItem(item: GroupItem): void {
     if (item.state === GROUP_SPINNING) return
-    joinSession(item)
+    session.join(item)
     item.state = GROUP_SPINNING
     item.terminalAction = undefined
     item.frameIndex = 0
@@ -213,7 +212,7 @@ export function createGroup(options: GroupOptions = {}): SpinnerGroup {
 
     capabilities = active
     if (mode === 'interactive') {
-      if (redraw()) armTimer()
+      if (redraw()) scheduler.arm()
       return
     }
     if (!acquireInteractiveLease(target, lease)) {
@@ -223,7 +222,7 @@ export function createGroup(options: GroupOptions = {}): SpinnerGroup {
     }
 
     mode = 'interactive'
-    if (writeInitialFrame()) armTimer()
+    if (writeInitialFrame()) scheduler.arm()
   }
 
   function stopItem(item: GroupItem): void {
@@ -251,7 +250,7 @@ export function createGroup(options: GroupOptions = {}): SpinnerGroup {
     if (previous !== GROUP_SPINNING) item.session = undefined
     const active = capabilities ?? resolveCapabilities()
 
-    if (mode === 'interactive' && previous === GROUP_SPINNING && item.session === activeSession) {
+    if (mode === 'interactive' && previous === GROUP_SPINNING && session.owns(item)) {
       redrawOrFinish()
       return
     }
@@ -268,7 +267,7 @@ export function createGroup(options: GroupOptions = {}): SpinnerGroup {
   }
 
   function canAnimate(active: Capabilities): boolean {
-    const visible = visibleItems()
+    const visible = session.visibleItems()
     return (
       active.animation &&
       fitsGroupHeight(visible.length) &&
@@ -282,9 +281,9 @@ export function createGroup(options: GroupOptions = {}): SpinnerGroup {
   }
 
   function redrawOrFinish(): void {
-    if (activeItems().length === 0)
+    if (session.activeItems().length === 0)
       closeInteractive(`${renderRows(capabilities as Capabilities).join('\n')}\n`)
-    else redraw()
+    else if (redraw()) scheduler.arm()
   }
 
   function redraw(): boolean {
@@ -331,11 +330,12 @@ export function createGroup(options: GroupOptions = {}): SpinnerGroup {
   }
 
   function demoteToStatic(active: Capabilities): void {
-    clearTimer()
+    scheduler.clear()
     releaseInteractiveLease(target, lease)
     mode = 'static'
     capabilities = undefined
-    const output = visibleItems()
+    const output = session
+      .visibleItems()
       .map((item) => renderGroupStaticLine(item, active, staticMode, indent))
       .join('')
     if (!writeTarget(target, `${clearRows()}${cursorShow()}${output}`)) abortInteractive()
@@ -344,7 +344,7 @@ export function createGroup(options: GroupOptions = {}): SpinnerGroup {
   }
 
   function closeInteractive(output: string): void {
-    clearTimer()
+    scheduler.clear()
     releaseInteractiveLease(target, lease)
     mode = undefined
     capabilities = undefined
@@ -352,12 +352,12 @@ export function createGroup(options: GroupOptions = {}): SpinnerGroup {
       writeTarget(target, SHOW_CURSOR)
     renderedRows = 0
     requestedRows = 0
-    activeSession = NO_SESSION
+    session.reset()
   }
 
   function abortInteractive(): void {
-    clearTimer()
-    for (const item of activeItems()) {
+    scheduler.clear()
+    for (const item of session.activeItems()) {
       item.state = GROUP_STOPPED
       item.session = undefined
     }
@@ -366,39 +366,12 @@ export function createGroup(options: GroupOptions = {}): SpinnerGroup {
     capabilities = undefined
     renderedRows = 0
     requestedRows = 0
-    activeSession = NO_SESSION
+    session.reset()
     if (hideCursor) writeTarget(target, SHOW_CURSOR)
   }
 
-  function armTimer(): void {
-    clearTimer()
-    const interval = Math.min(...activeItems().map((item) => item.frameSet.interval))
-    timerInterval = interval
-    timer = setInterval(tick, interval)
-    timer.unref()
-  }
-
-  function tick(): void {
-    for (const item of activeItems()) {
-      item.elapsedMs += timerInterval
-      if (item.elapsedMs >= item.frameSet.interval) {
-        item.frameIndex += 1
-        item.elapsedMs %= item.frameSet.interval
-      }
-    }
-    redraw()
-  }
-
-  function activeItems(): GroupItem[] {
-    return items.filter((item) => item.session === activeSession && isGroupSpinning(item))
-  }
-
-  function visibleItems(): GroupItem[] {
-    return items.filter((item) => item.session === activeSession && isGroupVisible(item))
-  }
-
   function hasVisibleRows(): boolean {
-    return visibleItems().length > 0
+    return session.visibleItems().length > 0
   }
 
   function renderCurrentFrame(): string {
@@ -408,11 +381,13 @@ export function createGroup(options: GroupOptions = {}): SpinnerGroup {
   }
 
   function renderRows(active: Capabilities): string[] {
-    return visibleItems().map((item) =>
-      isGroupSpinning(item)
-        ? renderGroupFrame(item, active, indent)
-        : renderGroupStatus(item, active, indent),
-    )
+    return session
+      .visibleItems()
+      .map((item) =>
+        isGroupSpinning(item)
+          ? renderGroupFrame(item, active, indent)
+          : renderGroupStatus(item, active, indent),
+      )
   }
 
   function writeStaticStart(item: GroupItem, active: Capabilities): void {
@@ -425,33 +400,28 @@ export function createGroup(options: GroupOptions = {}): SpinnerGroup {
     if (line !== undefined && !writeCoordinatedLine(target, `${line}\n`)) abortStaticSession()
   }
 
-  function joinSession(item: GroupItem): void {
-    if (activeSession === NO_SESSION) activeSession = Symbol('spinlog.group')
-    item.session = activeSession
-  }
-
   function closeStaticSessionIfFinished(): void {
-    if (activeItems().length === 0) closeStaticSession()
+    if (session.activeItems().length === 0) closeStaticSession()
   }
 
   function closeStaticSession(): void {
-    clearTimer()
+    scheduler.clear()
     mode = undefined
     capabilities = undefined
-    activeSession = NO_SESSION
+    session.reset()
     renderedRows = 0
     requestedRows = 0
   }
 
   function abortStaticSession(): void {
-    clearTimer()
-    for (const item of activeItems()) {
+    scheduler.clear()
+    for (const item of session.activeItems()) {
       item.state = GROUP_STOPPED
       item.session = undefined
     }
     mode = undefined
     capabilities = undefined
-    activeSession = NO_SESSION
+    session.reset()
     renderedRows = 0
     requestedRows = 0
   }
@@ -479,14 +449,6 @@ export function createGroup(options: GroupOptions = {}): SpinnerGroup {
     let output = CLEAR_LINE
     for (let index = 1; index < renderedRows; index += 1) output += `\x1b[1A${CLEAR_LINE}`
     return output
-  }
-
-  function clearTimer(): void {
-    if (timer) {
-      clearInterval(timer)
-      timer = undefined
-    }
-    timerInterval = 0
   }
 
   return group

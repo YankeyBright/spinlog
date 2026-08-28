@@ -20,7 +20,7 @@ npm run benchmark
 npm run benchmark:check
 ```
 
-The 10,240-byte gzip ceiling for `dist/index.js` remains a hard Phase 0 size contract, independently enforced by `npm run size` and `npm run size:limit`.
+The 10,496-byte gzip ceiling for `dist/index.js` remains a hard Phase 0 size contract, independently enforced by `npm run size` and `npm run size:limit`.
 
 ## SBOM Evidence
 

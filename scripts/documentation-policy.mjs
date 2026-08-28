@@ -39,6 +39,7 @@ const REQUIRED_README_CLAIMS = Object.freeze([
   '`Math.floor()`',
   '`succeed()` completes the value to 100%',
   '`min(10, stream.rows - 1)`',
+  "intentionally differs from Node's CLI color policy",
   'Exactly eleven files in the npm tarball',
   'zero runtime components',
   'Publication is temporarily blocked',

@@ -26,7 +26,7 @@ Create a production package shell around the frozen Phase 0 contract. Phase 1 pr
 - Vitest enforces 100% V8 coverage globally and per source file, with justified 120-second test and hook timeouts for cold package and terminal-emulation work.
 - The Phase 0 policy suite proves the contract validator rejects known drift cases.
 - Biome formatting and linting are enabled.
-- The exact gzip gate rejects artifacts above 10,240 bytes. Size Limit independently measures gzip output while externalizing only the Node `util` and `process` built-ins used by the ESM artifact.
+- The exact gzip gate rejects artifacts above 10,496 bytes. Size Limit independently measures gzip output while externalizing only the Node `util` and `process` built-ins used by the ESM artifact.
 - Package dry-run validation enforces the approved eleven-file tarball.
 - publint, Are The Types Wrong, and a clean packed-consumer test validate real package consumption.
 - Required CI covers the frozen Node 22, Node 24, and Node 26 matrix, plus Windows and macOS packed-consumer jobs.

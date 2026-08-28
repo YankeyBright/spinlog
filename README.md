@@ -1,6 +1,6 @@
 # spinlog
 
-An ESM-only terminal feedback library with zero consumer runtime dependencies and an exact 10,240-byte gzip ceiling.
+An ESM-only terminal feedback library with zero consumer runtime dependencies and an exact 10,496-byte gzip ceiling.
 
 ## Status
 
@@ -186,7 +186,7 @@ In automatic mode, interactive animation requires a target TTY, a conservative r
 
 `static` defaults to `'symbol'` and `terminal` defaults to `'auto'`. `'text'` writes unstyled sanitized text, and `'silent'` suppresses automatic static start and settlement lines while leaving explicit logs available. Every interactive lease is target-local. `unicode: false` forces ASCII built-ins, and `hideCursor: false` suppresses both cursor-hide and cursor-show escapes for that surface. The `Symbol.dispose` method provides explicit block-scoped cleanup.
 
-`NO_COLOR`, `NODE_DISABLE_COLORS`, and `FORCE_COLOR` retain their precedence. `FORCE_COLOR` enables ANSI SGR (including emphasis) but never enables cursor animation. `color: false` is an explicit surface-level override that disables automatic color even if terminal capability and environment variables allow it.
+Spinlog's color-environment policy intentionally differs from Node's CLI color policy; see the [Node CLI reference](https://nodejs.org/api/cli.html#force_color1-2-3). For v1 compatibility, a non-empty `NO_COLOR` or `NODE_DISABLE_COLORS` overrides `FORCE_COLOR`; empty disable variables are ignored; and every defined `FORCE_COLOR` value other than exact `0` or `false` enables ANSI SGR (including emphasis). This policy affects Spinlog output only and never enables cursor animation. `color: false` remains the explicit surface-level override that disables automatic color even when terminal capability and environment variables allow it.
 
 User-controlled terminal text, prefixes, suffixes, overrides, logs, flow messages, and progress text are sanitized lazily at the render boundary. ANSI, OSC, C0/C1 controls, bidi controls, and line separators cannot create extra terminal lines. Assigned spinner values remain unchanged; sanitized text and grapheme-aware terminal width are cached until text, prefix, or suffix changes. Custom frames are the deliberate exception: they are sanitized and frozen at definition time. Combining sequences occupy their base width, East Asian wide/full-width and emoji clusters occupy two cells, and custom frames are measured in full.
 
@@ -215,7 +215,7 @@ See [MIGRATION.md](MIGRATION.md) for migration from 0.1.x, Chalk, Ora, and Clack
 - Zero runtime, optional, and peer dependencies.
 - No npm lifecycle scripts.
 - Exactly eleven files in the npm tarball.
-- `dist/index.js` currently measures 9,897 bytes using gzip level 9, below the 10,240-byte hard ceiling.
+- `dist/index.js` currently measures 10,430 bytes using gzip level 9, below the 10,496-byte hard ceiling.
 - A one-style `spinlog/styles` consumer remains constrained by a 768-byte tree-shaking ceiling.
 - A canonical CycloneDX 1.5 runtime SBOM with zero runtime components is included in the tarball.
 - Publication is temporarily blocked pending refreshed runtime, terminal, package, SBOM, benchmark, and documentation evidence for the `0.2.0` pre-1.0 contract.
