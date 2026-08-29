@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto'
-import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -67,15 +66,10 @@ export function digestReleaseTarball(path) {
   }
 }
 
-function npmVersion() {
-  if (process.env.NPM_VERSION) return process.env.NPM_VERSION
-  if (process.platform === 'win32') {
-    return execFileSync('cmd.exe', ['/d', '/s', '/c', 'npm.cmd --version'], {
-      encoding: 'utf8',
-      windowsHide: true,
-    }).trim()
-  }
-  return execFileSync('npm', ['--version'], { encoding: 'utf8', windowsHide: true }).trim()
+function npmVersion(environment) {
+  if (environment.NPM_VERSION) return environment.NPM_VERSION
+  const userAgentMatch = environment.npm_config_user_agent?.match(/\bnpm\/([^\s]+)/u)
+  return userAgentMatch?.[1] ?? 'unknown'
 }
 
 export function createReleaseManifest(
@@ -108,7 +102,7 @@ export function createReleaseManifest(
     repository: EXPECTED.repository,
     gitCommit,
     node: process.version,
-    npm: npmVersion(),
+    npm: npmVersion(environment),
     tarball: {
       path: relative(PROJECT_ROOT, tarball).split(sep).join('/'),
       ...digest,

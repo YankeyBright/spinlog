@@ -67,6 +67,9 @@ jobs:
           npm run check:phase3
           npm run check:phase5
 
+      - name: Record npm Version
+        run: echo "NPM_VERSION=$(npm --version)" >> "$GITHUB_ENV"
+
       - name: Pack And Verify Exact Release Artifact
         run: |
           npm run build

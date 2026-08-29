@@ -46,8 +46,8 @@ const isMain = process.argv[1] && pathToFileURL(resolve(process.argv[1])).href =
 
 if (isMain) {
   try {
-    const manifest = verifyReleaseArtifact(process.argv[2])
-    console.log(`release-artifact=verified commit=${manifest.gitCommit}`)
+    verifyReleaseArtifact(process.argv[2])
+    console.log('release-artifact=verified')
   } catch (error) {
     console.error(`release-artifact: ${error.message}`)
     process.exitCode = 1

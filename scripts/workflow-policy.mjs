@@ -48,6 +48,7 @@ const RELEASE_COMMANDS = new Set([
   'npm ci --ignore-scripts',
   'npm run check:foundation\nnpm run check:phase4\nnpm run test:stability',
   'npm audit --audit-level=low',
+  'echo "NPM_VERSION=$(npm --version)" >> "$GITHUB_ENV"',
   'npm run verify:preview\nnpm run check:release-ancestry\nnpm run check:phase3\nnpm run check:phase5',
   "npm run build\nnpm run sbom\nnpm run pack:check\nnode -e \"require('fs').mkdirSync('artifacts/release',{recursive:true})\"\nnpm pack --json --ignore-scripts --pack-destination artifacts/release\nnode scripts/create-release-manifest.mjs artifacts/release\nnode scripts/verify-release-artifact.mjs artifacts/release\nnode scripts/verify-packed-runtime.mjs artifacts/release",
   'node scripts/verify-packed-runtime.mjs artifacts/release',
