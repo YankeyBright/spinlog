@@ -4,7 +4,7 @@ An ESM-only terminal feedback library with zero consumer runtime dependencies an
 
 ## Status
 
-This is the final pre-1.0 API redesign: `spinlog@0.2.0`. It intentionally includes breaking changes from 0.1.x, documented in [MIGRATION.md](MIGRATION.md). Publication remains blocked on the `next` tag until the full verification and release-evidence sequence is reviewed.
+This is the final pre-1.0 API redesign: `spinlog@0.2.0`. It intentionally includes breaking changes from 0.1.x, documented in [MIGRATION.md](MIGRATION.md). The reviewed release bootstrap fixes only the `spinlog@0.2.0` / `v0.2.0` / `next` target; this repository contains no automatic npm publication path.
 
 The normative contracts are [specs/v1-public-api.d.ts](specs/v1-public-api.d.ts), [specs/v1-styles-api.d.ts](specs/v1-styles-api.d.ts), and [specs/v1-behavior.json](specs/v1-behavior.json).
 
@@ -218,7 +218,7 @@ See [MIGRATION.md](MIGRATION.md) for migration from 0.1.x, Chalk, Ora, and Clack
 - `dist/index.js` currently measures 10,490 bytes using gzip level 9, below the 10,496-byte hard ceiling.
 - A one-style `spinlog/styles` consumer remains constrained by a 768-byte tree-shaking ceiling.
 - A canonical CycloneDX 1.5 runtime SBOM with zero runtime components is included in the tarball.
-- Publication is temporarily blocked pending refreshed runtime, terminal, package, SBOM, benchmark, and documentation evidence for the `0.2.0` pre-1.0 contract.
+- The reviewed release bootstrap fixes only the `spinlog@0.2.0` / `v0.2.0` / `next` target; publication still requires the attested artifact and human 2FA bootstrap gates.
 
 These controls reduce defined risks. They are not a security certification, provenance claim, SLSA claim, or guarantee of zero risk.
 
@@ -239,7 +239,7 @@ npm run check:phase4
 npm run check:phase5
 ```
 
-Release acceptance additionally requires package checks, size checks, terminal-emulation and cross-platform TTY-target smoke coverage, and three consecutive full green test runs. `npm run check:phase5` validates the static trusted-release policy separately and reports `phase5=hold` while publication is blocked.
+Release acceptance additionally requires package checks, size checks, terminal-emulation and cross-platform TTY-target smoke coverage, and three consecutive full green test runs. `npm run check:phase5` validates the static bootstrap policy separately and reports `phase5=bootstrap-authorized`; it does not authenticate to npm or publish.
 
 ## Security
 

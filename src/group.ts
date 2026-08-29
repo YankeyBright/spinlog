@@ -189,6 +189,8 @@ export function createGroup(options: GroupOptions = {}): SpinnerGroup {
 
   function startItem(item: GroupItem): void {
     if (item.state === GROUP_SPINNING) return
+    // Joining creates a fresh session identity when the previous group has
+    // finished, preventing old terminal rows from being redrawn by new items.
     session.join(item)
     item.state = GROUP_SPINNING
     item.terminalAction = undefined
@@ -245,6 +247,8 @@ export function createGroup(options: GroupOptions = {}): SpinnerGroup {
       item.snapshot = undefined
     }
     const previous = item.state
+    // A completed row stays visible for the current session; only an item that
+    // was never active leaves the session immediately.
     item.state = [GROUP_SUCCEEDED, GROUP_FAILED, GROUP_WARNED, GROUP_INFORMED][action] as GroupState
     item.terminalAction = action
     if (previous !== GROUP_SPINNING) item.session = undefined
@@ -446,6 +450,8 @@ export function createGroup(options: GroupOptions = {}): SpinnerGroup {
   }
 
   function clearRows(): string {
+    // Clear only rows confirmed by didWriteFrame. requestedRows may describe a
+    // frame still queued and must never cause us to erase unrelated output.
     let output = CLEAR_LINE
     for (let index = 1; index < renderedRows; index += 1) output += `\x1b[1A${CLEAR_LINE}`
     return output

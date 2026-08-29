@@ -111,6 +111,9 @@ export function createSpinner(text = '', options: SpinnerOptions = {}): Spinner 
     },
     start() {
       if (state === SPINNING) return this
+      // Capabilities are captured per cycle. Only terminal-width changes are
+      // rechecked by prepareInteractiveFrame before the next physical write;
+      // environment-derived capabilities stay fixed for this cycle.
       state = SPINNING
       frameIndex = 0
       const active = resolveCapabilities()
@@ -180,6 +183,8 @@ export function createSpinner(text = '', options: SpinnerOptions = {}): Spinner 
 
     const active = capabilities ?? resolveCapabilities()
     const previous = renderMode
+    // Terminal methods are first-result-wins and release the lease before
+    // writing the permanent status line so another surface can take ownership.
     state = terminalState(action)
     capabilities = undefined
     renderMode = undefined
@@ -225,6 +230,8 @@ export function createSpinner(text = '', options: SpinnerOptions = {}): Spinner 
   }
 
   function demoteToStatic(active: Capabilities): void {
+    // A live target can lose width/cursor support. Demotion preserves the
+    // current text and status while stopping future interactive writes.
     clearTimer()
     releaseInteractiveLease(target, lease)
     renderMode = 'static'

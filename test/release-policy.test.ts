@@ -3,23 +3,69 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 import { validateHttpsPolicy } from '../scripts/https-policy.mjs'
-import { validatePreviewContract, validateReleaseWorkflows } from '../scripts/release-policy.mjs'
+import {
+  validatePreviewContext,
+  validatePreviewContract,
+  validateReleaseBootstrapContract,
+  validateReleaseWorkflows,
+} from '../scripts/release-policy.mjs'
 import { validatePublishedIntegrity } from '../scripts/verify-published-integrity.mjs'
-import { parseWorkflow } from '../scripts/workflow-policy.mjs'
+import { parseWorkflow, validateReleaseAutomationWorkflows } from '../scripts/workflow-policy.mjs'
 
 const packageJson = JSON.parse(readFileSync('package.json', 'utf8'))
 const contract = JSON.parse(readFileSync('specs/phase5-preview.json', 'utf8'))
+const releaseContract = JSON.parse(readFileSync('specs/phase5-release.json', 'utf8'))
 const workflows = {
   'release-readiness.yml': parseWorkflow(
     readFileSync('.github/workflows/release-readiness.yml', 'utf8'),
     'release-readiness.yml',
   ).value,
 }
+const automationWorkflows = Object.fromEntries(
+  ['release-build.yml', 'release-publish.yml'].map((name) => [
+    name,
+    parseWorkflow(readFileSync(`.github/workflows/${name}`, 'utf8'), name).value,
+  ]),
+)
 
-describe('release freeze policy', () => {
-  it('accepts the explicit publication hold and read-only revalidation workflow', () => {
+describe('release bootstrap policy', () => {
+  it('accepts the historical freeze, bootstrap contract, and guarded workflows', () => {
     expect(validatePreviewContract(contract, packageJson)).toEqual([])
+    expect(validateReleaseBootstrapContract(releaseContract, packageJson)).toEqual([])
     expect(validateReleaseWorkflows(workflows)).toEqual([])
+    expect(validateReleaseAutomationWorkflows(automationWorkflows)).toEqual([])
+  })
+
+  it('reports a missing release builder without throwing', () => {
+    expect(
+      validateReleaseAutomationWorkflows({
+        'release-publish.yml': automationWorkflows['release-publish.yml'],
+      }),
+    ).toContain('release-build.yml must be a reusable workflow')
+  })
+
+  it('requires the consumer job to download and verify the release artifact', () => {
+    const withoutDownload = structuredClone(automationWorkflows['release-build.yml'])
+    withoutDownload.jobs.consumer.steps = withoutDownload.jobs.consumer.steps.filter(
+      (step) => step.uses !== 'actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c',
+    )
+    const withoutVerification = structuredClone(automationWorkflows['release-build.yml'])
+    withoutVerification.jobs.consumer.steps = withoutVerification.jobs.consumer.steps.map((step) =>
+      step.name === 'Verify Packed Runtime'
+        ? { ...step, run: 'node scripts/other-check.mjs' }
+        : step,
+    )
+
+    for (const altered of [withoutDownload, withoutVerification]) {
+      expect(
+        validateReleaseAutomationWorkflows({
+          ...automationWorkflows,
+          'release-build.yml': altered,
+        }),
+      ).toContain(
+        'release-build.yml consumer must verify the packed runtime on Node 22, 24, and 26',
+      )
+    }
   })
 
   it('rejects a changed publication target or incomplete revalidation sequence', () => {
@@ -61,6 +107,89 @@ describe('release freeze policy', () => {
 
     expect(validateReleaseWorkflows({ 'release-readiness.yml': altered })).toContain(
       'release-readiness.yml must contain only the revalidation job',
+    )
+  })
+
+  it.each([
+    ['latest dist-tag', { publication: { ...releaseContract.publication, distTag: 'latest' } }],
+    [
+      'alternate registry',
+      {
+        publication: { ...releaseContract.publication, registry: 'https://registry.example.test/' },
+      },
+    ],
+    ['tag mismatch', { publication: { ...releaseContract.publication, tag: 'v0.2.1' } }],
+    [
+      'token bootstrap',
+      {
+        publication: {
+          ...releaseContract.publication,
+          authentication: { ...releaseContract.publication.authentication, bootstrap: 'NPM_TOKEN' },
+        },
+      },
+    ],
+    [
+      'missing artifact attestation',
+      { publication: { ...releaseContract.publication, artifact: 'rebuild-in-publisher' } },
+    ],
+    ['unreviewed contract key', { unreviewed: true }],
+  ])('rejects %s in the bootstrap contract', (_name, mutation) => {
+    const altered = { ...releaseContract, ...mutation }
+    expect(validateReleaseBootstrapContract(altered, packageJson)).not.toEqual([])
+  })
+
+  it.each([
+    ['builder drift', { workflow: { ...releaseContract.workflow, builder: 'other.yml' } }],
+    ['publisher drift', { workflow: { ...releaseContract.workflow, publisher: 'other.yml' } }],
+    ['environment drift', { workflow: { ...releaseContract.workflow, environment: 'public' } }],
+  ])('rejects %s in the workflow contract', (_name, mutation) => {
+    expect(
+      validateReleaseBootstrapContract({ ...releaseContract, ...mutation }, packageJson),
+    ).not.toEqual([])
+  })
+
+  it('rejects package publication drift', () => {
+    expect(
+      validateReleaseBootstrapContract(releaseContract, {
+        ...packageJson,
+        version: '0.2.1',
+        publishConfig: { ...packageJson.publishConfig, tag: 'latest' },
+      }),
+    ).toEqual(
+      expect.arrayContaining([
+        'package identity and HTTPS next publish configuration must match the release bootstrap',
+      ]),
+    )
+  })
+
+  it('accepts only the exact GitHub tag context for the bootstrap', () => {
+    expect(
+      validatePreviewContext(
+        {
+          GITHUB_ACTIONS: 'true',
+          GITHUB_REPOSITORY: 'YankeyBright/spinlog',
+          GITHUB_REF_NAME: 'v0.2.0',
+          GITHUB_SHA: '8aaa6eb33c79a4b9df6ef80e6174ecb056ef7ca0',
+        },
+        packageJson,
+      ),
+    ).toEqual([])
+    expect(
+      validatePreviewContext(
+        {
+          GITHUB_ACTIONS: 'true',
+          GITHUB_REPOSITORY: 'YankeyBright/spinlog',
+          GITHUB_REF_NAME: 'v0.2.1',
+          GITHUB_SHA: '8aaa6eb33c79a4b9df6ef80e6174ecb056ef7ca0',
+          NPM_TOKEN: 'unexpected',
+        },
+        packageJson,
+      ),
+    ).toEqual(
+      expect.arrayContaining([
+        'preview context requires the v0.2.0 tag',
+        'preview context must not expose npm publication credentials',
+      ]),
     )
   })
 })

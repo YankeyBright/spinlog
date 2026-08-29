@@ -25,7 +25,11 @@ export const AUTHORITATIVE_PHASE_FILES = Object.freeze([
 ])
 
 const REQUIRED_TEXT = Object.freeze({
-  'README.md': ['final pre-1.0 API redesign', 'spinlog@0.2.0', 'Publication remains blocked'],
+  'README.md': [
+    'final pre-1.0 API redesign',
+    'spinlog@0.2.0',
+    'The reviewed release bootstrap fixes only the',
+  ],
   'specs/00_PHASE_MAP.md': CANONICAL_PHASES.map(({ number, title }) => `| ${number} | ${title} |`),
   'specs/03_COMPETITIVE_ANALYSIS.md': [
     '| Color functions (red, green, blue, etc.) | chalk, picocolors |',

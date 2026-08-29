@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "package": "spinlog",
+  "version": "0.2.0",
+  "repository": "YankeyBright/spinlog",
+  "status": "bootstrap-authorized",
+  "publication": {
+    "tag": "v0.2.0",
+    "distTag": "next",
+    "registry": "https://registry.npmjs.org/",
+    "access": "public",
+    "artifact": "attested-downloaded-tarball-only",
+    "authentication": {
+      "bootstrap": "human-2fa",
+      "future": "npm-trusted-publishing-oidc-only"
+    },
+    "provenance": {
+      "bootstrap": "github-artifact-attestation",
+      "future": "npm-oidc-provenance"
+    },
+    "stablePromotion": "prohibited",
+    "githubRelease": "prohibited"
+  },
+  "workflow": {
+    "builder": "release-build.yml",
+    "publisher": "release-publish.yml",
+    "environment": "npm-publish",
+    "authorization": "protected-environment-approval-required"
+  }
+}

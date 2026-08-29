@@ -4,7 +4,12 @@ import { join } from 'node:path'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { findPackedTarball, resolveArtifactDirectory } from '../scripts/verify-packed-runtime.mjs'
+import {
+  assertPackedSpinnerOutput,
+  findPackedTarball,
+  PACKED_SPINNER_OUTPUTS,
+  resolveArtifactDirectory,
+} from '../scripts/verify-packed-runtime.mjs'
 
 const workspaces: string[] = []
 
@@ -24,6 +29,18 @@ afterEach(() => {
 })
 
 describe('packed runtime artifact boundary', () => {
+  it('keeps deterministic packed Spinner output contracts for non-TTY and TTY consumers', () => {
+    expect(PACKED_SPINNER_OUTPUTS).toEqual({
+      nonTTY: '- Non-TTY\n+ Non-TTY done\n',
+      tty: '\x1b[?25l- TTY\x1b[2K\r+ TTY done\n\x1b[?25h',
+    })
+    expect(() => assertPackedSpinnerOutput('nonTTY', PACKED_SPINNER_OUTPUTS.nonTTY)).not.toThrow()
+    expect(() => assertPackedSpinnerOutput('tty', PACKED_SPINNER_OUTPUTS.tty)).not.toThrow()
+    expect(() => assertPackedSpinnerOutput('tty', PACKED_SPINNER_OUTPUTS.nonTTY)).toThrow(
+      'packed tty spinner output mismatch',
+    )
+  })
+
   it('accepts a canonical artifact subdirectory inside the repository', () => {
     const { artifacts, packageDirectory, project } = artifactFixture()
 

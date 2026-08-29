@@ -81,6 +81,8 @@ export function enqueuePermanentTask(state: TargetState, task: OutputTask): bool
 
 export function enqueueCosmeticTask(state: TargetState, task: OutputTask): boolean {
   if (state.rejecting) return false
+  // Frames are replaceable: retaining only the newest cosmetic task prevents
+  // a slow stream from replaying stale animation after backpressure clears.
   state.cosmetic = task
   return drainOutput(state)
 }
@@ -127,6 +129,8 @@ function drainOutput(state: TargetState): boolean {
   let accepted = true
   state.draining = true
   try {
+    // Permanent lines always win over the latest cosmetic frame so logs remain
+    // ordered while an interactive surface is being rebuilt around them.
     while (!state.blocked) {
       const task = takeNextTask(state)
       if (task === undefined) break
@@ -236,6 +240,8 @@ function startBackpressureWait(state: TargetState, task: OutputTask): boolean {
 }
 
 function takeNextTask(state: TargetState): OutputTask | undefined {
+  // The queue is FIFO for permanent output; at most one cosmetic frame follows
+  // it, because cosmetic work is intentionally coalesced by enqueueCosmeticTask.
   const permanent = state.permanent.shift()
   if (permanent !== undefined) {
     state.queuedBytes -= permanent.bytes
@@ -455,6 +461,8 @@ function rejectWaiters(state: TargetState, error: Error): void {
 
 function settleFlushWaiters(state: TargetState): void {
   if (state.waiters.length === 0) return
+  // Each waiter owns a sequence watermark, so output accepted after flush()
+  // was called cannot delay that earlier promise.
   const pending = state.waiters.splice(0)
   for (const waiter of pending) {
     if (!hasPendingPermanentBefore(state, waiter.watermark)) waiter.resolve()
@@ -509,6 +517,8 @@ function settleIfIdle(state: TargetState): void {
     Object.keys(state.listeners).length === 0 &&
     state.failure === undefined
   ) {
+    // WeakMap cleanup is important for short-lived custom streams; no target
+    // state should survive after all accepted work and listeners are gone.
     targets.delete(state.target.stream)
   }
 }

@@ -212,6 +212,8 @@ export function createProgress(text: string, options: ProgressOptions): Progress
     capabilities = undefined
     mode = undefined
 
+    // Success is the only terminal action that implies completion; failures,
+    // warnings, and informational results preserve the caller's last value.
     if (previous === 'interactive') {
       releaseInteractiveLease(target, lease)
       const output = `${renderStatus(action, active)}\n`
@@ -330,6 +332,8 @@ export function createProgress(text: string, options: ProgressOptions): Progress
   function getRenderSnapshot(): RenderSnapshot {
     if (renderSnapshot !== undefined) return renderSnapshot
 
+    // Measurements and sanitized fields are cached until a text-like property
+    // changes; progress updates can then redraw without repeating width scans.
     const prefix = sanitizeSegment(currentPrefix)
     const text = sanitizeSegment(currentText)
     const suffix = sanitizeSegment(currentSuffix)

@@ -16,7 +16,7 @@ Node.js CLI developers and security-conscious teams that need terminal feedback 
 6. **Build Shape:** Direct esbuild emits two minified ESM entrypoints with linked source maps; TypeScript emits declarations directly.
 7. **Stream Discipline:** Style helpers are side-effect-free and stream-free; render surfaces default to stderr, accept explicit writable targets, never patch global writes, and never manage stdin.
 8. **Host Ownership:** The library installs no process-lifecycle listener and never terminates its host process.
-9. **Supply Chain:** Releases use GitHub OIDC trusted publishing and include a validated runtime-only CycloneDX SBOM.
+9. **Supply Chain:** The `0.2.0` preview bootstrap uses a GitHub-attested tarball and validated runtime-only CycloneDX SBOM; later releases use GitHub OIDC trusted publishing.
 
 ## Pre-1.0 boundary
 

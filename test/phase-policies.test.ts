@@ -394,14 +394,59 @@ describe('runtime source policy', () => {
 
 describe('workflow policy', () => {
   const workflows = Object.fromEntries(
-    ['ci.yml', 'codeql.yml', 'release-readiness.yml'].map((name) => [
-      name,
-      readFileSync(`.github/workflows/${name}`, 'utf8'),
-    ]),
+    [
+      'ci.yml',
+      'codeql.yml',
+      'release-build.yml',
+      'release-publish.yml',
+      'release-readiness.yml',
+    ].map((name) => [name, readFileSync(`.github/workflows/${name}`, 'utf8')]),
   )
 
-  it('accepts the frozen Phase 5 workflow set', () => {
+  it('accepts the reviewed Phase 5 workflow set', () => {
     expect(validateWorkflowPolicy(workflows)).toEqual([])
+  })
+
+  it.each([
+    [
+      'release tag drift',
+      (source: string) => source.replace("tags: ['v0.2.0']", "tags: ['v0.2.1']"),
+    ],
+    [
+      'release attestation removal',
+      (source: string) => source.replace('actions/attest@', 'actions/setup-node@'),
+    ],
+    [
+      'release digest verification removal',
+      (source: string) =>
+        source.replace(
+          'node scripts/verify-release-artifact.mjs artifacts/release',
+          'node scripts/verify-packed-runtime.mjs artifacts/release',
+        ),
+    ],
+    [
+      'release publish credential',
+      (source: string) =>
+        source.replace(
+          'name: Release Bootstrap',
+          `name: Release Bootstrap\n  env:\n    NPM_TOKEN: \${{ secrets.NPM_TOKEN }}`,
+        ),
+    ],
+    [
+      'unprotected release environment',
+      (source: string) => source.replace('permissions:\n', 'environment: public\npermissions:\n'),
+    ],
+    ['release unpinned action', (source: string) => source.replace(/@[a-f0-9]{40}/, '@main')],
+  ])('rejects %s structurally', (_name, mutate) => {
+    const altered = { ...workflows, 'release-build.yml': workflows['release-build.yml'] }
+    const target =
+      _name === 'release tag drift' ||
+      _name === 'release publish credential' ||
+      _name === 'unprotected release environment'
+        ? 'release-publish.yml'
+        : 'release-build.yml'
+    altered[target] = mutate(altered[target])
+    expect(validateWorkflowPolicy(altered)).not.toEqual([])
   })
 
   it.each([

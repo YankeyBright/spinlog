@@ -14,7 +14,13 @@ const ALLOWED_ACTIONS = new Set([
   'github/codeql-action/analyze',
 ])
 const CI_CONCURRENCY_GROUP = `ci-\${{ github.workflow }}-\${{ github.ref }}`
-const WORKFLOW_NAMES = ['ci.yml', 'codeql.yml', 'release-readiness.yml']
+const WORKFLOW_NAMES = [
+  'ci.yml',
+  'codeql.yml',
+  'release-build.yml',
+  'release-publish.yml',
+  'release-readiness.yml',
+]
 const BASELINE_STATUS_OUTPUT = `\${{ steps.baseline.outputs.present }}`
 const CANDIDATE_BASELINE_CONDITION = `\${{ needs.baseline-status.outputs.present == 'true' }}`
 const SOURCE_COMMIT_EXPRESSION = `\${{ github.event.pull_request.head.sha || github.sha }}`
@@ -24,6 +30,30 @@ else
   echo "Committed benchmark baseline is absent; candidate verification is deferred."
   echo "present=false" >> "$GITHUB_OUTPUT"
 fi`
+const RELEASE_READ_PERMISSIONS = Object.freeze({ contents: 'read' })
+const RELEASE_ATTEST_PERMISSIONS = Object.freeze({
+  contents: 'read',
+  'id-token': 'write',
+  attestations: 'write',
+})
+const RELEASE_NODE_MATRIX = Object.freeze(['22.13.0', '24.19.0', '26.0.0'])
+const RELEASE_CONSUMER_NODE_MATRIX = Object.freeze(['22.13.0', '24.x', '26.x'])
+const RELEASE_CONSUMER_OS_MATRIX = Object.freeze([
+  'ubuntu-latest',
+  'windows-latest',
+  'macos-latest',
+])
+const MATRIX_OS_EXPRESSION = '$' + '{{ matrix.os }}'
+const RELEASE_COMMANDS = new Set([
+  'npm ci --ignore-scripts',
+  'npm run check:foundation\nnpm run check:phase4\nnpm run test:stability',
+  'npm audit --audit-level=low',
+  'echo "NPM_VERSION=$(npm --version)" >> "$GITHUB_ENV"',
+  'npm run verify:preview\nnpm run check:release-ancestry\nnpm run check:phase3\nnpm run check:phase5',
+  "npm run build\nnpm run sbom\nnpm run pack:check\nnode -e \"require('fs').mkdirSync('artifacts/release',{recursive:true})\"\nnpm pack --json --ignore-scripts --pack-destination artifacts/release\nnode scripts/create-release-manifest.mjs artifacts/release\nnode scripts/verify-release-artifact.mjs artifacts/release\nnode scripts/verify-packed-runtime.mjs artifacts/release",
+  'node scripts/verify-packed-runtime.mjs artifacts/release',
+  'node scripts/verify-release-artifact.mjs artifacts/release',
+])
 const CI_COMMANDS = new Set([
   'npm ci --ignore-scripts',
   'npm run check:foundation\nnpm run check:phase4\nnpm run test:stability',
@@ -41,7 +71,7 @@ function equals(left, right) {
 }
 
 function steps(workflow) {
-  return Object.values(workflow.jobs ?? {}).flatMap((job) => job?.steps ?? [])
+  return Object.values(workflow?.jobs ?? {}).flatMap((job) => job?.steps ?? [])
 }
 
 function findKeys(value, names) {
@@ -103,7 +133,7 @@ function validateCi(workflow, failures) {
   ) {
     failures.push('ci.yml must use the frozen cancellation concurrency policy')
   }
-  const quality = workflow.jobs?.quality
+  const quality = workflow?.jobs?.quality
   const packedArtifact = workflow.jobs?.['packed-artifact']
   const consumer = workflow.jobs?.['packed-consumer']
   const baselineStatus = workflow.jobs?.['baseline-status']
@@ -208,6 +238,175 @@ function validateCodeql(workflow, failures) {
   }
 }
 
+function hasAction(workflow, action) {
+  const workflowSteps = workflow?.steps ?? steps(workflow)
+  return workflowSteps.some(
+    (step) => typeof step.uses === 'string' && step.uses.split('@')[0] === action,
+  )
+}
+
+function hasCommand(job, fragment) {
+  return (job?.steps ?? []).some(
+    (step) => typeof step.run === 'string' && step.run.trim().includes(fragment),
+  )
+}
+
+function validateReleaseBuild(workflow, failures) {
+  const call = workflow?.on?.workflow_call
+  if (!call || typeof call !== 'object' || Array.isArray(call)) {
+    failures.push('release-build.yml must be a reusable workflow')
+  }
+  if (!equals(workflow?.permissions, RELEASE_READ_PERMISSIONS)) {
+    failures.push('release-build.yml must grant only read-only contents by default')
+  }
+  const jobNames = sortCanonicalText(Object.keys(workflow?.jobs ?? {}))
+  if (!equals(jobNames, ['attest', 'consumer', 'package', 'quality'])) {
+    failures.push('release-build.yml must contain quality, package, consumer, and attest jobs only')
+  }
+
+  const quality = workflow?.jobs?.quality
+  if (
+    quality?.['runs-on'] !== 'ubuntu-latest' ||
+    quality?.['timeout-minutes'] !== 35 ||
+    !equals(quality?.strategy?.matrix?.['node-version'], RELEASE_NODE_MATRIX) ||
+    quality?.needs !== undefined
+  ) {
+    failures.push('release-build.yml quality must cover Node 22, 24, and 26 before packaging')
+  }
+
+  const packageJob = workflow?.jobs?.package
+  if (
+    packageJob?.needs !== 'quality' ||
+    packageJob?.['runs-on'] !== 'ubuntu-latest' ||
+    packageJob?.['timeout-minutes'] !== 25
+  ) {
+    failures.push('release-build.yml package must run on Node 24 after the quality matrix')
+  }
+  if (
+    !(packageJob?.steps ?? steps(packageJob)).some(
+      (step) =>
+        step.uses?.startsWith('actions/setup-node@') && step.with?.['node-version'] === '24.19.0',
+    )
+  ) {
+    failures.push('release-build.yml package must use Node 24.19.0')
+  }
+
+  const consumer = workflow?.jobs?.consumer
+  if (
+    consumer?.needs !== 'package' ||
+    consumer?.['runs-on'] !== MATRIX_OS_EXPRESSION ||
+    consumer?.['timeout-minutes'] !== 15 ||
+    !equals(consumer?.strategy?.matrix?.os, RELEASE_CONSUMER_OS_MATRIX) ||
+    !equals(consumer?.strategy?.matrix?.['node-version'], RELEASE_CONSUMER_NODE_MATRIX) ||
+    !hasAction(consumer, 'actions/download-artifact') ||
+    !hasCommand(consumer, 'node scripts/verify-packed-runtime.mjs artifacts/release')
+  ) {
+    failures.push(
+      'release-build.yml consumer must verify the packed runtime on Node 22, 24, and 26',
+    )
+  }
+
+  const attest = workflow?.jobs?.attest
+  if (
+    !equals(attest?.needs, ['package', 'consumer']) ||
+    attest?.['runs-on'] !== 'ubuntu-latest' ||
+    attest?.['timeout-minutes'] !== 10 ||
+    !equals(attest?.permissions, RELEASE_ATTEST_PERMISSIONS)
+  ) {
+    failures.push(
+      'release-build.yml attestation must wait for consumers with minimal write permissions',
+    )
+  }
+  if (
+    !hasAction(attest, 'actions/download-artifact') ||
+    !hasAction(attest, 'actions/attest') ||
+    !hasAction(attest, 'actions/upload-artifact')
+  ) {
+    failures.push(
+      'release-build.yml must download, attest, and upload the verified release artifact',
+    )
+  }
+  if (!hasAction(packageJob, 'actions/upload-artifact')) {
+    failures.push(
+      'release-build.yml package must upload the candidate artifact for consumer verification',
+    )
+  }
+  for (const command of [
+    'npm pack --json --ignore-scripts --pack-destination artifacts/release',
+    'node scripts/create-release-manifest.mjs artifacts/release',
+    'node scripts/verify-release-artifact.mjs artifacts/release',
+    'node scripts/verify-packed-runtime.mjs artifacts/release',
+  ]) {
+    if (!hasCommand(packageJob, command)) {
+      failures.push(`release-build.yml package must run ${command}`)
+    }
+  }
+  if (!hasCommand(attest, 'node scripts/verify-release-artifact.mjs artifacts/release')) {
+    failures.push('release-build.yml attestation must reverify the manifest and integrity')
+  }
+  if (
+    !(attest?.steps ?? steps(attest)).some(
+      (step) =>
+        step.uses?.startsWith('actions/attest@') &&
+        step.with?.['subject-path'] === 'artifacts/release/spinlog-0.2.0.tgz',
+    )
+  ) {
+    failures.push('release-build.yml attestation must cover the exact 0.2.0 tarball')
+  }
+
+  validateCommands(workflow, 'release-build.yml', RELEASE_COMMANDS, failures)
+  const serialized = JSON.stringify(workflow)
+  if (
+    /\b(?:npm\s+publish|gh\s+release|NPM_TOKEN|NODE_AUTH_TOKEN|registry-url)\b/iu.test(
+      serialized,
+    ) ||
+    findKeys(workflow, new Set(['environment', 'secrets'])).length > 0
+  ) {
+    failures.push(
+      'release-build.yml must not publish, use tokens, select latest, or use a release environment',
+    )
+  }
+}
+
+function validateReleasePublish(workflow, failures) {
+  if (!equals(workflow?.on, { push: { tags: ['v0.2.0'] } })) {
+    failures.push('release-publish.yml must trigger only on the immutable v0.2.0 tag')
+  }
+  if (!equals(workflow?.permissions, RELEASE_READ_PERMISSIONS)) {
+    failures.push('release-publish.yml must grant only read-only contents by default')
+  }
+  const jobNames = sortCanonicalText(Object.keys(workflow?.jobs ?? {}))
+  if (!equals(jobNames, ['release-build'])) {
+    failures.push('release-publish.yml must contain only the reusable release-build caller')
+  }
+  const caller = workflow?.jobs?.['release-build']
+  if (
+    caller?.uses !== './.github/workflows/release-build.yml' ||
+    !equals(caller?.permissions, RELEASE_ATTEST_PERMISSIONS) ||
+    'environment' in (caller ?? {}) ||
+    'secrets' in (caller ?? {}) ||
+    'steps' in (caller ?? {})
+  ) {
+    failures.push('release-publish.yml must call the reviewed builder without publish credentials')
+  }
+  const serialized = JSON.stringify(workflow)
+  if (
+    /\b(?:npm\s+publish|gh\s+release|NPM_TOKEN|NODE_AUTH_TOKEN|latest|registry-url)\b/iu.test(
+      serialized,
+    ) ||
+    findKeys(workflow, new Set(['environment', 'secrets'])).length > 0
+  ) {
+    failures.push('release-publish.yml bootstrap must not publish, use tokens, or select latest')
+  }
+}
+
+export function validateReleaseAutomationWorkflows(workflows) {
+  const failures = []
+  validateReleaseBuild(workflows?.['release-build.yml'], failures)
+  validateReleasePublish(workflows?.['release-publish.yml'], failures)
+  return [...new Set(failures)]
+}
+
 export function parseWorkflow(source, name) {
   const document = parseDocument(source)
   if (document.errors.length > 0) {
@@ -226,7 +425,9 @@ export function parseWorkflow(source, name) {
 export function validateWorkflowPolicy(sources) {
   const failures = []
   if (!equals(sortCanonicalText(Object.keys(sources)), WORKFLOW_NAMES)) {
-    failures.push('workflows must be exactly ci.yml, codeql.yml, and release-readiness.yml')
+    failures.push(
+      'workflows must be exactly ci.yml, codeql.yml, release-build.yml, release-publish.yml, and release-readiness.yml',
+    )
     return failures
   }
   const parsed = Object.fromEntries(
@@ -239,6 +440,7 @@ export function validateWorkflowPolicy(sources) {
   validateCi(parsed['ci.yml'], failures)
   validateCodeql(parsed['codeql.yml'], failures)
   failures.push(...validateReleaseWorkflows(parsed))
+  failures.push(...validateReleaseAutomationWorkflows(parsed))
   for (const [name, workflow] of Object.entries(parsed)) validateActions(workflow, name, failures)
   return [...new Set(failures)]
 }

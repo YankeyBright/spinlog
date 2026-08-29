@@ -1,9 +1,13 @@
 import { readFileSync } from 'node:fs'
 
-import { validatePreviewContext } from './release-policy.mjs'
+import { validatePreviewContext, validateReleaseBootstrapContract } from './release-policy.mjs'
 
 const packageJson = JSON.parse(readFileSync('package.json', 'utf8'))
-const failures = validatePreviewContext(process.env, packageJson)
+const contract = JSON.parse(readFileSync('specs/phase5-release.json', 'utf8'))
+const failures = [
+  ...validateReleaseBootstrapContract(contract, packageJson),
+  ...validatePreviewContext(process.env, packageJson),
+]
 if (
   process.env.npm_config_registry &&
   process.env.npm_config_registry !== 'https://registry.npmjs.org/'
@@ -12,8 +16,6 @@ if (
 }
 if (Number.parseInt(process.versions.node, 10) !== 24)
   failures.push('preview builder must run on Node 24')
-if (process.env.npm_config_provenance === 'false')
-  failures.push('npm provenance cannot be disabled')
 
 if (failures.length > 0) {
   for (const failure of new Set(failures)) console.error(`preview: ${failure}`)

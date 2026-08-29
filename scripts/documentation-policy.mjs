@@ -42,7 +42,7 @@ const REQUIRED_README_CLAIMS = Object.freeze([
   "intentionally differs from Node's CLI color policy",
   'Exactly eleven files in the npm tarball',
   'zero runtime components',
-  'Publication is temporarily blocked',
+  'The reviewed release bootstrap fixes only the',
 ])
 const REQUIRED_MIGRATION_CLAIMS = Object.freeze([
   'not API-compatible with Chalk, Ora, or Clack',

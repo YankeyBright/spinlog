@@ -9,7 +9,7 @@ This specification is the single source of truth for phase numbering across the 
 | 2 | Core Implementation and Testing | Implement the frozen pre-1.0 runtime and its behavior-driven tests together. | `npm run check:phase2` |
 | 3 | Benchmarking and SBOM Hardening | Prove size and performance and harden runtime inventory evidence. | `npm run check:phase3` and `npm run verify:candidate` |
 | 4 | Documentation and Migration | Publish verified usage, audit, and migration guidance after runtime behavior exists. | Defined in the Phase 4 specification |
-| 5 | Trusted Release | Publish through OIDC and verify provenance, signatures, and release assets. | Defined in the Phase 5 specification |
+| 5 | Trusted Release | Bootstrap one attested `0.2.0` `next` preview, then publish later versions through OIDC and verify provenance, signatures, and release assets. | Defined in the Phase 5 specification |
 
 ## Boundary Rules
 

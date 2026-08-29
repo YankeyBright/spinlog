@@ -15,6 +15,36 @@ const BLOCKED_PUBLICATION = Object.freeze({
   distTag: 'next',
   registry: 'https://registry.npmjs.org/',
 })
+export const RELEASE_BOOTSTRAP = Object.freeze({
+  schemaVersion: 1,
+  package: 'spinlog',
+  version: '0.2.0',
+  repository: 'YankeyBright/spinlog',
+  status: 'bootstrap-authorized',
+  publication: {
+    tag: 'v0.2.0',
+    distTag: 'next',
+    registry: 'https://registry.npmjs.org/',
+    access: 'public',
+    artifact: 'attested-downloaded-tarball-only',
+    authentication: {
+      bootstrap: 'human-2fa',
+      future: 'npm-trusted-publishing-oidc-only',
+    },
+    provenance: {
+      bootstrap: 'github-artifact-attestation',
+      future: 'npm-oidc-provenance',
+    },
+    stablePromotion: 'prohibited',
+    githubRelease: 'prohibited',
+  },
+  workflow: {
+    builder: 'release-build.yml',
+    publisher: 'release-publish.yml',
+    environment: 'npm-publish',
+    authorization: 'protected-environment-approval-required',
+  },
+})
 const REQUIRED_REVALIDATION = Object.freeze([
   'Review the pre-1.0 0.2 Phase 0 contract and Phase 2 runtime behavior.',
   'Complete three consecutive full green test runs, including target-local terminal coverage.',
@@ -55,6 +85,54 @@ export function validatePreviewContract(contract, packageJson) {
     failures.push('package identity and future HTTPS preview configuration must remain frozen')
   }
   return failures
+}
+
+/** Validate the reviewed one-time public preview bootstrap contract. */
+export function validateReleaseBootstrapContract(contract, packageJson) {
+  const failures = []
+  if (!isDeepStrictEqual(contract, RELEASE_BOOTSTRAP)) {
+    failures.push('release bootstrap must exactly match the approved 0.2.0 next contract')
+  }
+  if (
+    contract?.publication?.tag !== 'v0.2.0' ||
+    contract?.publication?.distTag !== 'next' ||
+    contract?.publication?.registry !== 'https://registry.npmjs.org/' ||
+    contract?.publication?.access !== 'public'
+  ) {
+    failures.push('release bootstrap must identify only the v0.2.0 next HTTPS publication target')
+  }
+  if (
+    contract?.publication?.artifact !== 'attested-downloaded-tarball-only' ||
+    contract?.publication?.authentication?.bootstrap !== 'human-2fa' ||
+    contract?.publication?.provenance?.bootstrap !== 'github-artifact-attestation'
+  ) {
+    failures.push('release bootstrap must require an attested downloaded tarball and human 2FA')
+  }
+  if (
+    contract?.publication?.stablePromotion !== 'prohibited' ||
+    contract?.publication?.githubRelease !== 'prohibited' ||
+    contract?.workflow?.environment !== 'npm-publish' ||
+    contract?.workflow?.authorization !== 'protected-environment-approval-required'
+  ) {
+    failures.push(
+      'release bootstrap must prohibit latest promotion and require protected-environment approval',
+    )
+  }
+  if (
+    packageJson?.name !== RELEASE_BOOTSTRAP.package ||
+    packageJson?.version !== RELEASE_BOOTSTRAP.version ||
+    !isDeepStrictEqual(packageJson?.publishConfig, {
+      access: 'public',
+      provenance: true,
+      registry: RELEASE_BOOTSTRAP.publication.registry,
+      tag: RELEASE_BOOTSTRAP.publication.distTag,
+    })
+  ) {
+    failures.push(
+      'package identity and HTTPS next publish configuration must match the release bootstrap',
+    )
+  }
+  return [...new Set(failures)]
 }
 
 /** Validate that the temporary workflow can revalidate but cannot publish. */
@@ -107,7 +185,28 @@ export function validateReleaseWorkflows(workflows) {
   return [...new Set(failures)]
 }
 
-/** Preview-context validation remains a hard failure until a fresh release policy is approved. */
-export function validatePreviewContext() {
-  return ['preview publication is blocked pending the required revalidation sequence']
+/** Validate the immutable GitHub tag context used for the bootstrap artifact. */
+export function validatePreviewContext(environment = process.env, packageJson = {}) {
+  const failures = []
+  if (environment.GITHUB_ACTIONS !== 'true')
+    failures.push('preview context requires GitHub Actions')
+  if (environment.GITHUB_REPOSITORY !== RELEASE_BOOTSTRAP.repository) {
+    failures.push(`preview context requires ${RELEASE_BOOTSTRAP.repository}`)
+  }
+  if (environment.GITHUB_REF_NAME !== RELEASE_BOOTSTRAP.publication.tag) {
+    failures.push(`preview context requires the ${RELEASE_BOOTSTRAP.publication.tag} tag`)
+  }
+  if (!/^[0-9a-f]{40}$/u.test(environment.GITHUB_SHA ?? '')) {
+    failures.push('preview context requires a full GitHub source commit')
+  }
+  if (environment.NPM_TOKEN || environment.NODE_AUTH_TOKEN) {
+    failures.push('preview context must not expose npm publication credentials')
+  }
+  if (
+    packageJson.name !== RELEASE_BOOTSTRAP.package ||
+    packageJson.version !== RELEASE_BOOTSTRAP.version
+  ) {
+    failures.push('preview context package identity must match the release bootstrap')
+  }
+  return [...new Set(failures)]
 }
