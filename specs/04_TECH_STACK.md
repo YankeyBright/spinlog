@@ -38,7 +38,7 @@
 
 - All direct development dependencies are exact-pinned and locked.
 - GitHub Actions use immutable commit SHAs, minimal permissions, and no persisted checkout credentials.
-- Phase 5 publication is currently blocked. The read-only revalidation workflow has no OIDC, attestation, registry credentials, or publication capability; a future reviewed policy must restore trusted publishing only for an attested exact tarball and HTTPS registry.
+- Phase 5 authorizes one `spinlog@0.2.0` / `v0.2.0` / `next` bootstrap. Its tag workflow builds and attests an exact tarball but has no npm publication credentials; future releases require a separately reviewed Trusted Publishing OIDC workflow and HTTPS registry.
 - The npm CLI's native SBOM command plus a checked-in deterministic validator generates a reproducible runtime-only CycloneDX 1.5 document.
 - esbuild is a direct exact pin at `0.28.2`; tsup and package overrides are prohibited.
 - The Phase 1 policy rejects every esbuild resolution in the affected `>=0.27.3 <0.28.1` range.

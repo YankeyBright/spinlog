@@ -57,4 +57,4 @@ npm run check:phase3
 npm run verify:candidate
 ```
 
-`npm run check:foundation` is the ordered Phase 0-through-Phase 2 gate used before baseline collection. Phase 3 is complete only after the Node 22/24/26 foundation matrix passes, the five Node 24 baseline jobs produce a reviewable baseline, that baseline is committed independently, and the Node 24 candidate job validates against it. The custom-frame, group, and progress revision invalidates the former reviewed baseline; Phase 5 remains blocked until a new baseline and release policy are approved.
+`npm run check:foundation` is the ordered Phase 0-through-Phase 2 gate used before baseline collection. Phase 3 is complete only after the Node 22/24/26 foundation matrix passes, the five Node 24 baseline jobs produce a reviewable baseline, that baseline is committed independently, and the Node 24 candidate job validates against it. The custom-frame, group, and progress revision invalidated the former reviewed baseline; the refreshed baseline is now consumed by the reviewed `0.2.0` / `next` bootstrap policy.

@@ -1,39 +1,33 @@
 # Phase 5: Trusted Release
 
-## Current Status
+## Release Bootstrap
 
-Phase 5 is intentionally blocked. Terminal UX hardening changed runtime, build, benchmark, dependency, package, and documentation inputs after the prior preview receipt. No tag, package version, registry credential, OIDC token, attestation, or GitHub release workflow may publish `spinlog` until the required revalidation is reviewed.
+Phase 5 authorizes one controlled public preview: `spinlog@0.2.0`, created from the immutable `v0.2.0` tag and published to `https://registry.npmjs.org/` with the `next` dist-tag. It does not authorize `latest`, a GitHub Release, or any other version.
 
-The file `specs/phase5-preview.json` is the machine-readable release freeze. It identifies the blocked `spinlog@0.2.0` / `v0.2.0` / `next` target and the exact revalidation sequence. The former benchmark receipt is historical evidence only; it is not release authorization.
+`specs/phase5-preview.json` remains the immutable historical freeze. The active machine-readable authorization is `specs/phase5-release.json`; it fixes the package, tag, registry, artifact, authentication, and workflow identities and reports `bootstrap-authorized` until the external publication receipt is reviewed.
 
-## Temporary Workflow
+The first publication is a one-time human 2FA bootstrap because [npm Trusted Publishing](https://docs.npmjs.com/cli/v11/commands/npm-trust) requires the package to exist before its publisher relationship can be configured. CI builds and attests the exact tarball, and the package owner publishes only that downloaded artifact. No npm token is stored in GitHub or used by the workflow. After the package exists, future releases must use npm Trusted Publishing with OIDC and npm provenance.
 
-`.github/workflows/release-readiness.yml` may run manually on Node `24.19.0` to execute Phase 0 through Phase 4 verification and the required three-run stability check. It has only `contents: read` permission and may not:
+## Release Workflows
 
-- run on tags;
-- request OIDC or attestation permissions;
-- authenticate to npm or reference publishing credentials;
-- invoke `npm publish`, `gh release`, staging, or promotion; or
-- write repository, release, or registry state.
+`.github/workflows/release-publish.yml` runs only for the signed `v0.2.0` tag and calls the same-repository `release-build.yml`. The reusable builder:
 
-The release-freeze validator rejects any relaxation of this workflow.
+- validates the reviewed `main` ancestry, exact package/tag/version identity, and all Phase 0 through Phase 4 gates;
+- runs the supported Node 22, 24, and 26 quality and packed-consumer matrix, including the real-spinner TTY and non-TTY smoke checks;
+- creates one exact npm tarball, records its source commit and SHA-256/SHA-512 integrity, and verifies the manifest;
+- uploads the candidate, waits for every consumer, generates a [GitHub artifact attestation](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations), and uploads the verified release artifact.
 
-## Reauthorization Requirements
+Bootstrap workflows may not run `npm publish`, access `NPM_TOKEN` or `NODE_AUTH_TOKEN`, create a GitHub release, select `latest`, or use a mutable action reference. The read-only `release-readiness.yml` remains available for manual revalidation.
 
-1. Review the pre-1.0 0.2 Phase 0 contract and Phase 2 runtime behavior.
-2. Complete three consecutive full green test runs, including target-local terminal coverage.
-3. Collect and independently review a new five-run Linux Node 24 benchmark baseline.
-4. Regenerate Phase 3 reproducibility, SBOM, packed-consumer, candidate-manifest, and audit evidence.
-5. Complete the Phase 4 documentation review and remote Node 22/24/26 matrices.
-6. Approve a new release-policy contract before restoring a same-repository reusable builder and tag workflow.
+## External Controls
 
-The future policy must publish only an attested, downloaded tarball to `https://registry.npmjs.org/`, must use npm Trusted Publishing with a protected environment, and must never write `latest` without a separate reviewed contract revision.
+- Protect `main` with pull requests, CODEOWNERS review, required CI and CodeQL checks, stale-approval dismissal, signed commits, and blocked force-push/deletion. Protect `v*` tags from unauthorized creation, update, or deletion.
+- Require an independent maintainer review for release-policy and workflow changes. Keep the `npm-publish` GitHub environment protected by required reviewers; it is reserved for a future OIDC publisher job.
+- Enable npm `auth-and-writes` two-factor authentication for the bootstrap owner. After the first publish, configure npm Trusted Publishing for `release-publish.yml` and revoke publish-capable tokens.
+- Keep secret scanning, push protection, dependency alerts, Dependabot security updates, and CodeQL enabled.
 
-## External Controls For Reauthorization
+## Publication and Verification
 
-- Keep `main` public and protected: pull requests, required checks, signed commits, no force push, and no branch deletion.
-- Require CODEOWNERS review and one maintainer approval for the current repository. Upgrade to two independent maintainers when a second maintainer is onboarded.
-- Configure npm Trusted Publishing only after the new workflow filename and protected environment are approved. Require npm two-factor authentication for auth-and-writes and revoke long-lived publish tokens.
-- Keep GitHub secret scanning, push protection, dependency alerts, Dependabot security updates, and CodeQL enabled.
+After a successful tag workflow, verify the artifact manifest, checksum, and GitHub attestation. Publish the downloaded tarball explicitly with the `next` tag and `--provenance=false` only for this bootstrap; the GitHub attestation is the bootstrap build-origin evidence. Then verify npm registry integrity, signatures, the `next` dist-tag, clean installs, and real spinner behavior on Node 22, 24, and 26. Record the run URL, source commit, tarball digest, registry integrity, and verification results in a reviewed release receipt.
 
-This hold is a security control, not a production-readiness claim. A future release remains subject to its own reviewed acceptance evidence.
+No stable-release, `latest`, npm-OIDC-provenance, SLSA, or zero-vulnerability claim may be made until its corresponding evidence exists. Promotion requires a separate reviewed Phase 5 contract revision.

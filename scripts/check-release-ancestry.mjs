@@ -16,6 +16,9 @@ try {
   if (git(['describe', '--exact-match', '--tags', 'HEAD']) !== expectedTag) {
     throw new Error(`release ancestry requires the ${expectedTag} tag on HEAD`)
   }
+  if (git(['cat-file', '-t', expectedTag]) !== 'tag') {
+    throw new Error(`release ancestry requires an annotated ${expectedTag} tag`)
+  }
   if (git(['rev-parse', 'HEAD']) !== git(['rev-parse', 'origin/main'])) {
     throw new Error('release tag must point to the reviewed origin/main commit')
   }

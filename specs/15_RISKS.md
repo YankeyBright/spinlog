@@ -70,4 +70,4 @@
 
 **Risk:** Build infrastructure is modified even though publishing uses OIDC.
 
-**Mitigation:** The Phase 5 preview uses immutable action commits, minimum permissions, disabled persisted checkout credentials, a protected release environment, no long-lived publish token, GitHub attestations, npm integrity comparison, and post-publication provenance verification. Stable promotion remains a separate policy change.
+**Mitigation:** The Phase 5 bootstrap uses immutable action commits, minimum permissions, disabled persisted checkout credentials, GitHub artifact attestation, exact npm integrity comparison, and human 2FA for the one-time publish. Future releases use a protected environment and npm Trusted Publishing OIDC; stable promotion remains a separate policy change.

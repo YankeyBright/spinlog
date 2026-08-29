@@ -20,4 +20,4 @@ v1 does not attempt to replace task runners, prompt libraries, progress renderer
 
 ## Security Position
 
-The project uses a minimal published package surface, package allowlisting, lifecycle-script prohibition, a validated runtime SBOM, and npm OIDC provenance. These controls provide evidence and reduce exposure; they are not a substitute for secure development practices, account security, code review, or formal compliance certification.
+The project uses a minimal package surface, package allowlisting, lifecycle-script prohibition, a validated runtime SBOM, and attested release artifacts; later releases use npm OIDC provenance. These controls provide evidence and reduce exposure; they are not a substitute for secure development practices, account security, code review, or formal compliance certification.

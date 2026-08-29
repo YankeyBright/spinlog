@@ -30,7 +30,7 @@ The 10,496-byte ceiling is a versioned product constraint, not a checker bypass.
 
 - No truecolor, themes, ETA/rate, prompt, structured task-log, global-write-interception, or stdin-management API.
 - No CommonJS or browser-first runtime.
-- No publication until the blocked 0.2.0 `next` release policy is replaced by reviewed evidence.
+- No publication outside the reviewed `spinlog@0.2.0` / `v0.2.0` / `next` bootstrap contract.
 
 ## Definition of done
 

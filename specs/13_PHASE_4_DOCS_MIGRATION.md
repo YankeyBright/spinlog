@@ -9,7 +9,7 @@ Publish tested, source-controlled guidance for the frozen pre-1.0 0.2 behavior w
 - `README.md` documents the callable factory, explicit writable targets, target-local leases, rendering controls, group height policy, progress semantics, promise settlement text, process ownership, package evidence, and verification commands.
 - Canonical runnable files under `examples/` are the source of every README code block. `npm run docs:update` synchronizes them; `npm run docs:check` fails on snippet drift, API claims, measured gzip size, SBOM claims, unsupported Node ranges, or broken relative links.
 - The measured root artifact size is derived from `dist/index.js` with gzip level 9. Documentation may not substitute the 10,496-byte ceiling for the measured value.
-- Public wording must state that publication is currently blocked, must never imply a completed stable release, SLSA level, or absence of all vulnerabilities, and must reserve any future npm publication for a reviewed policy.
+- Public wording must identify the one reviewed `0.2.0` / `next` bootstrap, must never imply a completed stable release, SLSA level, or absence of all vulnerabilities, and must reserve all later npm publication for a reviewed policy.
 
 ## Migration
 
@@ -35,4 +35,4 @@ npm run check:phase4
 npm run check:phases
 ```
 
-Phase 4 is locally implemented when its gate passes. Project-wide completion still requires a newly reviewed five-run Node 24 benchmark baseline, the Node 22/24/26 remote matrices, and a green final aggregate under a future release policy. Phase 5 is currently a publication hold; stable-release claims require a separate reviewed policy change.
+Phase 4 is locally implemented when its gate passes. Project-wide completion still requires the Node 22/24/26 remote matrices and a green final aggregate under the reviewed bootstrap policy. Stable-release claims require a separate reviewed policy change.
