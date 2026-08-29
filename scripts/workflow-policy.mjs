@@ -264,7 +264,7 @@ function validateReleaseBuild(workflow, failures) {
     failures.push('release-build.yml must contain quality, package, consumer, and attest jobs only')
   }
 
-  const quality = workflow.jobs?.quality
+  const quality = workflow?.jobs?.quality
   if (
     quality?.['runs-on'] !== 'ubuntu-latest' ||
     quality?.['timeout-minutes'] !== 35 ||
@@ -297,7 +297,9 @@ function validateReleaseBuild(workflow, failures) {
     consumer?.['runs-on'] !== MATRIX_OS_EXPRESSION ||
     consumer?.['timeout-minutes'] !== 15 ||
     !equals(consumer?.strategy?.matrix?.os, RELEASE_CONSUMER_OS_MATRIX) ||
-    !equals(consumer?.strategy?.matrix?.['node-version'], RELEASE_CONSUMER_NODE_MATRIX)
+    !equals(consumer?.strategy?.matrix?.['node-version'], RELEASE_CONSUMER_NODE_MATRIX) ||
+    !hasAction(consumer, 'actions/download-artifact') ||
+    !hasCommand(consumer, 'node scripts/verify-packed-runtime.mjs artifacts/release')
   ) {
     failures.push(
       'release-build.yml consumer must verify the packed runtime on Node 22, 24, and 26',

@@ -36,6 +36,38 @@ describe('release bootstrap policy', () => {
     expect(validateReleaseAutomationWorkflows(automationWorkflows)).toEqual([])
   })
 
+  it('reports a missing release builder without throwing', () => {
+    expect(
+      validateReleaseAutomationWorkflows({
+        'release-publish.yml': automationWorkflows['release-publish.yml'],
+      }),
+    ).toContain('release-build.yml must be a reusable workflow')
+  })
+
+  it('requires the consumer job to download and verify the release artifact', () => {
+    const withoutDownload = structuredClone(automationWorkflows['release-build.yml'])
+    withoutDownload.jobs.consumer.steps = withoutDownload.jobs.consumer.steps.filter(
+      (step) => step.uses !== 'actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c',
+    )
+    const withoutVerification = structuredClone(automationWorkflows['release-build.yml'])
+    withoutVerification.jobs.consumer.steps = withoutVerification.jobs.consumer.steps.map((step) =>
+      step.name === 'Verify Packed Runtime'
+        ? { ...step, run: 'node scripts/other-check.mjs' }
+        : step,
+    )
+
+    for (const altered of [withoutDownload, withoutVerification]) {
+      expect(
+        validateReleaseAutomationWorkflows({
+          ...automationWorkflows,
+          'release-build.yml': altered,
+        }),
+      ).toContain(
+        'release-build.yml consumer must verify the packed runtime on Node 22, 24, and 26',
+      )
+    }
+  })
+
   it('rejects a changed publication target or incomplete revalidation sequence', () => {
     const alteredContract = {
       ...contract,

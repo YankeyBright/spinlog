@@ -111,8 +111,9 @@ export function createSpinner(text = '', options: SpinnerOptions = {}): Spinner 
     },
     start() {
       if (state === SPINNING) return this
-      // Capabilities are captured per cycle. A later resize or terminal change
-      // is handled by prepareInteractiveFrame before the next physical write.
+      // Capabilities are captured per cycle. Only terminal-width changes are
+      // rechecked by prepareInteractiveFrame before the next physical write;
+      // environment-derived capabilities stay fixed for this cycle.
       state = SPINNING
       frameIndex = 0
       const active = resolveCapabilities()

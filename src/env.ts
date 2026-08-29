@@ -63,8 +63,9 @@ function resolveAnimation(
   cursor: boolean,
   terminal: TerminalMode,
 ): boolean {
-  // Animation is stricter than color: it needs a real cursor-capable TTY and
-  // must be disabled for static/CI/dumb targets unless explicitly requested.
+  // Automatic animation requires a cursor-capable TTY and is disabled for
+  // static, non-TTY, dumb, CI, and test targets. Explicit interactive mode
+  // bypasses the automatic CI/test checks and does not require cursor support.
   if (terminal === 'static' || !isTTY || isDumbTerminal(env)) return false
   return terminal === 'interactive' || (cursor && !disablesAutomaticFeatures(env, isTTY))
 }

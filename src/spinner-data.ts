@@ -79,8 +79,8 @@ export function selectBuiltinFrame(spinner: SpinnerName, unicode: boolean, index
 
 /** Select a frame without exposing mutable animation state. */
 export function selectFrame(set: FrameSet, unicode: boolean, index: number): string {
-  // The dots catalogue has a deterministic ASCII fallback; custom frame sets
-  // are already sanitized and are therefore used exactly as supplied.
+  // unicodeFallback selects the deterministic ASCII line frames for built-in
+  // dots; custom definitions from createFrameSet keep their sanitized frames.
   const frames = set.unicodeFallback && !unicode ? LINE_FRAMES : set.frames
   const frame = frames[index % frames.length]
   if (frame === undefined) throw new TypeError('spinner frame set must not be empty')
