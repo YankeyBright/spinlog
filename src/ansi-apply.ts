@@ -11,6 +11,8 @@ export function applyAnsiDefinition(definition: StyleDefinition, text: string): 
   const closing = sgrSequence(definition.close)
   if (definition.mode === RESET) return `${opening}${text}${closing}`
 
+  // Re-open the outer style after an inner close so nested helpers cannot
+  // accidentally leave the caller's style disabled.
   const restore = definition.mode === SHARED ? `${closing}${opening}` : opening
   return `${opening}${text.replaceAll(closing, restore)}${closing}`
 }
@@ -24,6 +26,8 @@ export function normalizeWithDefinition(formatted: string, definition: StyleDefi
   const closingStart = formatted.lastIndexOf(closing)
   if (closingStart < opening.length || formatted.slice(closingStart) !== closing) return formatted
 
+  // Reconstruct only the outer style. Unknown or already-normalized segments
+  // are preserved verbatim so this helper remains safe for arbitrary SGR text.
   const [first = '', ...segments] = formatted.slice(opening.length, closingStart).split(closing)
   let restored = first
   for (const segment of segments) {

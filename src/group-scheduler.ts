@@ -15,6 +15,8 @@ export function createGroupScheduler(
 
   function arm(): void {
     clear()
+    // One timer advances every active row; elapsed time keeps slower custom
+    // frame sets in phase instead of forcing all rows to share one interval.
     interval = Math.min(...activeItems().map((item) => item.frameSet.interval))
     timer = setInterval(tick, interval)
     timer.unref()

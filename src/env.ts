@@ -50,6 +50,8 @@ function hasSgrSupport(env: NodeJS.ProcessEnv, isTTY: boolean): boolean {
 }
 
 function resolveColor(env: NodeJS.ProcessEnv, sgr: boolean, automaticDisabled: boolean): boolean {
+  // Explicit opt-outs win over FORCE_COLOR; otherwise automatic color requires
+  // both SGR support and an environment where automatic features are allowed.
   if (spinlogDisablesColor(env)) return false
   if (env.FORCE_COLOR !== undefined) return spinlogForcesColor(env)
   return sgr && !automaticDisabled
@@ -61,6 +63,8 @@ function resolveAnimation(
   cursor: boolean,
   terminal: TerminalMode,
 ): boolean {
+  // Animation is stricter than color: it needs a real cursor-capable TTY and
+  // must be disabled for static/CI/dumb targets unless explicitly requested.
   if (terminal === 'static' || !isTTY || isDumbTerminal(env)) return false
   return terminal === 'interactive' || (cursor && !disablesAutomaticFeatures(env, isTTY))
 }
